@@ -1,22 +1,35 @@
-# dependencies
+# ── dependencies ────────────────────────────────────────────────────────────
 node_modules/
+packages/*/node_modules/
 .pnpm-store/
+.pnp.*
+jspm_packages/
 
-# build outputs
+# ── build outputs ───────────────────────────────────────────────────────────
 dist/
 build/
-*.tsbuildinfo
+out/
 packages/*/dist/
+packages/*/build/
 packages/web/dist/
+**/*.tsbuildinfo
+.tsbuildinfo
 
-# test / coverage
+# ── test / coverage artifacts ───────────────────────────────────────────────
 coverage/
-test-results/
-playwright-report/
+.nyc_output/
+**/test-results/
+**/playwright-report/
+playwright/.cache/
 .vitest-cache/
+.vitest-reports/
+junit.xml
 
-# local databases and saves
-saves/
+# ── local databases / save files ────────────────────────────────────────────
+# The saves/ directory itself is tracked (via .gitkeep) but its contents are
+# not — actual save slots are per-developer and never checked in.
+saves/*
+!saves/.gitkeep
 *.db
 *.db-shm
 *.db-wal
@@ -24,26 +37,87 @@ saves/
 *.sqlite-shm
 *.sqlite-wal
 
-# env
+# ── environment ─────────────────────────────────────────────────────────────
 .env
 .env.local
 .env.*.local
+.env.development
+.env.production
+.env.test
+# Do commit .env.example / .env.*.example if they exist.
+!.env.example
+!.env.*.example
 
-# editor / OS
-.DS_Store
-.vscode/
-.idea/
-*.swp
-*.swo
-Thumbs.db
+# ── secrets ────────────────────────────────────────────────────────────────
+# Defense-in-depth: these should never be anywhere near the repo, but catch
+# the common names just in case.
+*.pem
+*.key
+*.p12
+*.pfx
+secrets.json
+credentials.json
 
-# logs
+# ── logs ───────────────────────────────────────────────────────────────────
 *.log
 npm-debug.log*
 pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+logs/
 
-# docker
+# ── editor / IDE ───────────────────────────────────────────────────────────
+.vscode/
+!.vscode/settings.json.example
+.idea/
+*.swp
+*.swo
+*.swn
+*~
+.project
+.classpath
+.settings/
+*.sublime-workspace
+*.sublime-project
+
+# ── OS detritus ────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ── tooling caches ─────────────────────────────────────────────────────────
+.turbo/
+.next/
+.cache/
+.parcel-cache/
+.vite/
+.eslintcache
+.stylelintcache
+.prettiercache
+.rollup.cache/
+.swc/
+
+# ── docker ─────────────────────────────────────────────────────────────────
 .docker/
 
-# drizzle meta (generated migration journals retained; only meta cache ignored)
+# ── TanStack Router codegen ────────────────────────────────────────────────
+# routeTree.gen.ts IS committed per TDD v2 §9.4 / Story 00 §9.4 — fresh
+# clones must typecheck without first running the dev server. Do not add it
+# here.
+
+# ── Drizzle meta ───────────────────────────────────────────────────────────
 packages/server/drizzle/meta/_journal.json.bak
+
+# ── misc ───────────────────────────────────────────────────────────────────
+*.orig
+*.rej
+*.bak
+*.tmp
+tmp/
+tsconfig.tsbuildinfo

@@ -8,6 +8,12 @@ Canonical sources:
 - `docs/RPG_FC_Design_and_Style_Guide.docx` — Style Guide v1.0
 - `docs/stories/` — story specs; each story has ACs that must all pass before it ships
 
+Nested operating notes (load these when working inside a subtree):
+- `packages/shared/CLAUDE.md` — public barrel vs. the `hidden` side-door, brand discipline
+- `packages/server/CLAUDE.md` — layer directions, dual-dialect rules, Hono RPC inference tips
+- `packages/web/CLAUDE.md` — Style Guide hard rules, component vocabulary, no-numbers JSX conventions
+- `tests/CLAUDE.md` — test tiers, doctrine suite, fixture conventions, container smoke
+
 ---
 
 ## 1. What RPG FC is
