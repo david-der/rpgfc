@@ -33,3 +33,15 @@ export {
   getContractForPlayer,
 } from "./transfer-response.js";
 export type { TransfersPage } from "./transfer-response.js";
+export {
+  renderTacticsForClub,
+  upsertTacticsRendered,
+  setAssignmentRendered,
+} from "./tactics-response.js";
+export type { SetAssignmentRenderedResult } from "./tactics-response.js";
+export {
+  renderSquadForClub,
+  setSquadRoleRendered,
+  loadPromiseMoodForPlayer,
+} from "./squad-response.js";
+export type { PromiseMoodForPlayer } from "./squad-response.js";

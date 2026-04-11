@@ -87,3 +87,39 @@ export type {
   RenderedListing,
 } from "./contract.js";
 export { BID_STATES, PLAYING_TIME_ROLES } from "./contract.js";
+
+export type {
+  Formation,
+  PitchSlot,
+  PlayingStyle,
+  RenderedSlotAssignment,
+  RenderedTactics,
+  Tactics,
+  TeamInstruction,
+} from "./tactics.js";
+export {
+  FORMATIONS,
+  FORMATION_SLOTS,
+  PITCH_SLOTS,
+  PITCH_SLOT_LABELS,
+  PITCH_SLOT_POSITION_FAMILIES,
+  PLAYING_STYLES,
+  TEAM_INSTRUCTIONS,
+  TEAM_INSTRUCTION_LABELS,
+} from "./tactics.js";
+
+export type {
+  Harmony,
+  PromiseMood,
+  RenderedSquad,
+  RenderedSquadEntry,
+  SquadEntry,
+  SquadRole,
+} from "./squad.js";
+export {
+  HARMONY_LABELS,
+  HARMONY_TIERS,
+  PROMISE_MOODS,
+  SQUAD_ROLES,
+  SQUAD_ROLE_LABELS,
+} from "./squad.js";

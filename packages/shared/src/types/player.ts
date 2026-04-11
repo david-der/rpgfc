@@ -1,8 +1,10 @@
 import type { MentalTraits, NaturalGifts, PreferredFoot } from "./attributes.js";
 import type { BadgeRef } from "./badge.js";
 import type { CertaintyTier } from "./certainty.js";
+import type { PlayingTimeRole } from "./contract.js";
 import type { ExperienceTier } from "./experience.js";
 import type { ScoutReportRef } from "./scout.js";
+import type { PromiseMood, SquadRole } from "./squad.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  THE RENDERING BOUNDARY (TDD v2 §6)
@@ -93,6 +95,14 @@ export interface WirePlayer {
    *  endpoint always populates it. The explicit `| undefined` matches
    *  tsconfig's exactOptionalPropertyTypes. */
   scoutReports?: ScoutReportRef[] | undefined;
+  /** Story 05: the player's current squad role + contract role promise
+   *  + the qualitative mood that results from comparing the two.
+   *  Populated by the rendering layer when a SquadEntry exists for the
+   *  player. Never a number — the mood label is a short prose line. */
+  squadRole?: SquadRole | undefined;
+  rolePromise?: PlayingTimeRole | undefined;
+  promiseMood?: PromiseMood | undefined;
+  promiseMoodLabel?: string | undefined;
 }
 
 // RenderedPlayer is the server-internal branded flavor of WirePlayer. Only

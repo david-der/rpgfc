@@ -16,6 +16,8 @@ import {
   seedListingsIfEmpty,
   seedPreferencesIfEmpty,
 } from "./application/transfers/seed-listings.js";
+import { seedTacticsIfEmpty } from "./application/tactics/seed.js";
+import { seedSquadIfEmpty } from "./application/squad/seed.js";
 
 const env = parseEnv();
 
@@ -80,6 +82,17 @@ async function main() {
   const prefSeed = await seedPreferencesIfEmpty(dbClient);
   if (!prefSeed.skipped) {
     logger.info({ preferences: prefSeed.preferencesCreated }, "Seeded player preferences");
+  }
+
+  // Story 05: one Default tactics row per club, one squad_entries row
+  // per contracted player. Both idempotent.
+  const tacticsSeed = await seedTacticsIfEmpty(dbClient);
+  if (!tacticsSeed.skipped) {
+    logger.info({ tactics: tacticsSeed.rowsCreated }, "Seeded tactics");
+  }
+  const squadSeed = await seedSquadIfEmpty(dbClient);
+  if (!squadSeed.skipped) {
+    logger.info({ squad: squadSeed.entriesCreated }, "Seeded squad entries");
   }
 
   // WEB_DIST points at a built Vite bundle. In local dev Vite runs on :5173
