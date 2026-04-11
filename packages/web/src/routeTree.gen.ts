@@ -11,6 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TransfersIndexRouteImport } from './routes/transfers.index'
+import { Route as TacticsIndexRouteImport } from './routes/tactics.index'
+import { Route as SquadIndexRouteImport } from './routes/squad.index'
 import { Route as ScoutsIndexRouteImport } from './routes/scouts.index'
 import { Route as PlayersIndexRouteImport } from './routes/players.index'
 import { Route as TransfersPlayerIdRouteImport } from './routes/transfers.$playerId'
@@ -25,6 +27,16 @@ const IndexRoute = IndexRouteImport.update({
 const TransfersIndexRoute = TransfersIndexRouteImport.update({
   id: '/transfers/',
   path: '/transfers/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TacticsIndexRoute = TacticsIndexRouteImport.update({
+  id: '/tactics/',
+  path: '/tactics/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SquadIndexRoute = SquadIndexRouteImport.update({
+  id: '/squad/',
+  path: '/squad/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ScoutsIndexRoute = ScoutsIndexRouteImport.update({
@@ -60,6 +72,8 @@ export interface FileRoutesByFullPath {
   '/transfers/$playerId': typeof TransfersPlayerIdRoute
   '/players/': typeof PlayersIndexRoute
   '/scouts/': typeof ScoutsIndexRoute
+  '/squad/': typeof SquadIndexRoute
+  '/tactics/': typeof TacticsIndexRoute
   '/transfers/': typeof TransfersIndexRoute
 }
 export interface FileRoutesByTo {
@@ -69,6 +83,8 @@ export interface FileRoutesByTo {
   '/transfers/$playerId': typeof TransfersPlayerIdRoute
   '/players': typeof PlayersIndexRoute
   '/scouts': typeof ScoutsIndexRoute
+  '/squad': typeof SquadIndexRoute
+  '/tactics': typeof TacticsIndexRoute
   '/transfers': typeof TransfersIndexRoute
 }
 export interface FileRoutesById {
@@ -79,6 +95,8 @@ export interface FileRoutesById {
   '/transfers/$playerId': typeof TransfersPlayerIdRoute
   '/players/': typeof PlayersIndexRoute
   '/scouts/': typeof ScoutsIndexRoute
+  '/squad/': typeof SquadIndexRoute
+  '/tactics/': typeof TacticsIndexRoute
   '/transfers/': typeof TransfersIndexRoute
 }
 export interface FileRouteTypes {
@@ -90,6 +108,8 @@ export interface FileRouteTypes {
     | '/transfers/$playerId'
     | '/players/'
     | '/scouts/'
+    | '/squad/'
+    | '/tactics/'
     | '/transfers/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -99,6 +119,8 @@ export interface FileRouteTypes {
     | '/transfers/$playerId'
     | '/players'
     | '/scouts'
+    | '/squad'
+    | '/tactics'
     | '/transfers'
   id:
     | '__root__'
@@ -108,6 +130,8 @@ export interface FileRouteTypes {
     | '/transfers/$playerId'
     | '/players/'
     | '/scouts/'
+    | '/squad/'
+    | '/tactics/'
     | '/transfers/'
   fileRoutesById: FileRoutesById
 }
@@ -118,6 +142,8 @@ export interface RootRouteChildren {
   TransfersPlayerIdRoute: typeof TransfersPlayerIdRoute
   PlayersIndexRoute: typeof PlayersIndexRoute
   ScoutsIndexRoute: typeof ScoutsIndexRoute
+  SquadIndexRoute: typeof SquadIndexRoute
+  TacticsIndexRoute: typeof TacticsIndexRoute
   TransfersIndexRoute: typeof TransfersIndexRoute
 }
 
@@ -135,6 +161,20 @@ declare module '@tanstack/react-router' {
       path: '/transfers'
       fullPath: '/transfers/'
       preLoaderRoute: typeof TransfersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tactics/': {
+      id: '/tactics/'
+      path: '/tactics'
+      fullPath: '/tactics/'
+      preLoaderRoute: typeof TacticsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/squad/': {
+      id: '/squad/'
+      path: '/squad'
+      fullPath: '/squad/'
+      preLoaderRoute: typeof SquadIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/scouts/': {
@@ -182,6 +222,8 @@ const rootRouteChildren: RootRouteChildren = {
   TransfersPlayerIdRoute: TransfersPlayerIdRoute,
   PlayersIndexRoute: PlayersIndexRoute,
   ScoutsIndexRoute: ScoutsIndexRoute,
+  SquadIndexRoute: SquadIndexRoute,
+  TacticsIndexRoute: TacticsIndexRoute,
   TransfersIndexRoute: TransfersIndexRoute,
 }
 export const routeTree = rootRouteImport

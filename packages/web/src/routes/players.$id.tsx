@@ -24,11 +24,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 
+import type { PromiseMood } from "@rpgfc/shared";
+
 import { BadgeStack } from "../components/ui/BadgeStack";
 import { CertaintyText } from "../components/ui/CertaintyText";
 import { ContractCard } from "../components/ui/ContractCard";
 import { KeyNumber } from "../components/ui/KeyNumber";
 import { NarrativeBlock } from "../components/ui/NarrativeBlock";
+import { PromiseMoodChip } from "../components/ui/PromiseMoodChip";
 import { ScoutReportCard } from "../components/ui/ScoutReportCard";
 import { TabBar, type TabDefinition } from "../components/ui/TabBar";
 import { TierPill } from "../components/ui/TierPill";
@@ -212,6 +215,18 @@ function PlayerProfile() {
           >
             Known <CertaintyText certainty={player.certainty}>{player.certainty}</CertaintyText>
           </p>
+          {/* Story 05: promise-mood row. Appears only when the player has
+              a squad entry (which implies a contract row is reachable).
+              The chip itself carries data-testid="player-facing" on the
+              prose line, so the doctrine suite scrapes it. */}
+          {player.promiseMood && player.promiseMoodLabel && (
+            <div className="mt-3" data-testid="player-mood">
+              <PromiseMoodChip
+                mood={player.promiseMood as PromiseMood}
+                label={player.promiseMoodLabel}
+              />
+            </div>
+          )}
         </div>
         <div className="flex items-start gap-6">
           <KeyNumber value={player.age} label="Age" allowlistReason="age" />

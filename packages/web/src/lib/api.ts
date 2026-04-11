@@ -136,3 +136,76 @@ export async function fetchPlayerContract(id: string) {
   if (!res.ok) throw new Error(`contract fetch failed: ${res.status}`);
   return res.json();
 }
+
+// ── Story 05 — tactics + squad ─────────────────────────────────────────────
+
+type Formation = "4-4-2" | "4-3-3" | "4-2-3-1" | "3-5-2" | "3-4-3" | "5-3-2";
+type PlayingStyle = "Possession" | "Counter-Attack" | "High Press" | "Direct" | "Balanced";
+type TeamInstruction =
+  | "PlayOutFromTheBack"
+  | "HighLine"
+  | "HighTempo"
+  | "WorkBallIntoBox"
+  | "PressHigh"
+  | "StayCompact";
+type PitchSlot =
+  | "GK"
+  | "DC1"
+  | "DC2"
+  | "DC3"
+  | "LB"
+  | "RB"
+  | "LWB"
+  | "RWB"
+  | "DMC"
+  | "MCL"
+  | "MCC"
+  | "MCR"
+  | "AMC"
+  | "LW"
+  | "RW"
+  | "ST1"
+  | "ST2";
+type SquadRole = "Starter" | "Rotation" | "Backup" | "Youth";
+
+export async function fetchTactics() {
+  const res = await api.api.tactics.$get();
+  if (!res.ok) throw new Error(`tactics fetch failed: ${res.status}`);
+  return res.json();
+}
+
+export async function updateTactics(body: {
+  formation: Formation;
+  playingStyle: PlayingStyle;
+  instructions: TeamInstruction[];
+}) {
+  const res = await api.api.tactics.$put({ json: body });
+  if (!res.ok) throw new Error(`tactics update failed: ${res.status}`);
+  return res.json();
+}
+
+export async function setTacticsAssignment(body: {
+  slot: PitchSlot;
+  playerId: number | null;
+}) {
+  const res = await api.api.tactics.assignments.$post({ json: body });
+  if (!res.ok) {
+    throw new Error(`tactics assignment failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function fetchSquad() {
+  const res = await api.api.squad.$get();
+  if (!res.ok) throw new Error(`squad fetch failed: ${res.status}`);
+  return res.json();
+}
+
+export async function setSquadRole(playerId: number, role: SquadRole) {
+  const res = await api.api.squad[":playerId"].role.$put({
+    param: { playerId: String(playerId) },
+    json: { role },
+  });
+  if (!res.ok) throw new Error(`squad role update failed: ${res.status}`);
+  return res.json();
+}
