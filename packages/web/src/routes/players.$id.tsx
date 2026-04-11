@@ -28,9 +28,10 @@ import { BadgeStack } from "../components/ui/BadgeStack";
 import { CertaintyText } from "../components/ui/CertaintyText";
 import { KeyNumber } from "../components/ui/KeyNumber";
 import { NarrativeBlock } from "../components/ui/NarrativeBlock";
+import { ScoutReportCard } from "../components/ui/ScoutReportCard";
 import { TabBar, type TabDefinition } from "../components/ui/TabBar";
 import { TierPill } from "../components/ui/TierPill";
-import { fetchPlayer } from "../lib/api";
+import { fetchPlayer, fetchPlayerReports } from "../lib/api";
 
 export const Route = createFileRoute("/players/$id")({
   component: PlayerProfile,
@@ -51,6 +52,10 @@ function PlayerProfile() {
   const query = useQuery({
     queryKey: ["player", id],
     queryFn: () => fetchPlayer(id),
+  });
+  const reportsQuery = useQuery({
+    queryKey: ["player-reports", id],
+    queryFn: () => fetchPlayerReports(id),
   });
 
   if (query.isPending) {
@@ -130,7 +135,27 @@ function PlayerProfile() {
       content: <ComingSoon label="relationships" />,
     },
     { key: "contract", label: "Contract", content: <ComingSoon label="contract" /> },
-    { key: "reports", label: "Reports", content: <ComingSoon label="reports" /> },
+    {
+      key: "reports",
+      label: "Reports",
+      content: (
+        <section className="space-y-4">
+          {reportsQuery.isPending && <p className="text-parchment-600">Loading reports…</p>}
+          {reportsQuery.isError && (
+            <p className="text-semantic-error">Could not load scout reports.</p>
+          )}
+          {reportsQuery.data?.items.length === 0 && (
+            <p className="text-sm italic text-parchment-500">
+              No scout reports yet. Send a scout to a Player Focus assignment to start building
+              knowledge of this player.
+            </p>
+          )}
+          {reportsQuery.data?.items.map((report) => (
+            <ScoutReportCard key={report.id} report={report} />
+          ))}
+        </section>
+      ),
+    },
   ];
 
   // Story 02 §8.4: the club stripe and the "back to roster" affordance

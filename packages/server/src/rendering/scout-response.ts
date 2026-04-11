@@ -55,10 +55,7 @@ export interface ScoutWithAssignment {
   recentReports: ScoutReportRef[];
 }
 
-export async function listScouts(
-  db: DbClient,
-  runId: number,
-): Promise<ScoutRef[]> {
+export async function listScouts(db: DbClient, runId: number): Promise<ScoutRef[]> {
   if (db.dialect === "sqlite") {
     return db.sqlite
       .prepare<[number], ScoutRow>(
@@ -76,15 +73,13 @@ export async function listScouts(
   return res.rows.map(rowToScoutRef);
 }
 
-async function loadScoutById(
-  db: DbClient,
-  id: number,
-): Promise<ScoutRef | null> {
+async function loadScoutById(db: DbClient, id: number): Promise<ScoutRef | null> {
   if (db.dialect === "sqlite") {
     const row = db.sqlite
-      .prepare<[number], ScoutRow>(
-        `SELECT id, run_id, name, region, voice_id, trust_tier FROM scouts WHERE id = ?`,
-      )
+      .prepare<
+        [number],
+        ScoutRow
+      >(`SELECT id, run_id, name, region, voice_id, trust_tier FROM scouts WHERE id = ?`)
       .get(id);
     return row ? rowToScoutRef(row) : null;
   }
@@ -95,10 +90,7 @@ async function loadScoutById(
   return res.rows[0] ? rowToScoutRef(res.rows[0]) : null;
 }
 
-export async function getScout(
-  db: DbClient,
-  id: number,
-): Promise<ScoutWithAssignment | null> {
+export async function getScout(db: DbClient, id: number): Promise<ScoutWithAssignment | null> {
   const scout = await loadScoutById(db, id);
   if (!scout) return null;
   const activeAssignment = await getActiveAssignment(db, id);
@@ -117,10 +109,7 @@ export async function getScout(
   return { scout, activeAssignment, recentReports };
 }
 
-export async function getPlayerReports(
-  db: DbClient,
-  playerId: number,
-): Promise<ScoutReportRef[]> {
+export async function getPlayerReports(db: DbClient, playerId: number): Promise<ScoutReportRef[]> {
   const rows = await listReportsForPlayer(db, playerId, 10);
   return rows.map((r) => ({
     id: r.id,

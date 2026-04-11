@@ -48,7 +48,8 @@ function assembleRef(row: ClubRow, identity: IdentityRow | undefined): RenderedC
         secondaryInk: identity.secondary_ink,
       }
     : FALLBACK_COLORS;
-  const reputation = (identity?.reputation_tier as ReputationTier | undefined) ?? FALLBACK_REPUTATION;
+  const reputation =
+    (identity?.reputation_tier as ReputationTier | undefined) ?? FALLBACK_REPUTATION;
   return {
     id: row.id,
     name: row.name,
@@ -60,16 +61,12 @@ function assembleRef(row: ClubRow, identity: IdentityRow | undefined): RenderedC
 
 // Preload every club + its identity row into an id-keyed map. Renderers
 // pass `map.get(clubId) ?? null` into renderPlayer's findClub dep.
-export async function loadFullClubMap(
-  client: DbClient,
-): Promise<Map<number, RenderedClubRef>> {
+export async function loadFullClubMap(client: DbClient): Promise<Map<number, RenderedClubRef>> {
   const map = new Map<number, RenderedClubRef>();
 
   if (client.dialect === "sqlite") {
     const sqlite = client.sqlite;
-    const clubs = sqlite
-      .prepare<[], ClubRow>(`SELECT id, name, nationality FROM clubs`)
-      .all();
+    const clubs = sqlite.prepare<[], ClubRow>(`SELECT id, name, nationality FROM clubs`).all();
     const identities = sqlite
       .prepare<[], IdentityRow>(
         `SELECT club_id, primary_color, secondary_color, stripe_color,
@@ -84,9 +81,7 @@ export async function loadFullClubMap(
     return map;
   }
 
-  const clubsRes = await client.pool.query<ClubRow>(
-    `SELECT id, name, nationality FROM clubs`,
-  );
+  const clubsRes = await client.pool.query<ClubRow>(`SELECT id, name, nationality FROM clubs`);
   const identitiesRes = await client.pool.query<IdentityRow>(
     `SELECT club_id, primary_color, secondary_color, stripe_color,
             primary_ink, secondary_ink, reputation_tier

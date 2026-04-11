@@ -76,13 +76,7 @@ describe("AC-08 — rendering prose never contains digits", () => {
       c.players.map((p, i) => asHiddenPlayer({ id: i + 1, ...p })),
     );
 
-    const tiers: CertaintyTier[] = [
-      "Unknown",
-      "Speculation",
-      "Likely",
-      "Confident",
-      "Certain",
-    ];
+    const tiers: CertaintyTier[] = ["Unknown", "Speculation", "Likely", "Confident", "Certain"];
     for (const tier of tiers) {
       for (const hidden of players) {
         const ctx: RenderContext = {
@@ -132,11 +126,7 @@ describe("AC-09 — certainty is driven by the knowledge snapshot", () => {
     // Snapshot has no per-badge observations — every badge resolves to
     // Unknown via the per-badge fallback rule.
     const empty: PlayerKnowledge = { playerId: 1, all: [], best: new Map() };
-    const rendered = renderPlayer(
-      hidden,
-      { now: REFERENCE_DATE, knowledge: empty },
-      deps,
-    );
+    const rendered = renderPlayer(hidden, { now: REFERENCE_DATE, knowledge: empty }, deps);
     for (const badge of rendered.badges) {
       expect(badge.certainty).toBe("Unknown");
     }

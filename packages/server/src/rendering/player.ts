@@ -1,9 +1,4 @@
-import type {
-  BadgeRef,
-  CertaintyTier,
-  RenderedClubRef,
-  RenderedPlayer,
-} from "@rpgfc/shared";
+import type { BadgeRef, CertaintyTier, RenderedClubRef, RenderedPlayer } from "@rpgfc/shared";
 import { ARCHETYPE_BY_ID, asRenderedPlayer } from "@rpgfc/shared";
 import type { HiddenPlayer } from "@rpgfc/shared/types/hidden";
 
@@ -64,10 +59,7 @@ export function renderPlayer(
   // certainty otherwise. The legacy `resolveBadges(snapshot, certainty)`
   // call assigned a single certainty across the whole stack — Story 03
   // overrides per-badge after the fact.
-  const baseBadges = resolveBadges(
-    { name: hidden.name, badgeKeys: hidden.badgeKeys },
-    overall,
-  );
+  const baseBadges = resolveBadges({ name: hidden.name, badgeKeys: hidden.badgeKeys }, overall);
   const badges: BadgeRef[] = baseBadges.map((b) => ({
     ...b,
     certainty: badgeCertaintyFromKnowledge(ctx, b.key, overall),

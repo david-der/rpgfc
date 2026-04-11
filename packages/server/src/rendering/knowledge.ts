@@ -59,10 +59,7 @@ function rowToFact(r: RawRow): FactObservation {
   };
 }
 
-export async function knowPlayer(
-  client: DbClient,
-  playerId: number,
-): Promise<PlayerKnowledge> {
+export async function knowPlayer(client: DbClient, playerId: number): Promise<PlayerKnowledge> {
   const all: FactObservation[] = [];
 
   if (client.dialect === "sqlite") {

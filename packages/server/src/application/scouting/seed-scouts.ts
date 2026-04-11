@@ -59,9 +59,7 @@ export async function seedScoutsIfMissing(
 
   if (client.dialect === "sqlite") {
     const count = client.sqlite
-      .prepare<[number], { n: number }>(
-        `SELECT COUNT(*) AS n FROM scouts WHERE run_id = ?`,
-      )
+      .prepare<[number], { n: number }>(`SELECT COUNT(*) AS n FROM scouts WHERE run_id = ?`)
       .get(runId);
     if ((count?.n ?? 0) > 0) {
       return { scoutsInserted: 0, skipped: true };

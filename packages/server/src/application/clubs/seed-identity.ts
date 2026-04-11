@@ -26,22 +26,14 @@ function stableIndex(seed: string, mod: number): number {
 // deterministic but not always identical — local clubs generally have
 // smaller budgets but a lucky seed can shift the wage budget up one
 // tier to add variety.
-const WAGE_BUDGET_TIERS = [
-  "Shoestring",
-  "Modest",
-  "Competitive",
-  "Substantial",
-  "Lavish",
-] as const;
+const WAGE_BUDGET_TIERS = ["Shoestring", "Modest", "Competitive", "Substantial", "Lavish"] as const;
 
 export interface ClubIdentitySeedResult {
   clubsUpdated: number;
   clubsSkipped: number;
 }
 
-export async function seedClubIdentityIfMissing(
-  client: DbClient,
-): Promise<ClubIdentitySeedResult> {
+export async function seedClubIdentityIfMissing(client: DbClient): Promise<ClubIdentitySeedResult> {
   if (client.dialect === "sqlite") {
     const sqlite = client.sqlite;
     const clubs = sqlite
@@ -154,7 +146,7 @@ function pickWageBudget(
   // Start at the reputation's corresponding tier, then jitter ±1 so the
   // correlation is strong but not mechanical.
   const base = REPUTATION_TIERS.indexOf(reputation);
-  const jitter = (stableIndex(clubName + ":wage", 3) - 1); // -1 | 0 | 1
+  const jitter = stableIndex(clubName + ":wage", 3) - 1; // -1 | 0 | 1
   const idx = Math.max(0, Math.min(WAGE_BUDGET_TIERS.length - 1, base + jitter));
   return WAGE_BUDGET_TIERS[idx]!;
 }

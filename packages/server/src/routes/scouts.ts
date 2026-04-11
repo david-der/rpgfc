@@ -14,11 +14,7 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
 
-import {
-  getScout,
-  listScouts,
-  startScoutAssignment,
-} from "../rendering/index.js";
+import { getScout, listScouts, startScoutAssignment } from "../rendering/index.js";
 import type { DbClient } from "../db/client.js";
 
 export interface ScoutsRouteDeps {
@@ -33,9 +29,7 @@ const idParam = z.object({ id: z.coerce.number().int().positive() });
 
 const startBody = z.object({
   kind: z.enum(["region", "player"]),
-  targetRegion: z
-    .enum(["Iberia", "BeneluxFrance", "SouthAmerica", "Global"])
-    .optional(),
+  targetRegion: z.enum(["Iberia", "BeneluxFrance", "SouthAmerica", "Global"]).optional(),
   targetPlayerId: z.number().int().positive().optional(),
 });
 
@@ -49,10 +43,7 @@ export function createScoutsRoute(deps: ScoutsRouteDeps) {
       const { id } = c.req.valid("param");
       const result = await getScout(deps.db, id);
       if (!result) {
-        return c.json(
-          { error: { code: "not_found", message: "Scout not found" } },
-          404,
-        );
+        return c.json({ error: { code: "not_found", message: "Scout not found" } }, 404);
       }
       return c.json(result);
     })

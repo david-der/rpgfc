@@ -6,8 +6,10 @@
 // to exercise the information economy from the UI without restarting
 // the server.
 //
-// Gated on devEndpointsEnabled (env.AUTH_MODE === "dev") exactly like
-// `/api/players/generate`.
+// The route is ALWAYS declared so Hono's RPC type inference picks it up
+// on the web client (`api.api.world["observation-tick"].$post()`). The
+// dev guard runs inside the handler — production hits return 404 with
+// the standard error envelope. AC-13 covers both branches.
 
 import { Hono } from "hono";
 
@@ -21,12 +23,11 @@ export interface WorldRouteDeps {
 }
 
 export function createWorldRoute(deps: WorldRouteDeps) {
-  const app = new Hono();
-  if (deps.devEndpointsEnabled) {
-    app.post("/observation-tick", async (c) => {
-      const result = await tickWorldObservations(deps.db, deps.currentRunId);
-      return c.json(result);
-    });
-  }
-  return app;
+  return new Hono().post("/observation-tick", async (c) => {
+    if (!deps.devEndpointsEnabled) {
+      return c.json({ error: { code: "not_found", message: "Not found" } }, 404);
+    }
+    const result = await tickWorldObservations(deps.db, deps.currentRunId);
+    return c.json(result);
+  });
 }

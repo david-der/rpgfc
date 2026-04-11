@@ -143,10 +143,9 @@ export async function startAssignment(
 
     let playerName: string | null = null;
     if (row.target_player_id) {
-      const p = await pg.query<{ name: string }>(
-        `SELECT name FROM players WHERE id = $1`,
-        [row.target_player_id],
-      );
+      const p = await pg.query<{ name: string }>(`SELECT name FROM players WHERE id = $1`, [
+        row.target_player_id,
+      ]);
       playerName = p.rows[0]?.name ?? null;
     }
     return rowToRef(row, playerName);
@@ -194,24 +193,21 @@ export async function getActiveAssignment(
   if (!row) return null;
   let playerName: string | null = null;
   if (row.target_player_id) {
-    const p = await client.pool.query<{ name: string }>(
-      `SELECT name FROM players WHERE id = $1`,
-      [row.target_player_id],
-    );
+    const p = await client.pool.query<{ name: string }>(`SELECT name FROM players WHERE id = $1`, [
+      row.target_player_id,
+    ]);
     playerName = p.rows[0]?.name ?? null;
   }
   return rowToRef(row, playerName);
 }
 
-export async function listScoutsWithMeta(
-  client: DbClient,
-  runId: number,
-): Promise<ScoutMetaRow[]> {
+export async function listScoutsWithMeta(client: DbClient, runId: number): Promise<ScoutMetaRow[]> {
   if (client.dialect === "sqlite") {
     return client.sqlite
-      .prepare<[number], ScoutMetaRow>(
-        `SELECT id, name, region FROM scouts WHERE run_id = ? ORDER BY id`,
-      )
+      .prepare<
+        [number],
+        ScoutMetaRow
+      >(`SELECT id, name, region FROM scouts WHERE run_id = ? ORDER BY id`)
       .all(runId);
   }
   const res = await client.pool.query<ScoutMetaRow>(

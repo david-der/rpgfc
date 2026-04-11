@@ -11,7 +11,7 @@
 // the router's link-type inference can narrow on `item.to` if needed.
 
 import type { LucideIcon } from "lucide-react";
-import { Home, Users } from "lucide-react";
+import { Eye, Home, Users } from "lucide-react";
 
 export interface NavItem {
   /** Stable identity used for React keys and active-state comparison. */
@@ -42,6 +42,13 @@ export const PRIMARY_NAV: readonly NavItem[] = [
     to: "/players",
     icon: Users,
     description: "Browse the player roster",
+  },
+  {
+    key: "scouts",
+    label: "Scouts",
+    to: "/scouts",
+    icon: Eye,
+    description: "Manage the scout network",
   },
 ] as const;
 

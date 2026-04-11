@@ -37,9 +37,10 @@ describe("scouting — Story 03", () => {
 
     if (db.dialect !== "sqlite") throw new Error("test only runs on SQLite");
     const scouts = db.sqlite
-      .prepare<[], { id: number; name: string }>(
-        `SELECT id, name FROM scouts WHERE run_id = 1 ORDER BY id`,
-      )
+      .prepare<
+        [],
+        { id: number; name: string }
+      >(`SELECT id, name FROM scouts WHERE run_id = 1 ORDER BY id`)
       .all();
     henriId = scouts.find((s) => s.name === "Henri Lavigne")!.id;
     cristinaId = scouts.find((s) => s.name === "Cristina Romero")!.id;
@@ -52,9 +53,7 @@ describe("scouting — Story 03", () => {
   it("AC-08: 4 seed scouts land on world gen", () => {
     if (db.dialect !== "sqlite") return;
     const count = db.sqlite
-      .prepare<[], { n: number }>(
-        `SELECT COUNT(*) AS n FROM scouts WHERE run_id = 1`,
-      )
+      .prepare<[], { n: number }>(`SELECT COUNT(*) AS n FROM scouts WHERE run_id = 1`)
       .get();
     expect(count?.n).toBe(4);
   });
@@ -136,10 +135,7 @@ describe("scouting — Story 03", () => {
     if (db.dialect !== "sqlite") return;
     // Every new observation by Cristina must reference an Iberian player.
     const cristinaObs = db.sqlite
-      .prepare<
-        [number],
-        { subject_id: number; nationality: string }
-      >(
+      .prepare<[number], { subject_id: number; nationality: string }>(
         `SELECT k.subject_id, p.nationality
          FROM knowledge_nodes k
          JOIN players p ON p.id = k.subject_id

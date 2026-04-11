@@ -39,7 +39,12 @@ export default defineConfig({
     env: {
       DATABASE_URL: "sqlite::memory:",
       PORT: "8787",
+      // Story 03 needs the dev-only observation tick endpoint mounted so
+      // the Playwright flow can exercise the information economy. The
+      // doctrine suite is dev-style end-to-end coverage, so AUTH_MODE=dev
+      // is the correct setting.
       NODE_ENV: "production",
+      AUTH_MODE: "dev",
       WEB_DIST: webDist,
       LOG_LEVEL: "warn",
     },

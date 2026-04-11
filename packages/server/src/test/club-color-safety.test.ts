@@ -2,11 +2,7 @@
 // parchment-50 page background.
 import { describe, expect, it } from "vitest";
 
-import {
-  CLUB_PALETTES,
-  PARCHMENT_50,
-  contrastRatio,
-} from "../application/clubs/palette.js";
+import { CLUB_PALETTES, PARCHMENT_50, contrastRatio } from "../application/clubs/palette.js";
 
 describe("club palette color safety — Story 03 AC-03", () => {
   it("every palette's primary color clears WCAG AA against parchment-50", () => {

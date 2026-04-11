@@ -5,12 +5,7 @@
 // The full stack — scout entity, assignments, observations, reports —
 // together replaces the synthetic `viewerScoutLevel` integer from Story 01.
 
-export const SCOUT_REGIONS = [
-  "Iberia",
-  "BeneluxFrance",
-  "SouthAmerica",
-  "Global",
-] as const;
+export const SCOUT_REGIONS = ["Iberia", "BeneluxFrance", "SouthAmerica", "Global"] as const;
 
 export type ScoutRegion = (typeof SCOUT_REGIONS)[number];
 

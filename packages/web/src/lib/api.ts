@@ -45,3 +45,46 @@ export async function fetchPlayer(id: string) {
   }
   return res.json();
 }
+
+// ── Story 03 — scouts + knowledge graph ────────────────────────────────────
+
+export async function fetchScouts() {
+  const res = await api.api.scouts.$get();
+  if (!res.ok) throw new Error(`scouts fetch failed: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchScout(id: string) {
+  const res = await api.api.scouts[":id"].$get({ param: { id } });
+  if (res.status === 404) throw new Error("Scout not found");
+  if (!res.ok) throw new Error(`scout fetch failed: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchPlayerReports(id: string) {
+  const res = await api.api.players[":id"].reports.$get({ param: { id } });
+  if (!res.ok) throw new Error(`player reports failed: ${res.status}`);
+  return res.json();
+}
+
+export async function startScoutAssignment(
+  scoutId: string,
+  body: {
+    kind: "region" | "player";
+    targetRegion?: "Iberia" | "BeneluxFrance" | "SouthAmerica" | "Global";
+    targetPlayerId?: number;
+  },
+) {
+  const res = await api.api.scouts[":id"].assignments.$post({
+    param: { id: scoutId },
+    json: body,
+  });
+  if (!res.ok) throw new Error(`start assignment failed: ${res.status}`);
+  return res.json();
+}
+
+export async function tickWorldObservations() {
+  const res = await api.api.world["observation-tick"].$post();
+  if (!res.ok) throw new Error(`observation tick failed: ${res.status}`);
+  return res.json();
+}

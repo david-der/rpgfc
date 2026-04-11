@@ -68,9 +68,7 @@ export async function renderPlayersPage(
 
   const items = result.items.map((hidden) => {
     const knowledge = knowledgeMap.get(hidden.id);
-    const ctx: RenderContext = knowledge
-      ? { ...baseCtx, knowledge }
-      : { ...baseCtx };
+    const ctx: RenderContext = knowledge ? { ...baseCtx, knowledge } : { ...baseCtx };
     return renderPlayer(hidden, ctx, {
       findClub: (cid) => clubs.get(cid) ?? null,
     });

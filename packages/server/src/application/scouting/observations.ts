@@ -73,9 +73,7 @@ const REGION_TO_NATIONALITY: Record<string, readonly string[]> = {
 async function loadScout(client: DbClient, scoutId: number): Promise<ScoutFull | null> {
   if (client.dialect === "sqlite") {
     const row = client.sqlite
-      .prepare<[number], ScoutFull>(
-        `SELECT id, name, region, voice_id FROM scouts WHERE id = ?`,
-      )
+      .prepare<[number], ScoutFull>(`SELECT id, name, region, voice_id FROM scouts WHERE id = ?`)
       .get(scoutId);
     return row ?? null;
   }
@@ -110,10 +108,7 @@ async function loadActiveAssignmentsForRun(
   return res.rows;
 }
 
-async function loadPlayerCore(
-  client: DbClient,
-  playerId: number,
-): Promise<PlayerCore | null> {
+async function loadPlayerCore(client: DbClient, playerId: number): Promise<PlayerCore | null> {
   if (client.dialect === "sqlite") {
     const row = client.sqlite
       .prepare<
@@ -334,9 +329,7 @@ export async function runObservationTick(
     if (assignment.kind === "region" && assignment.target_region) {
       const players = await loadPlayersInRegion(client, assignment.target_region, 6);
       // Pick 2-6 players via the deterministic RNG to vary tick output.
-      const rng = mulberry32(
-        (runId * 1_000_000 + assignment.id * 1_000 + tickIndex) >>> 0,
-      );
+      const rng = mulberry32((runId * 1_000_000 + assignment.id * 1_000 + tickIndex) >>> 0);
       const target = 2 + Math.floor(rng.next() * 5);
       const sliced = players.slice(0, Math.min(target, players.length));
       for (const player of sliced) {
@@ -494,10 +487,7 @@ interface KnowledgeNodeInsert {
   sourceScoutId: number | null;
 }
 
-async function insertKnowledgeNode(
-  client: DbClient,
-  node: KnowledgeNodeInsert,
-): Promise<void> {
+async function insertKnowledgeNode(client: DbClient, node: KnowledgeNodeInsert): Promise<void> {
   if (client.dialect === "sqlite") {
     client.sqlite
       .prepare(
@@ -567,13 +557,7 @@ async function insertScoutReport(client: DbClient, report: ReportInsert): Promis
     `INSERT INTO scout_reports
        (scout_id, assignment_id, player_id, prose_body, created_at)
      VALUES ($1, $2, $3, $4, $5)`,
-    [
-      report.scoutId,
-      report.assignmentId,
-      report.playerId,
-      report.proseBody,
-      report.createdAt,
-    ],
+    [report.scoutId, report.assignmentId, report.playerId, report.proseBody, report.createdAt],
   );
 }
 
@@ -588,10 +572,10 @@ async function endAssignmentRow(
       .run(now, assignmentId);
     return;
   }
-  await client.pool.query(
-    `UPDATE scout_assignments SET ended_at = $1 WHERE id = $2`,
-    [now, assignmentId],
-  );
+  await client.pool.query(`UPDATE scout_assignments SET ended_at = $1 WHERE id = $2`, [
+    now,
+    assignmentId,
+  ]);
 }
 
 // Walk this player's existing observations to find the highest certainty

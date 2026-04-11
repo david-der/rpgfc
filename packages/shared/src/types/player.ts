@@ -2,6 +2,7 @@ import type { MentalTraits, NaturalGifts, PreferredFoot } from "./attributes.js"
 import type { BadgeRef } from "./badge.js";
 import type { CertaintyTier } from "./certainty.js";
 import type { ExperienceTier } from "./experience.js";
+import type { ScoutReportRef } from "./scout.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  THE RENDERING BOUNDARY (TDD v2 §6)
@@ -43,13 +44,7 @@ export interface HiddenPlayer {
   narrativeSeed: NarrativeSeed;
 }
 
-export const REPUTATION_TIERS = [
-  "Local",
-  "Regional",
-  "National",
-  "Continental",
-  "Elite",
-] as const;
+export const REPUTATION_TIERS = ["Local", "Regional", "National", "Continental", "Elite"] as const;
 export type ReputationTier = (typeof REPUTATION_TIERS)[number];
 
 export interface ClubColors {
@@ -95,8 +90,9 @@ export interface WirePlayer {
   experience: ExperienceTier;
   /** Story 03: recent scout reports about this player. May be empty or
    *  absent when the list endpoint wants to save bytes; the profile
-   *  endpoint always populates it. */
-  scoutReports?: import("./scout.js").ScoutReportRef[];
+   *  endpoint always populates it. The explicit `| undefined` matches
+   *  tsconfig's exactOptionalPropertyTypes. */
+  scoutReports?: ScoutReportRef[] | undefined;
 }
 
 // RenderedPlayer is the server-internal branded flavor of WirePlayer. Only
