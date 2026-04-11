@@ -25,3 +25,11 @@ export {
   tickWorldObservations,
 } from "./scout-response.js";
 export type { ScoutWithAssignment } from "./scout-response.js";
+export {
+  renderTransfersPage,
+  submitBidRendered,
+  getBidRendered,
+  forceAcceptBidRendered,
+  getContractForPlayer,
+} from "./transfer-response.js";
+export type { TransfersPage } from "./transfer-response.js";

@@ -60,3 +60,30 @@ export { SCOUT_REGIONS, SCOUT_VOICE_IDS, SCOUT_TRUST_TIERS } from "./scout.js";
 
 export type { FactType, SubjectKind, KnowledgeNodeRef } from "./knowledge.js";
 export { FACT_TYPES } from "./knowledge.js";
+
+export type { BidStance, CurrencyTier } from "./currency.js";
+export {
+  CURRENCY_TIERS,
+  FEE_TIER_MIDPOINT_CENTS,
+  FEE_TIER_THRESHOLDS_CENTS,
+  WAGE_TIER_MIDPOINT_CENTS,
+  WAGE_TIER_THRESHOLDS_CENTS,
+  feeTierFor,
+  stanceFor,
+  wageTierFor,
+} from "./currency.js";
+
+export type {
+  BidProposal,
+  BidRef,
+  BidState,
+  Contract,
+  LoanTerms,
+  PlayingTimeRole,
+  RejectionReason,
+  RenderedBid,
+  RenderedBidProposal,
+  RenderedContract,
+  RenderedListing,
+} from "./contract.js";
+export { BID_STATES, PLAYING_TIME_ROLES } from "./contract.js";

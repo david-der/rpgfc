@@ -48,8 +48,9 @@ export async function seedClubIdentityIfMissing(client: DbClient): Promise<ClubI
     const insert = sqlite.prepare(
       `INSERT INTO club_identity_ext
          (club_id, primary_color, secondary_color, stripe_color,
-          primary_ink, secondary_ink, reputation_tier, wage_budget_tier)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          primary_ink, secondary_ink, reputation_tier, wage_budget_tier,
+          cash_reserve_cents, wage_budget_cents_per_week)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
 
     let updated = 0;
@@ -64,6 +65,8 @@ export async function seedClubIdentityIfMissing(client: DbClient): Promise<ClubI
         const palette = CLUB_PALETTES[stableIndex(club.name, CLUB_PALETTES.length)]!;
         const reputation = pickReputation(club.name);
         const wageBudget = pickWageBudget(club.name, reputation);
+        const budgetCents = wageBudgetCentsFor(reputation);
+        const cashReserveCents = cashReserveCentsFor(reputation, club.name);
         insert.run(
           club.id,
           palette.primary,
@@ -73,6 +76,8 @@ export async function seedClubIdentityIfMissing(client: DbClient): Promise<ClubI
           palette.secondaryInk,
           reputation,
           wageBudget,
+          cashReserveCents,
+          budgetCents,
         );
         updated++;
       }
@@ -106,11 +111,14 @@ export async function seedClubIdentityIfMissing(client: DbClient): Promise<ClubI
       const palette = CLUB_PALETTES[stableIndex(club.name, CLUB_PALETTES.length)]!;
       const reputation = pickReputation(club.name);
       const wageBudget = pickWageBudget(club.name, reputation);
+      const budgetCents = wageBudgetCentsFor(reputation);
+      const cashReserveCents = cashReserveCentsFor(reputation, club.name);
       await pg.query(
         `INSERT INTO club_identity_ext
            (club_id, primary_color, secondary_color, stripe_color,
-            primary_ink, secondary_ink, reputation_tier, wage_budget_tier)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            primary_ink, secondary_ink, reputation_tier, wage_budget_tier,
+            cash_reserve_cents, wage_budget_cents_per_week)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
         [
           club.id,
           palette.primary,
@@ -120,6 +128,8 @@ export async function seedClubIdentityIfMissing(client: DbClient): Promise<ClubI
           palette.secondaryInk,
           reputation,
           wageBudget,
+          cashReserveCents,
+          budgetCents,
         ],
       );
       updated++;
@@ -137,6 +147,42 @@ export async function seedClubIdentityIfMissing(client: DbClient): Promise<ClubI
 function pickReputation(clubName: string): ReputationTier {
   const idx = stableIndex(clubName + ":rep", REPUTATION_TIERS.length);
   return REPUTATION_TIERS[idx]!;
+}
+
+// Story 04 arithmetic-grade budgets. These are the cents the seller
+// evaluator and bid flow actually compare against. Tier labels live
+// on their own (wage_budget_tier TEXT) so the rendering layer can
+// surface the label without doing arithmetic.
+//
+// Values are chosen so `Elite` clubs can comfortably sign a single
+// `Significant`-tier wage without blowing their budget, while `Local`
+// clubs top out around the `Modest` wage tier.
+const WAGE_BUDGET_BY_REPUTATION: Record<ReputationTier, number> = {
+  Local: 5_000_000, // $50k/week budget
+  Regional: 15_000_000, // $150k/week
+  National: 50_000_000, // $500k/week
+  Continental: 150_000_000, // $1.5M/week
+  Elite: 400_000_000, // $4M/week
+};
+
+const CASH_RESERVE_BY_REPUTATION: Record<ReputationTier, number> = {
+  Local: 5_000_000_00, // $5M
+  Regional: 25_000_000_00, // $25M
+  National: 100_000_000_00, // $100M
+  Continental: 400_000_000_00, // $400M
+  Elite: 1_200_000_000_00, // $1.2B
+};
+
+function wageBudgetCentsFor(reputation: ReputationTier): number {
+  return WAGE_BUDGET_BY_REPUTATION[reputation];
+}
+
+function cashReserveCentsFor(reputation: ReputationTier, clubName: string): number {
+  // Add a small deterministic jitter (±25%) so two Elite clubs don't
+  // have the exact same cash reserve.
+  const base = CASH_RESERVE_BY_REPUTATION[reputation];
+  const jitterPct = (stableIndex(clubName + ":cash", 21) - 10) / 40; // -0.25..+0.25
+  return Math.floor(base * (1 + jitterPct));
 }
 
 function pickWageBudget(

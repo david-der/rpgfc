@@ -12,6 +12,10 @@ import { seedContentIfMissing } from "./application/content-seed.js";
 import { seedClubIdentityIfMissing } from "./application/clubs/seed-identity.js";
 import { seedWorldIfEmpty } from "./application/players/index.js";
 import { seedScoutsIfMissing } from "./application/scouting/seed-scouts.js";
+import {
+  seedListingsIfEmpty,
+  seedPreferencesIfEmpty,
+} from "./application/transfers/seed-listings.js";
 
 const env = parseEnv();
 
@@ -65,6 +69,17 @@ async function main() {
   const scoutSeed = await seedScoutsIfMissing(dbClient, 1);
   if (!scoutSeed.skipped) {
     logger.info({ scouts: scoutSeed.scoutsInserted }, "Seeded scouts");
+  }
+
+  // Story 04: every club lists 1-3 players; every player gets a
+  // preferences row. Both idempotent.
+  const listingSeed = await seedListingsIfEmpty(dbClient);
+  if (!listingSeed.skipped) {
+    logger.info({ listings: listingSeed.listingsCreated }, "Seeded listings");
+  }
+  const prefSeed = await seedPreferencesIfEmpty(dbClient);
+  if (!prefSeed.skipped) {
+    logger.info({ preferences: prefSeed.preferencesCreated }, "Seeded player preferences");
   }
 
   // WEB_DIST points at a built Vite bundle. In local dev Vite runs on :5173

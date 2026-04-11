@@ -14,6 +14,7 @@ import { z } from "zod";
 
 import type { DbClient } from "../db/client.js";
 import {
+  getContractForPlayer,
   getPlayerReports,
   renderPlayerById,
   renderPlayersPage,
@@ -67,6 +68,16 @@ export function createPlayersRoute(deps: PlayersRouteDeps) {
       const { id } = c.req.valid("param");
       const items = await getPlayerReports(deps.db, id);
       return c.json({ items });
+    })
+    // Story 04 — rendered contract for a specific player. Returns null
+    // if the player has no contract yet (newly generated, not signed).
+    .get("/:id/contract", zValidator("param", idParam), async (c) => {
+      const { id } = c.req.valid("param");
+      const contract = await getContractForPlayer(deps.db, id);
+      if (!contract) {
+        return c.json({ contract: null });
+      }
+      return c.json({ contract });
     });
 
   if (deps.devEndpointsEnabled) {
