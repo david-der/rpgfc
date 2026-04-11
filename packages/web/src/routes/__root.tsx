@@ -1,15 +1,19 @@
-import { Outlet, createRootRoute } from "@tanstack/react-router";
+import { createRootRoute, Outlet } from "@tanstack/react-router";
 
-// Root layout. Story 00 keeps it minimal — just the outlet. Navigation chrome,
-// club theming wrapper, and the persistent Inspector land in Story 01+.
+import { AppShell } from "../components/ui/AppShell";
+
+// Root layout. Story 02 wraps every routed page in the AppShell so the
+// club stripe, NavBar, and main content region are consistent across
+// Home, Players, and the Profile view — no page owns its own nav chrome.
+
 export const Route = createRootRoute({
   component: RootLayout,
 });
 
 function RootLayout() {
   return (
-    <div className="min-h-screen bg-parchment-50 text-parchment-900">
+    <AppShell>
       <Outlet />
-    </div>
+    </AppShell>
   );
 }

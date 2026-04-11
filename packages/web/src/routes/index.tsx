@@ -15,7 +15,9 @@ function Landing() {
   });
 
   return (
-    <main className="mx-auto max-w-prose px-6 py-16">
+    // Wrapped in a <div> rather than <main> — the AppShell owns the
+    // single top-level <main> so the landmark tree stays unambiguous.
+    <div className="mx-auto max-w-prose px-6 py-16">
       <header className="border-b border-parchment-300 pb-6">
         <div className="text-xs uppercase tracking-wide text-parchment-500">Walking skeleton</div>
         <h1 className="mt-2 font-serif text-4xl font-medium text-parchment-900">RPG FC</h1>
@@ -35,7 +37,7 @@ function Landing() {
           />
         </Card>
       </section>
-    </main>
+    </div>
   );
 }
 

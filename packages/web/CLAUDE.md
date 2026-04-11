@@ -100,7 +100,39 @@ When the RPC client inference shows `any` for a response body, the root
 cause is almost always on the server side — see
 `packages/server/CLAUDE.md` §4 for the fix pattern.
 
-## 6. Routing (TanStack Router)
+## 6. Navigation (Story 02)
+
+Top-level navigation flows through a **single typed registry**. Do not
+hand-roll nav JSX on a page; compose the shell instead.
+
+```
+src/lib/navigation.ts      → NavItem type + PRIMARY_NAV registry
+src/components/ui/NavBar   → horizontal tab-bar style per §6.4
+src/components/ui/AppShell → club-stripe + NavBar + <main><Outlet /></main>
+src/routes/__root.tsx      → wraps the Outlet in <AppShell>
+```
+
+To add a new top-level destination in Story 03+:
+
+1. Append a new `NavItem` to `PRIMARY_NAV` in `src/lib/navigation.ts`.
+   Set `key`, `label`, `to`, a Lucide `icon`, and a short `description`.
+2. Make sure the `to` target resolves on the router (create the route
+   file if it doesn't exist yet).
+3. Extend `isNavItemActive` only if your destination needs a non-prefix
+   matching rule. The default matches `/x` and any path starting with
+   `/x/` for every item except Home.
+
+**Never** hand-code a `<Link>` for a top-level destination on a page —
+the active-state styling, keyboard behavior, and accessibility
+attributes live in `NavBar`, and reimplementing them inline means
+every new maintainer has to audit every copy.
+
+**Nav chrome is never player-facing.** No element inside `<NavBar>` or
+`<AppShell>` carries `data-testid="player-facing"`. The doctrine suite
+asserts this from the outside (see `tests/doctrine/nav-shell.spec.ts`
+AC-12).
+
+## 7. Routing (TanStack Router)
 
 - File-based routes under `src/routes/`. Filename = path, with `$param`
   for dynamic segments.
@@ -113,7 +145,7 @@ cause is almost always on the server side — see
 - Use the route's `loader` for server data that should be available
   before the component mounts. Otherwise use `useQuery` in the component.
 
-## 7. Server state — TanStack Query
+## 8. Server state — TanStack Query
 
 - **No client-side global store for server state.** Every server-
   originated value lives in the Query cache.
@@ -122,7 +154,7 @@ cause is almost always on the server side — see
   permitted only for genuine cross-cutting concerns (e.g., toast queue).
   The default answer is always "keep it in the component tree."
 
-## 8. Tests
+## 9. Tests
 
 - **Unit / component tests** via Vitest (+ jsdom + @testing-library/react)
   live under `src/test/` alongside the code.

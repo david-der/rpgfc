@@ -21,7 +21,8 @@ function PlayersList() {
   });
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-10">
+    // <main> is provided by the AppShell; this route renders a plain div.
+    <div className="mx-auto max-w-5xl px-6 py-10">
       <SectionHeader eyebrow="Story 01" title="Players" />
       <section className="mt-8 space-y-4">
         {query.isPending && <p className="text-parchment-600">Loading roster…</p>}
@@ -34,6 +35,6 @@ function PlayersList() {
           <PlayerIdentityCard key={player.id} player={player} />
         ))}
       </section>
-    </main>
+    </div>
   );
 }
