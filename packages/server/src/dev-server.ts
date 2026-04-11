@@ -8,6 +8,8 @@ import { createDbClient } from "./db/client.js";
 import { runMigrations } from "./db/migrate.js";
 import { parseEnv } from "./env.js";
 import { createApp } from "./index.js";
+import { seedContentIfMissing } from "./application/content-seed.js";
+import { seedWorldIfEmpty } from "./application/players/index.js";
 
 const env = parseEnv();
 
@@ -31,6 +33,26 @@ async function main() {
     "Migrations applied",
   );
 
+  // Story 01: content first (archetypes, badges, thesaurus — versioned with
+  // the code), then a one-shot world generation if the players table is empty.
+  // Both calls are idempotent.
+  const contentSeed = await seedContentIfMissing(dbClient);
+  if (contentSeed.archetypesInserted + contentSeed.badgesInserted > 0) {
+    logger.info(contentSeed, "Seeded content tables");
+  }
+  const seedResult = await seedWorldIfEmpty(dbClient, {
+    seed: 42,
+    clubCount: 10,
+    playersPerClub: 20,
+    referenceDate: new Date("2026-06-01T00:00:00Z"),
+  });
+  if (!seedResult.skipped) {
+    logger.info(
+      { clubs: seedResult.clubsCreated, players: seedResult.playersCreated },
+      "Seeded initial world",
+    );
+  }
+
   // WEB_DIST points at a built Vite bundle. In local dev Vite runs on :5173
   // and proxies /api to this server, so WEB_DIST is unset and createApp
   // returns the API-only app. In the Docker image and the doctrine suite,
@@ -41,6 +63,8 @@ async function main() {
     dialect: dbClient.dialect,
     commit: env.GIT_SHA ?? "dev",
     db: dbClient,
+    devEndpointsEnabled: env.AUTH_MODE === "dev",
+    now: () => new Date(),
     ...(staticDir ? { staticDir } : {}),
   });
 

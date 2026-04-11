@@ -3,4 +3,11 @@
 // only via `@rpgfc/shared/types/hidden` and is forbidden to the web package
 // by an ESLint `no-restricted-imports` rule.
 export * from "./types/index.js";
-export { APP_NAME } from "./constants/index.js";
+export {
+  APP_NAME,
+  ARCHETYPE_LIBRARY,
+  ARCHETYPE_BY_ID,
+  BADGE_LIBRARY,
+  BADGE_BY_KEY,
+  THESAURUS,
+} from "./constants/index.js";

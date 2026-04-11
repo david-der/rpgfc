@@ -16,9 +16,14 @@ function fakeDb(): DbClient {
   };
 }
 
+const baseDeps = {
+  devEndpointsEnabled: false,
+  now: () => new Date("2026-06-01T00:00:00Z"),
+};
+
 describe("GET /api/health — Story 00 AC-11", () => {
   it("returns ok=true, the server dialect, and a commit string", async () => {
-    const app = createApiApp({ dialect: "sqlite", commit: "abc1234", db: fakeDb() });
+    const app = createApiApp({ ...baseDeps, dialect: "sqlite", commit: "abc1234", db: fakeDb() });
     const res = await app.request("/api/health");
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toMatch(/application\/json/);
@@ -34,6 +39,7 @@ describe("GET /api/health — Story 00 AC-11", () => {
 
   it("advertises postgres dialect when configured that way", async () => {
     const app = createApiApp({
+      ...baseDeps,
       dialect: "postgres",
       commit: "deadbeef",
       db: { ...fakeDb(), dialect: "postgres" } as DbClient,
@@ -45,7 +51,7 @@ describe("GET /api/health — Story 00 AC-11", () => {
 
   it("reports the commit as a 7–40 char hex or literal 'dev'", async () => {
     for (const commit of ["dev", "abc1234", "0123456789abcdef0123456789abcdef01234567"]) {
-      const app = createApiApp({ dialect: "sqlite", commit, db: fakeDb() });
+      const app = createApiApp({ ...baseDeps, dialect: "sqlite", commit, db: fakeDb() });
       const res = await app.request("/api/health");
       const body = (await res.json()) as { commit: string };
       expect(body.commit).toMatch(/^(dev|[a-f0-9]{7,40})$/);

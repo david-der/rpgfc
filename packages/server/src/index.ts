@@ -20,11 +20,18 @@ import { join } from "node:path";
 
 import type { DbClient, Dialect } from "./db/client.js";
 import type { HealthSnapshot } from "./routes/health.js";
+import { createPlayersRoute } from "./routes/players.js";
 
 export interface ApiDeps {
   dialect: Dialect;
   commit: string;
   db: DbClient;
+  /** Story 01: dev-only endpoints (e.g. POST /api/players/generate).
+   *  Driven from env.AUTH_MODE === "dev" in dev-server.ts. Tests set it
+   *  explicitly. */
+  devEndpointsEnabled: boolean;
+  /** Clock used for age math in rendering. Injected so tests can pin it. */
+  now: () => Date;
 }
 
 export interface AppDeps extends ApiDeps {
@@ -34,19 +41,27 @@ export interface AppDeps extends ApiDeps {
   staticDir?: string;
 }
 
-// API-only factory. Inlines the /api/health handler rather than `.route()`-
-// mounting a sub-app so that Hono's RPC type inference surfaces the concrete
-// response shape on the web client. A `.route()` call with a generic `Hono`
-// return type loses the json shape and the web client falls back to `any`.
+// API-only factory. The /api/health handler stays inline so Hono's RPC type
+// inference continues to surface its concrete response shape on the web
+// client. The /api/players sub-app is mounted via .route() — it's accessed
+// through the typed RPC client at `client.api.players.<method>`, which the
+// web client uses for data fetching.
 export function createApiApp(deps: ApiDeps) {
-  return new Hono().get("/api/health", (c) => {
-    const body: HealthSnapshot = {
-      ok: true,
-      dialect: deps.dialect,
-      commit: deps.commit,
-    };
-    return c.json(body);
+  const playersApp = createPlayersRoute({
+    db: deps.db,
+    devEndpointsEnabled: deps.devEndpointsEnabled,
+    now: deps.now,
   });
+  return new Hono()
+    .get("/api/health", (c) => {
+      const body: HealthSnapshot = {
+        ok: true,
+        dialect: deps.dialect,
+        commit: deps.commit,
+      };
+      return c.json(body);
+    })
+    .route("/api/players", playersApp);
 }
 
 // AppType is derived from the API-only factory. The web package's RPC client

@@ -1,5 +1,7 @@
+import type { MentalTraits, NaturalGifts, PreferredFoot } from "./attributes.js";
 import type { BadgeRef } from "./badge.js";
 import type { CertaintyTier } from "./certainty.js";
+import type { ExperienceTier } from "./experience.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  THE RENDERING BOUNDARY (TDD v2 §6)
@@ -14,15 +16,34 @@ import type { CertaintyTier } from "./certainty.js";
 // RenderedPlayer is the only player shape permitted to cross the HTTP wire.
 // The brand makes the two types nominally distinct at compile time, so that
 // accidentally returning a HiddenPlayer from a Hono handler is a type error.
-//
-// Story 00 keeps both bodies intentionally minimal. Story 01 adds
-// hiddenAttrs, badge wiring, prose, certainty, and experience tiers.
 
 declare const HIDDEN_BRAND: unique symbol;
 declare const RENDERED_BRAND: unique symbol;
 
+export interface NarrativeSeed {
+  hometown: string;
+  story: string;
+}
+
 export interface HiddenPlayer {
   readonly [HIDDEN_BRAND]: never;
+  id: number;
+  runId: number;
+  clubId: number | null;
+  name: string;
+  dob: string; // ISO-8601 date string (portable across SQLite + Postgres)
+  nationality: string;
+  preferredFoot: PreferredFoot;
+  archetypeId: string;
+  hiddenAttrs: NaturalGifts;
+  mentalTraits: MentalTraits;
+  /** Stable string keys from the badge library (e.g. "clutch_finisher"). */
+  badgeKeys: string[];
+  experienceYears: number;
+  narrativeSeed: NarrativeSeed;
+}
+
+export interface RenderedClubRef {
   id: number;
   name: string;
 }
@@ -31,26 +52,48 @@ export interface RenderedPlayer {
   readonly [RENDERED_BRAND]: never;
   id: number;
   name: string;
+  /** Computed from dob at render time. Ages are ALLOWLISTED numerics. */
+  age: number;
+  nationality: string;
+  preferredFoot: PreferredFoot;
+  /** Short position label derived from the archetype (e.g. "ST", "CB"). */
+  positionLabel: string;
+  club: RenderedClubRef | null;
   badges: BadgeRef[];
+  prose: {
+    identity: string;
+    currentForm: string;
+  };
+  /** How confidently the current viewer knows this player overall. */
   certainty: CertaintyTier;
+  experience: ExperienceTier;
 }
+
+// A "new" player — the shape the generator produces before the DB assigns
+// an id. Same as HiddenPlayer minus the id and the brand. The persistence
+// layer inserts the row, reads back the id, and hands the full HiddenPlayer
+// to downstream services.
+export type NewHiddenPlayer = Omit<HiddenPlayer, "id" | typeof HIDDEN_BRAND>;
 
 // Internal constructors. These are the ONLY sanctioned way to mint a value of
 // either branded type — they exist so call sites can't silently forge one.
-// The server's rendering module imports `asRenderedPlayer`; no one else should.
-// Story 00: no production call sites yet. These functions exist as anchors for
-// the brand enforcement the upcoming stories will lean on.
-export function asHiddenPlayer<T extends { id: number; name: string }>(v: T): HiddenPlayer {
+// The server's rendering module imports `asRenderedPlayer`; no one else
+// should. `asHiddenPlayer` lives behind the `/types/hidden` side-door.
+
+export function asHiddenPlayer<T extends Omit<HiddenPlayer, typeof HIDDEN_BRAND>>(
+  v: T,
+): HiddenPlayer {
   return v as unknown as HiddenPlayer;
 }
 
+export function asNewHiddenPlayer(v: NewHiddenPlayer): NewHiddenPlayer {
+  // Identity function — kept for parity with the other minters so call sites
+  // can document intent explicitly.
+  return v;
+}
+
 export function asRenderedPlayer<
-  T extends {
-    id: number;
-    name: string;
-    badges: BadgeRef[];
-    certainty: CertaintyTier;
-  },
+  T extends Omit<RenderedPlayer, typeof RENDERED_BRAND>,
 >(v: T): RenderedPlayer {
   return v as unknown as RenderedPlayer;
 }

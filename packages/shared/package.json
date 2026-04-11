@@ -8,7 +8,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./schemas": "./src/schemas/index.ts",
-    "./constants": "./src/constants/index.ts"
+    "./constants": "./src/constants/index.ts",
+    "./types/hidden": "./src/types/hidden.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
