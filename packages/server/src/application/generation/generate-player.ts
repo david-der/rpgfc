@@ -30,13 +30,7 @@ export interface GenerationContext {
   rng: Random;
 }
 
-function sampleNormalClamped(
-  rng: Random,
-  mean: number,
-  spread: number,
-  lo = 0,
-  hi = 100,
-): number {
+function sampleNormalClamped(rng: Random, mean: number, spread: number, lo = 0, hi = 100): number {
   const raw = rng.normal(mean, spread);
   return Math.max(lo, Math.min(hi, Math.round(raw)));
 }
@@ -165,9 +159,7 @@ export function generatePlayer(ctx: GenerationContext): NewHiddenPlayer {
   const earned = rollExperienceBadges(rng, archetype, experienceYears);
 
   // Merge and de-duplicate badge keys; only keep ones the library knows about.
-  const allKeys = [...new Set([...inborn, ...earned])].filter(
-    (k) => BADGE_BY_KEY[k] !== undefined,
-  );
+  const allKeys = [...new Set([...inborn, ...earned])].filter((k) => BADGE_BY_KEY[k] !== undefined);
 
   // 8. Finalize.
   const preferredFoot = pickFoot(rng, archetype);

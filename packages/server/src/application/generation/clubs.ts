@@ -5,8 +5,17 @@
 import type { Random } from "./rng.js";
 
 const PREFIXES = [
-  "Real", "Club", "Sporting", "Athletic", "Unión", "Racing",
-  "Internacional", "Atlético", "FC", "AC", "Club Deportivo",
+  "Real",
+  "Club",
+  "Sporting",
+  "Athletic",
+  "Unión",
+  "Racing",
+  "Internacional",
+  "Atlético",
+  "FC",
+  "AC",
+  "Club Deportivo",
 ];
 
 const CITIES_BY_NATIONALITY: Record<string, string[]> = {

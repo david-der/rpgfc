@@ -27,9 +27,14 @@ export { NATURAL_GIFT_KEYS, MENTAL_TRAIT_KEYS, PREFERRED_FEET } from "./attribut
 export type { ExperienceTier } from "./experience.js";
 export { EXPERIENCE_TIERS } from "./experience.js";
 
-export type { Archetype, AttributeDistribution, GiftDistribution, TraitDistribution } from "./archetype.js";
+export type {
+  Archetype,
+  AttributeDistribution,
+  GiftDistribution,
+  TraitDistribution,
+} from "./archetype.js";
 
 export type { Thesaurus, ThesaurusEntry, ThesaurusKey, ThesaurusPrecision } from "./thesaurus.js";
 
-export type { RenderedPlayer, RenderedClubRef, NarrativeSeed } from "./player.js";
+export type { RenderedPlayer, RenderedClubRef, NarrativeSeed, WirePlayer } from "./player.js";
 export { asRenderedPlayer } from "./player.js";

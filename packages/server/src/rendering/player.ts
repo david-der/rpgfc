@@ -40,7 +40,7 @@ export function renderPlayer(
   const certainty: CertaintyTier = computeCertainty(hidden, ctx);
   const precision = certainty === "Certain" || certainty === "Confident" ? "fine" : "coarse";
 
-  const badges = resolveBadges({ badgeKeys: hidden.badgeKeys }, certainty);
+  const badges = resolveBadges({ name: hidden.name, badgeKeys: hidden.badgeKeys }, certainty);
   const identity = generateIdentityProse({ hidden, badges, precision });
   const currentForm = generateFormProse(hidden);
 

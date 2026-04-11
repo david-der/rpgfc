@@ -1,7 +1,4 @@
-import type {
-  MentalTraitKey,
-  NaturalGiftKey,
-} from "../types/attributes.js";
+import type { MentalTraitKey, NaturalGiftKey } from "../types/attributes.js";
 import type { Thesaurus, ThesaurusEntry } from "../types/thesaurus.js";
 
 // The qualitative thesaurus — PRD §4.3.

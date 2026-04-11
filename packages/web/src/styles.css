@@ -1,3 +1,10 @@
+/* Self-hosted fonts via fontsource — Story 01 §9.3 risk resolved. These
+   imports ship the WOFF2 files as module assets; Vite bundles them with
+   content-hashed names, so there's no network dependency at runtime. */
+@import "@fontsource-variable/newsreader/index.css";
+@import "@fontsource-variable/inter/index.css";
+@import "@fontsource-variable/jetbrains-mono/index.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

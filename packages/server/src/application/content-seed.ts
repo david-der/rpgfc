@@ -23,9 +23,7 @@ export interface ContentSeedResult {
   thesaurusRowsInserted: number;
 }
 
-export async function seedContentIfMissing(
-  client: DbClient,
-): Promise<ContentSeedResult> {
+export async function seedContentIfMissing(client: DbClient): Promise<ContentSeedResult> {
   const now = new Date().toISOString();
   let archetypesInserted = 0;
   let badgesInserted = 0;
@@ -68,9 +66,7 @@ export async function seedContentIfMissing(
       }
     }
 
-    const countBadges = sqlite
-      .prepare<[], { n: number }>(`SELECT COUNT(*) AS n FROM badges`)
-      .get();
+    const countBadges = sqlite.prepare<[], { n: number }>(`SELECT COUNT(*) AS n FROM badges`).get();
     if ((countBadges?.n ?? 0) === 0) {
       const insert = sqlite.prepare(
         `INSERT INTO badges (key, category, display_name, tiers_json,

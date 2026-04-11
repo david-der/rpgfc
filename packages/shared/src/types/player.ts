@@ -48,8 +48,14 @@ export interface RenderedClubRef {
   name: string;
 }
 
-export interface RenderedPlayer {
-  readonly [RENDERED_BRAND]: never;
+// ─────────────────────────────────────────────────────────────────────────────
+// WirePlayer is the structural, non-branded shape that crosses the HTTP wire.
+// JSON serialization strips the brand, so client-side consumers need a type
+// they can hand to React components without TypeScript complaining about a
+// missing unique-symbol property. The web package uses WirePlayer everywhere.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface WirePlayer {
   id: number;
   name: string;
   /** Computed from dob at render time. Ages are ALLOWLISTED numerics. */
@@ -67,6 +73,13 @@ export interface RenderedPlayer {
   /** How confidently the current viewer knows this player overall. */
   certainty: CertaintyTier;
   experience: ExperienceTier;
+}
+
+// RenderedPlayer is the server-internal branded flavor of WirePlayer. Only
+// the server's rendering layer constructs values of this type; routes pass
+// them straight to Hono which serializes them as WirePlayer on the wire.
+export interface RenderedPlayer extends WirePlayer {
+  readonly [RENDERED_BRAND]: never;
 }
 
 // A "new" player — the shape the generator produces before the DB assigns
@@ -92,8 +105,8 @@ export function asNewHiddenPlayer(v: NewHiddenPlayer): NewHiddenPlayer {
   return v;
 }
 
-export function asRenderedPlayer<
-  T extends Omit<RenderedPlayer, typeof RENDERED_BRAND>,
->(v: T): RenderedPlayer {
+export function asRenderedPlayer<T extends Omit<RenderedPlayer, typeof RENDERED_BRAND>>(
+  v: T,
+): RenderedPlayer {
   return v as unknown as RenderedPlayer;
 }

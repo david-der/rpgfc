@@ -13,11 +13,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import type { DbClient } from "../db/client.js";
-import {
-  renderPlayerById,
-  renderPlayersPage,
-  runPlayersSeed,
-} from "../rendering/index.js";
+import { renderPlayerById, renderPlayersPage, runPlayersSeed } from "../rendering/index.js";
 import type { RenderContext } from "../rendering/index.js";
 
 export interface PlayersRouteDeps {
@@ -55,10 +51,7 @@ export function createPlayersRoute(deps: PlayersRouteDeps) {
       const ctx: RenderContext = { viewerScoutLevel: 3, now: deps.now() };
       const rendered = await renderPlayerById(deps.db, id, ctx);
       if (!rendered) {
-        return c.json(
-          { error: { code: "not_found", message: "Player not found" } },
-          404,
-        );
+        return c.json({ error: { code: "not_found", message: "Player not found" } }, 404);
       }
       return c.json(rendered);
     });

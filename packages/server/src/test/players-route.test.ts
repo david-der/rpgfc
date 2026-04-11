@@ -52,9 +52,7 @@ describe("/api/players — Story 01 AC-11/12/13", () => {
     expect(body.prose).toBeDefined();
     expect((body.prose as Record<string, unknown>).identity).toBeDefined();
     expect(Array.isArray(body.badges)).toBe(true);
-    expect(["Certain", "Confident", "Likely", "Speculation", "Unknown"]).toContain(
-      body.certainty,
-    );
+    expect(["Certain", "Confident", "Likely", "Speculation", "Unknown"]).toContain(body.certainty);
     // AC-02 / rendering-boundary safety: no hidden vector in the response.
     expect(body.hiddenAttrs).toBeUndefined();
     expect(body.mentalTraits).toBeUndefined();

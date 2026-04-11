@@ -46,8 +46,4 @@ export type MentalTraits = Record<MentalTraitKey, number>;
 
 export type PreferredFoot = "Left" | "Right" | "Both";
 
-export const PREFERRED_FEET: readonly PreferredFoot[] = [
-  "Left",
-  "Right",
-  "Both",
-] as const;
+export const PREFERRED_FEET: readonly PreferredFoot[] = ["Left", "Right", "Both"] as const;

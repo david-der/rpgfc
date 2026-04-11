@@ -62,9 +62,6 @@ export async function renderPlayersPage(
 // Re-exported application-side helper that the dev-only generation endpoint
 // needs. Routes import through this rendering module to keep the ESLint
 // boundary intact — the data this returns is not hidden state.
-export async function runPlayersSeed(
-  db: DbClient,
-  config: SeedConfig,
-): Promise<SeedResult> {
+export async function runPlayersSeed(db: DbClient, config: SeedConfig): Promise<SeedResult> {
   return seedWorldIfEmpty(db, config);
 }

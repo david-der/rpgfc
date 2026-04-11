@@ -1,8 +1,6 @@
 import type { BadgeRef, CertaintyTier } from "@rpgfc/shared";
 import { BADGE_BY_KEY } from "@rpgfc/shared";
 
-import type { RenderContext } from "./context.js";
-
 // Walk the player's badge keys and produce BadgeRef[] for the UI.
 //
 // Story 01 does not yet support per-badge certainty (every badge on the
@@ -10,13 +8,15 @@ import type { RenderContext } from "./context.js";
 // knowledge graph and per-badge confidence.
 
 export interface PlayerBadgeSnapshot {
+  name: string;
   badgeKeys: string[];
 }
 
-export function resolveBadges(
-  snapshot: PlayerBadgeSnapshot,
-  certainty: CertaintyTier,
-): BadgeRef[] {
+function substituteName(template: string, name: string): string {
+  return template.replace(/\{name\}/g, name);
+}
+
+export function resolveBadges(snapshot: PlayerBadgeSnapshot, certainty: CertaintyTier): BadgeRef[] {
   const refs: BadgeRef[] = [];
   for (const key of snapshot.badgeKeys) {
     const def = BADGE_BY_KEY[key];
@@ -26,8 +26,11 @@ export function resolveBadges(
     // tiering system lands. This is called out in the badge schema's
     // documentation.
     const tier = def.tiers ? 1 : null;
-    const displayName = def.tiers ? (def.tiers[0]?.displayName ?? def.displayName) : def.displayName;
-    const prose = def.tiers ? (def.tiers[0]?.prose ?? "") : def.displayName;
+    const displayName = def.tiers
+      ? (def.tiers[0]?.displayName ?? def.displayName)
+      : def.displayName;
+    const rawProse = def.tiers ? (def.tiers[0]?.prose ?? "") : def.displayName;
+    const prose = substituteName(rawProse, snapshot.name);
 
     refs.push({
       key: def.key,
@@ -40,9 +43,3 @@ export function resolveBadges(
   }
   return refs;
 }
-
-// Swallow the unused-parameter warning — the function signature is the
-// public contract for later stories.
-void function usesContext(_c: RenderContext) {
-  /* reserved for Story 02+ per-badge certainty */
-};

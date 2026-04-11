@@ -73,9 +73,10 @@ function newPlayerToInsert(p: NewHiddenPlayer, clubId: number | null, now: strin
 async function loadBadgeKeys(client: DbClient, playerId: number): Promise<string[]> {
   if (client.dialect === "sqlite") {
     const rows = client.sqlite
-      .prepare<[number], { badge_key: string }>(
-        `SELECT badge_key FROM player_badges WHERE player_id = ?`,
-      )
+      .prepare<
+        [number],
+        { badge_key: string }
+      >(`SELECT badge_key FROM player_badges WHERE player_id = ?`)
       .all(playerId);
     return rows.map((r) => r.badge_key);
   }
@@ -88,10 +89,7 @@ async function loadBadgeKeys(client: DbClient, playerId: number): Promise<string
 
 // ── public API ────────────────────────────────────────────────────────────
 
-export async function getPlayerById(
-  client: DbClient,
-  id: number,
-): Promise<HiddenPlayer | null> {
+export async function getPlayerById(client: DbClient, id: number): Promise<HiddenPlayer | null> {
   if (client.dialect === "sqlite") {
     const row = client.sqlite
       .prepare<[number], PlayerRow>(
@@ -132,10 +130,7 @@ export interface ListResult {
   nextCursor: number | null;
 }
 
-export async function listPlayers(
-  client: DbClient,
-  query: ListQuery,
-): Promise<ListResult> {
+export async function listPlayers(client: DbClient, query: ListQuery): Promise<ListResult> {
   const limit = Math.min(Math.max(query.limit, 1), 100);
 
   if (client.dialect === "sqlite") {
@@ -205,10 +200,7 @@ export interface SeedResult {
   skipped: boolean;
 }
 
-export async function seedWorldIfEmpty(
-  client: DbClient,
-  config: SeedConfig,
-): Promise<SeedResult> {
+export async function seedWorldIfEmpty(client: DbClient, config: SeedConfig): Promise<SeedResult> {
   // Idempotent: if players already exist, do nothing.
   const existing = await countPlayers(client);
   if (existing > 0) {
@@ -220,9 +212,7 @@ export async function seedWorldIfEmpty(
 
   if (client.dialect === "sqlite") {
     const sqlite = client.sqlite;
-    const insertRun = sqlite.prepare(
-      `INSERT INTO runs (seed, started_at) VALUES (?, ?)`,
-    );
+    const insertRun = sqlite.prepare(`INSERT INTO runs (seed, started_at) VALUES (?, ?)`);
     const insertClub = sqlite.prepare(
       `INSERT INTO clubs (run_id, name, nationality, founded_year, created_at) VALUES (?, ?, ?, ?, ?)`,
     );
@@ -246,13 +236,7 @@ export async function seedWorldIfEmpty(
       let playersCreated = 0;
 
       for (const club of world.clubs) {
-        const clubInfo = insertClub.run(
-          runId,
-          club.name,
-          club.nationality,
-          club.foundedYear,
-          now,
-        );
+        const clubInfo = insertClub.run(runId, club.name, club.nationality, club.foundedYear, now);
         const clubId = Number(clubInfo.lastInsertRowid);
         clubsCreated++;
         for (const p of club.players) {
@@ -353,28 +337,19 @@ export async function seedWorldIfEmpty(
 
 export async function countPlayers(client: DbClient): Promise<number> {
   if (client.dialect === "sqlite") {
-    const row = client.sqlite
-      .prepare<[], { n: number }>(`SELECT COUNT(*) AS n FROM players`)
-      .get();
+    const row = client.sqlite.prepare<[], { n: number }>(`SELECT COUNT(*) AS n FROM players`).get();
     return row?.n ?? 0;
   }
-  const res = await client.pool.query<{ n: string }>(
-    `SELECT COUNT(*)::text AS n FROM players`,
-  );
+  const res = await client.pool.query<{ n: string }>(`SELECT COUNT(*)::text AS n FROM players`);
   return Number(res.rows[0]?.n ?? 0);
 }
 
 // ── club resolver ────────────────────────────────────────────────────────
 
-export function findClubSync(
-  client: DbClient,
-  id: number,
-): { id: number; name: string } | null {
+export function findClubSync(client: DbClient, id: number): { id: number; name: string } | null {
   if (client.dialect === "sqlite") {
     const row = client.sqlite
-      .prepare<[number], { id: number; name: string }>(
-        `SELECT id, name FROM clubs WHERE id = ?`,
-      )
+      .prepare<[number], { id: number; name: string }>(`SELECT id, name FROM clubs WHERE id = ?`)
       .get(id);
     return row ?? null;
   }
@@ -395,9 +370,7 @@ export async function loadClubMap(
     for (const r of rows) map.set(r.id, r);
     return map;
   }
-  const res = await client.pool.query<{ id: number; name: string }>(
-    `SELECT id, name FROM clubs`,
-  );
+  const res = await client.pool.query<{ id: number; name: string }>(`SELECT id, name FROM clubs`);
   for (const r of res.rows) map.set(r.id, r);
   return map;
 }

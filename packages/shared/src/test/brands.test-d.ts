@@ -8,7 +8,13 @@
 
 import { expectTypeOf } from "vitest";
 
-import type { BadgeRef, CertaintyTier, MentalTraits, NaturalGifts, RenderedPlayer } from "../index.js";
+import type {
+  BadgeRef,
+  CertaintyTier,
+  MentalTraits,
+  NaturalGifts,
+  RenderedPlayer,
+} from "../index.js";
 import type { HiddenPlayer } from "../types/hidden.js";
 import { asHiddenPlayer } from "../types/hidden.js";
 import { asRenderedPlayer } from "../types/player.js";

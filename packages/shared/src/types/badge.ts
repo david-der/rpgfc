@@ -51,8 +51,8 @@ export type BadgeAwardTrigger =
   | "training_milestone";
 
 export type BadgeDecayKind =
-  | "none"             // permanent history (most Achievement badges)
-  | "soft"             // tier can regress after a bad window
+  | "none" // permanent history (most Achievement badges)
+  | "soft" // tier can regress after a bad window
   | "event_triggered"; // specific in-game events can strip the badge
 
 export interface BadgeTier {
@@ -64,8 +64,8 @@ export interface BadgeTier {
 export type BadgeEffect =
   | {
       type: "contextual_boost";
-      target: string;        // which hidden attribute/trait
-      context: string;       // e.g. "knockout_after_65min"
+      target: string; // which hidden attribute/trait
+      context: string; // e.g. "knockout_after_65min"
       magnitude: number;
     }
   | {

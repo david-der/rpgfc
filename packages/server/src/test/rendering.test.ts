@@ -52,38 +52,24 @@ describe("AC-09 — certainty masking", () => {
   it("low scout level yields Speculation or worse", () => {
     const w = world();
     const hidden = asHiddenPlayer({ id: 1, ...w.clubs[0]!.players[0]! });
-    const rendered = renderPlayer(
-      hidden,
-      { viewerScoutLevel: 0, now: REFERENCE_DATE },
-      deps,
-    );
+    const rendered = renderPlayer(hidden, { viewerScoutLevel: 0, now: REFERENCE_DATE }, deps);
     expect(["Unknown", "Speculation", "Likely"]).toContain(rendered.certainty);
   });
 
   it("max scout level yields Certain", () => {
     const w = world();
     const hidden = asHiddenPlayer({ id: 1, ...w.clubs[0]!.players[0]! });
-    const rendered = renderPlayer(
-      hidden,
-      { viewerScoutLevel: 5, now: REFERENCE_DATE },
-      deps,
-    );
+    const rendered = renderPlayer(hidden, { viewerScoutLevel: 5, now: REFERENCE_DATE }, deps);
     expect(rendered.certainty).toBe("Certain");
   });
 
   it("rendered badges carry per-badge certainty matching the viewer's tier", () => {
     const w = world();
-    const playerWithBadges = w.clubs
-      .flatMap((c) => c.players)
-      .find((p) => p.badgeKeys.length > 0);
+    const playerWithBadges = w.clubs.flatMap((c) => c.players).find((p) => p.badgeKeys.length > 0);
     expect(playerWithBadges).toBeDefined();
     const hidden = asHiddenPlayer({ id: 1, ...playerWithBadges! });
 
-    const rendered = renderPlayer(
-      hidden,
-      { viewerScoutLevel: 5, now: REFERENCE_DATE },
-      deps,
-    );
+    const rendered = renderPlayer(hidden, { viewerScoutLevel: 5, now: REFERENCE_DATE }, deps);
     for (const badge of rendered.badges) {
       expect(badge.certainty).toBe("Certain");
     }

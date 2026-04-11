@@ -18,8 +18,8 @@ export type TraitDistribution = Record<MentalTraitKey, AttributeDistribution>;
 export interface Archetype {
   id: string;
   displayName: string;
-  primaryRole: string;         // e.g. "Striker", "Center-Back"
-  positionLabel: string;       // shorter label for UI (e.g. "ST", "CB")
+  primaryRole: string; // e.g. "Striker", "Center-Back"
+  positionLabel: string; // shorter label for UI (e.g. "ST", "CB")
   giftDist: GiftDistribution;
   traitDist: TraitDistribution;
   startingBadgeKeys: string[]; // stable keys into the badge library

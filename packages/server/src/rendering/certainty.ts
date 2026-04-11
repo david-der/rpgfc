@@ -10,12 +10,12 @@ import type { RenderContext } from "./context.js";
 // counts; the function signature stays identical so the UI doesn't move.
 
 const LEVEL_TO_TIER: readonly CertaintyTier[] = [
-  "Unknown",       // 0
-  "Speculation",   // 1
-  "Likely",        // 2
-  "Confident",     // 3
-  "Confident",     // 4
-  "Certain",       // 5
+  "Unknown", // 0
+  "Speculation", // 1
+  "Likely", // 2
+  "Confident", // 3
+  "Confident", // 4
+  "Certain", // 5
 ];
 
 export function computeCertainty(_hidden: unknown, ctx: RenderContext): CertaintyTier {

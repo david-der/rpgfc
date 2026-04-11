@@ -15,9 +15,5 @@ export type { RenderContext } from "./context.js";
 export { computeCertainty } from "./certainty.js";
 export { bucketExperience } from "./experience.js";
 export { tierWordFor } from "./thesaurus.js";
-export {
-  renderPlayerById,
-  renderPlayersPage,
-  runPlayersSeed,
-} from "./player-response.js";
+export { renderPlayerById, renderPlayersPage, runPlayersSeed } from "./player-response.js";
 export type { RenderedPlayerPage } from "./player-response.js";

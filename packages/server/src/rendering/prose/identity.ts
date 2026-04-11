@@ -30,7 +30,8 @@ function standouts(hidden: HiddenPlayer, precision: "fine" | "coarse") {
   entries.sort((a, b) => b[1] - a[1]);
   const top = entries[0];
   const bottom = entries[entries.length - 1];
-  if (!top || !bottom) return { topWord: "capable", bottomWord: "ordinary", topKey: "pace" as NaturalGiftKey };
+  if (!top || !bottom)
+    return { topWord: "capable", bottomWord: "ordinary", topKey: "pace" as NaturalGiftKey };
   return {
     topKey: top[0],
     topWord: tierWordFor(top[0], top[1], precision),
