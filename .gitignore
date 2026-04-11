@@ -1,0 +1,49 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build outputs
+dist/
+build/
+*.tsbuildinfo
+packages/*/dist/
+packages/web/dist/
+
+# test / coverage
+coverage/
+test-results/
+playwright-report/
+.vitest-cache/
+
+# local databases and saves
+saves/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# env
+.env
+.env.local
+.env.*.local
+
+# editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# docker
+.docker/
+
+# drizzle meta (generated migration journals retained; only meta cache ignored)
+packages/server/drizzle/meta/_journal.json.bak

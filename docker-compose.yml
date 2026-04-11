@@ -1,0 +1,22 @@
+# Disposable local Postgres for dual-dialect parity testing (TDD v2 §11.3).
+# Not used in production — RDS Postgres on AWS replaces this.
+services:
+  postgres:
+    image: postgres:16
+    container_name: rpgfc-postgres-dev
+    environment:
+      POSTGRES_USER: rpgfc
+      POSTGRES_PASSWORD: rpgfc
+      POSTGRES_DB: rpgfc
+    ports:
+      - "5432:5432"
+    volumes:
+      - rpgfc-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rpgfc"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  rpgfc-pgdata:

@@ -1,0 +1,34 @@
+{
+  "name": "rpgfc",
+  "version": "0.0.0",
+  "private": true,
+  "description": "RPG FC — football management game. Walking skeleton.",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "DATABASE_URL=${DATABASE_URL:-sqlite:$PWD/saves/dev.db} pnpm run --parallel --filter @rpgfc/server --filter @rpgfc/web dev",
+    "build": "pnpm -r --filter @rpgfc/shared --filter @rpgfc/web --filter @rpgfc/server build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "eslint . --ext .ts,.tsx,.cjs,.mjs,.js --max-warnings 0",
+    "lint:fixtures": "eslint tests/fixtures/eslint/violations --no-error-on-unmatched-pattern",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "pnpm -r test",
+    "doctrine": "pnpm --filter @rpgfc/web build && pnpm --filter @rpgfc/server build && playwright test --config tests/doctrine/playwright.config.ts",
+    "db:generate": "pnpm --filter @rpgfc/server db:generate",
+    "db:reset": "rm -rf saves && mkdir -p saves"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.45.0",
+    "@types/node": "^20.12.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "@typescript-eslint/utils": "^8.0.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-rpgfc": "workspace:*",
+    "prettier": "^3.3.0",
+    "typescript": "^5.4.0"
+  }
+}

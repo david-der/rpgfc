@@ -1,0 +1,14 @@
+node_modules
+dist
+build
+coverage
+playwright-report
+test-results
+saves
+*.md
+pnpm-lock.yaml
+packages/web/src/routeTree.gen.ts
+# GitHub Actions YAML has some syntax Prettier's default YAML parser rejects.
+.github/
+# Fixtures deliberately violate rules; their formatting is not load-bearing.
+tests/fixtures/

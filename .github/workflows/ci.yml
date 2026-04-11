@@ -1,0 +1,111 @@
+# RPG FC CI — per TDD v2 §15.1. Four required jobs:
+#   1. lint         — ESLint + TypeScript strict compile across all packages.
+#   2. test-sqlite  — Vitest against in-memory SQLite.
+#   3. test-postgres — Vitest against a disposable Postgres 16 service.
+#   4. doctrine     — Playwright doctrine suite against the production build.
+#
+# `build-image` is gated to push-on-main and builds the Docker image. Story
+# 00 does not deploy; that ships in Story 09.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+
+  test-sqlite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+        env:
+          DATABASE_URL: sqlite::memory:
+
+  test-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: rpgfc
+          POSTGRES_PASSWORD: rpgfc
+          POSTGRES_DB: rpgfc
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @rpgfc/server test
+        env:
+          DATABASE_URL: postgres://rpgfc:rpgfc@localhost:5432/rpgfc
+          TEST_POSTGRES_URL: postgres://rpgfc:rpgfc@localhost:5432/rpgfc
+
+  doctrine:
+    runs-on: ubuntu-latest
+    needs: [test-sqlite]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @rpgfc/shared build
+      - run: pnpm --filter @rpgfc/web build
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm doctrine
+        env:
+          CI: "true"
+
+  build-image:
+    runs-on: ubuntu-latest
+    needs: [lint, test-sqlite, test-postgres, doctrine]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image
+        run: docker build -f docker/Dockerfile -t rpgfc:${{ github.sha }} .
+      - name: Image size + non-root check
+        run: IMAGE=rpgfc:${{ github.sha }} ./tests/docker/image-size.sh
+      - name: SQLite boot smoke
+        run: IMAGE=rpgfc:${{ github.sha }} ./tests/docker/sqlite-boot.sh

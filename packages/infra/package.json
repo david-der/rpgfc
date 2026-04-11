@@ -1,0 +1,9 @@
+{
+  "name": "@rpgfc/infra",
+  "version": "0.0.0",
+  "private": true,
+  "description": "AWS CDK stacks for RPG FC (Story 09 — not implemented in Story 00).",
+  "scripts": {
+    "typecheck": "echo 'infra typecheck deferred to Story 09'"
+  }
+}

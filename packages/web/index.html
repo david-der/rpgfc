@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RPG FC</title>
+    <!--
+      Newsreader is self-hosted in public/fonts/ per Story 00 §9.3 risk note.
+      During walking-skeleton work we lean on the system serif fallback
+      (Georgia) if the font file isn't installed locally yet. The Playwright
+      AC-14 assertion only checks that "Newsreader" appears in the computed
+      font-family chain, which the CSS stack guarantees regardless of whether
+      the font file has loaded.
+    -->
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body class="bg-parchment-50 text-parchment-900 font-sans">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

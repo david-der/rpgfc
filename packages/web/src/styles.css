@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Club theming — only these six CSS variables change when a club theme is
+   applied. The default values are moss/clay (Style Guide §3.1). Universal
+   tokens (parchment spine, form gradient, semantic, certainty) never change. */
+:root {
+  --club-primary: #5c6b33;
+  --club-primary-ink: #faf7f0;
+  --club-primary-soft: #dde3c9;
+  --club-secondary: #865732;
+  --club-secondary-ink: #faf7f0;
+  --club-stripe: #363f1e;
+}
+
+body {
+  background-color: #faf7f0; /* parchment-50 */
+  color: #1a1812; /* parchment-900 */
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Numeric displays: tabular-nums so digits never shift width as values
+   update. Style Guide §4.5 makes this mandatory for scorelines, minute
+   markers, dates, and fees. */
+.font-mono,
+[data-numeric] {
+  font-variant-numeric: tabular-nums;
+}

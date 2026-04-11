@@ -1,0 +1,16 @@
+{
+  "name": "eslint-plugin-rpgfc",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./index.cjs",
+  "exports": {
+    ".": "./index.cjs"
+  },
+  "scripts": {
+    "typecheck": "echo 'no typecheck for eslint-plugin-rpgfc (plain JS)'",
+    "test": "echo 'rules are covered by server fixture tests (AC-04, AC-05)'"
+  },
+  "peerDependencies": {
+    "eslint": "^8.57.0"
+  }
+}
