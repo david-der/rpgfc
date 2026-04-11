@@ -88,3 +88,51 @@ export async function tickWorldObservations() {
   if (!res.ok) throw new Error(`observation tick failed: ${res.status}`);
   return res.json();
 }
+
+// ── Story 04 — transfers + contracts ──────────────────────────────────────
+
+export async function fetchTransfers() {
+  const res = await api.api.transfers.$get();
+  if (!res.ok) throw new Error(`transfers fetch failed: ${res.status}`);
+  return res.json();
+}
+
+type CurrencyTier = "Minimal" | "Modest" | "Notable" | "Significant" | "Elite";
+type PlayingTimeRole =
+  | "Star Player"
+  | "Important Player"
+  | "Rotation"
+  | "Backup"
+  | "Youth/Development";
+
+export async function submitBid(
+  playerId: string,
+  body: {
+    feeTier: CurrencyTier;
+    wageTier: CurrencyTier;
+    signingBonusTier?: CurrencyTier;
+    rolePromise: PlayingTimeRole;
+    isLoan?: boolean;
+  },
+) {
+  const res = await api.api.transfers[":playerId"].bid.$post({
+    param: { playerId },
+    json: body,
+  });
+  if (!res.ok) throw new Error(`bid submit failed: ${res.status}`);
+  return res.json();
+}
+
+export async function forceAcceptBid(bidId: number) {
+  const res = await api.api.transfers.bids[":bidId"]["force-accept"].$post({
+    param: { bidId: String(bidId) },
+  });
+  if (!res.ok) throw new Error(`force-accept failed: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchPlayerContract(id: string) {
+  const res = await api.api.players[":id"].contract.$get({ param: { id } });
+  if (!res.ok) throw new Error(`contract fetch failed: ${res.status}`);
+  return res.json();
+}

@@ -26,12 +26,13 @@ import { useQuery } from "@tanstack/react-query";
 
 import { BadgeStack } from "../components/ui/BadgeStack";
 import { CertaintyText } from "../components/ui/CertaintyText";
+import { ContractCard } from "../components/ui/ContractCard";
 import { KeyNumber } from "../components/ui/KeyNumber";
 import { NarrativeBlock } from "../components/ui/NarrativeBlock";
 import { ScoutReportCard } from "../components/ui/ScoutReportCard";
 import { TabBar, type TabDefinition } from "../components/ui/TabBar";
 import { TierPill } from "../components/ui/TierPill";
-import { fetchPlayer, fetchPlayerReports } from "../lib/api";
+import { fetchPlayer, fetchPlayerContract, fetchPlayerReports } from "../lib/api";
 
 export const Route = createFileRoute("/players/$id")({
   component: PlayerProfile,
@@ -56,6 +57,10 @@ function PlayerProfile() {
   const reportsQuery = useQuery({
     queryKey: ["player-reports", id],
     queryFn: () => fetchPlayerReports(id),
+  });
+  const contractQuery = useQuery({
+    queryKey: ["player-contract", id],
+    queryFn: () => fetchPlayerContract(id),
   });
 
   if (query.isPending) {
@@ -134,7 +139,26 @@ function PlayerProfile() {
       label: "Relationships",
       content: <ComingSoon label="relationships" />,
     },
-    { key: "contract", label: "Contract", content: <ComingSoon label="contract" /> },
+    {
+      key: "contract",
+      label: "Contract",
+      content: (
+        <section className="space-y-4">
+          {contractQuery.isPending && <p className="text-parchment-600">Loading contract…</p>}
+          {contractQuery.isError && (
+            <p className="text-semantic-error">Could not load the contract.</p>
+          )}
+          {contractQuery.data?.contract ? (
+            <ContractCard contract={contractQuery.data.contract} />
+          ) : contractQuery.isSuccess ? (
+            <p className="text-sm italic text-parchment-500">
+              No contract on file yet. Sign this player through the transfer market to populate this
+              tab.
+            </p>
+          ) : null}
+        </section>
+      ),
+    },
     {
       key: "reports",
       label: "Reports",

@@ -10,14 +10,21 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as TransfersIndexRouteImport } from './routes/transfers.index'
 import { Route as ScoutsIndexRouteImport } from './routes/scouts.index'
 import { Route as PlayersIndexRouteImport } from './routes/players.index'
+import { Route as TransfersPlayerIdRouteImport } from './routes/transfers.$playerId'
 import { Route as ScoutsIdRouteImport } from './routes/scouts.$id'
 import { Route as PlayersIdRouteImport } from './routes/players.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TransfersIndexRoute = TransfersIndexRouteImport.update({
+  id: '/transfers/',
+  path: '/transfers/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ScoutsIndexRoute = ScoutsIndexRouteImport.update({
@@ -28,6 +35,11 @@ const ScoutsIndexRoute = ScoutsIndexRouteImport.update({
 const PlayersIndexRoute = PlayersIndexRouteImport.update({
   id: '/players/',
   path: '/players/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TransfersPlayerIdRoute = TransfersPlayerIdRouteImport.update({
+  id: '/transfers/$playerId',
+  path: '/transfers/$playerId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ScoutsIdRoute = ScoutsIdRouteImport.update({
@@ -45,44 +57,68 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/players/$id': typeof PlayersIdRoute
   '/scouts/$id': typeof ScoutsIdRoute
+  '/transfers/$playerId': typeof TransfersPlayerIdRoute
   '/players/': typeof PlayersIndexRoute
   '/scouts/': typeof ScoutsIndexRoute
+  '/transfers/': typeof TransfersIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/players/$id': typeof PlayersIdRoute
   '/scouts/$id': typeof ScoutsIdRoute
+  '/transfers/$playerId': typeof TransfersPlayerIdRoute
   '/players': typeof PlayersIndexRoute
   '/scouts': typeof ScoutsIndexRoute
+  '/transfers': typeof TransfersIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/players/$id': typeof PlayersIdRoute
   '/scouts/$id': typeof ScoutsIdRoute
+  '/transfers/$playerId': typeof TransfersPlayerIdRoute
   '/players/': typeof PlayersIndexRoute
   '/scouts/': typeof ScoutsIndexRoute
+  '/transfers/': typeof TransfersIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/players/$id' | '/scouts/$id' | '/players/' | '/scouts/'
+  fullPaths:
+    | '/'
+    | '/players/$id'
+    | '/scouts/$id'
+    | '/transfers/$playerId'
+    | '/players/'
+    | '/scouts/'
+    | '/transfers/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/players/$id' | '/scouts/$id' | '/players' | '/scouts'
+  to:
+    | '/'
+    | '/players/$id'
+    | '/scouts/$id'
+    | '/transfers/$playerId'
+    | '/players'
+    | '/scouts'
+    | '/transfers'
   id:
     | '__root__'
     | '/'
     | '/players/$id'
     | '/scouts/$id'
+    | '/transfers/$playerId'
     | '/players/'
     | '/scouts/'
+    | '/transfers/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   PlayersIdRoute: typeof PlayersIdRoute
   ScoutsIdRoute: typeof ScoutsIdRoute
+  TransfersPlayerIdRoute: typeof TransfersPlayerIdRoute
   PlayersIndexRoute: typeof PlayersIndexRoute
   ScoutsIndexRoute: typeof ScoutsIndexRoute
+  TransfersIndexRoute: typeof TransfersIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -92,6 +128,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/transfers/': {
+      id: '/transfers/'
+      path: '/transfers'
+      fullPath: '/transfers/'
+      preLoaderRoute: typeof TransfersIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/scouts/': {
@@ -106,6 +149,13 @@ declare module '@tanstack/react-router' {
       path: '/players'
       fullPath: '/players/'
       preLoaderRoute: typeof PlayersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/transfers/$playerId': {
+      id: '/transfers/$playerId'
+      path: '/transfers/$playerId'
+      fullPath: '/transfers/$playerId'
+      preLoaderRoute: typeof TransfersPlayerIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/scouts/$id': {
@@ -129,8 +179,10 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   PlayersIdRoute: PlayersIdRoute,
   ScoutsIdRoute: ScoutsIdRoute,
+  TransfersPlayerIdRoute: TransfersPlayerIdRoute,
   PlayersIndexRoute: PlayersIndexRoute,
   ScoutsIndexRoute: ScoutsIndexRoute,
+  TransfersIndexRoute: TransfersIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

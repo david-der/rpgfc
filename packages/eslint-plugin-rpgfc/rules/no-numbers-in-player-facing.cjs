@@ -11,7 +11,14 @@
 // That is where the rule is relaxed for jersey numbers, ages, scorelines,
 // and years — each allowlisted site is a documented decision.
 
-const NUMBER_RE = /\b\d+(\.\d+)?\b/;
+// Any run of 1+ digits anywhere in the text — no word-boundary
+// requirement, so `£14m` and `2x` both trip the rule. Story 04 widened
+// this from `\b\d+(\.\d+)?\b` because currency strings often wrap digits
+// in suffixes like "m" / "k" / "bn" that the word-boundary check skipped.
+const NUMBER_RE = /\d/;
+// Currency glyphs. Independent signal — a bare `$` or `£` in player-
+// facing JSX is a doctrine violation even without a trailing digit.
+const CURRENCY_GLYPH_RE = /[£$€¥]/;
 
 const NUMERIC_ATTRIBUTE_NAMES = new Set([
   "pace",
@@ -68,9 +75,11 @@ module.exports = {
         if (isAllowlisted) return;
 
         for (const child of node.children) {
-          if (child.type === "JSXText" && NUMBER_RE.test(child.value)) {
-            context.report({ node: child, messageId: "leaked" });
-            continue;
+          if (child.type === "JSXText") {
+            if (NUMBER_RE.test(child.value) || CURRENCY_GLYPH_RE.test(child.value)) {
+              context.report({ node: child, messageId: "leaked" });
+              continue;
+            }
           }
           if (child.type === "JSXExpressionContainer") {
             const expr = child.expression;
@@ -82,7 +91,10 @@ module.exports = {
             if (
               expr.type === "TemplateLiteral" &&
               expr.quasis &&
-              expr.quasis.some((q) => NUMBER_RE.test(q.value && q.value.raw))
+              expr.quasis.some((q) => {
+                const raw = q.value && q.value.raw;
+                return NUMBER_RE.test(raw) || CURRENCY_GLYPH_RE.test(raw);
+              })
             ) {
               context.report({ node: child, messageId: "leaked" });
               continue;
