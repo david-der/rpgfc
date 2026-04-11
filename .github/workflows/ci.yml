@@ -22,8 +22,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # pnpm version is read from the `packageManager` field in package.json.
+      # Do NOT pass `version:` here — pnpm/action-setup@v4 errors when both
+      # are set, and the error shows up at workflow-load time as
+      # "No jobs were run".
       - uses: pnpm/action-setup@v4
-        with: { version: 9 }
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -36,8 +39,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # pnpm version is read from the `packageManager` field in package.json.
+      # Do NOT pass `version:` here — pnpm/action-setup@v4 errors when both
+      # are set, and the error shows up at workflow-load time as
+      # "No jobs were run".
       - uses: pnpm/action-setup@v4
-        with: { version: 9 }
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -65,8 +71,11 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v4
+      # pnpm version is read from the `packageManager` field in package.json.
+      # Do NOT pass `version:` here — pnpm/action-setup@v4 errors when both
+      # are set, and the error shows up at workflow-load time as
+      # "No jobs were run".
       - uses: pnpm/action-setup@v4
-        with: { version: 9 }
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -82,8 +91,11 @@ jobs:
     needs: [test-sqlite]
     steps:
       - uses: actions/checkout@v4
+      # pnpm version is read from the `packageManager` field in package.json.
+      # Do NOT pass `version:` here — pnpm/action-setup@v4 errors when both
+      # are set, and the error shows up at workflow-load time as
+      # "No jobs were run".
       - uses: pnpm/action-setup@v4
-        with: { version: 9 }
       - uses: actions/setup-node@v4
         with:
           node-version: 20
