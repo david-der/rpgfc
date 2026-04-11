@@ -2,9 +2,20 @@
 //
 // Layout:
 //   - 2px club-stripe top edge (driven by --club-stripe CSS variable).
-//   - Hero with serif name, one-line identity, BadgeStack.
-//   - TabBar: Overview (fully wired) / History / Badges / Relationships /
-//     Contract / Reports (all stubbed).
+//   - Hero: club-stripe eyebrow, serif name, identity subtitle, one-line
+//     overall CertaintyText, KeyNumber for age, muted TierPill for experience.
+//   - TabBar: Overview (Style Guide §10.3 reading surface) / History / Badges /
+//     Relationships / Contract / Reports (latter five stubbed for Story 01).
+//
+// Fix-spec 01 applied (six craft fixes):
+//   FIX-01 — Identity prose appears exactly once, as the hero subtitle.
+//            The Overview body's drop-cap opens on player.prose.currentForm.
+//   FIX-02 — Experience row removed from the Facts list; the hero TierPill
+//            is the single expression of ExperienceTier on the page.
+//   FIX-03 — KeyNumber now renders the age in JetBrains Mono + tabular-nums.
+//   FIX-04 — TabBar labels force Inter regardless of ancestor font stack.
+//   FIX-05 — TierPill defaults to the muted (outlined) variant.
+//   FIX-06 — Overall CertaintyText sits under the subtitle in the hero.
 
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -63,9 +74,12 @@ function PlayerProfile() {
       label: "Overview",
       content: (
         <div className="space-y-8">
-          <NarrativeBlock dropCap label="Player identity">
-            <p>{player.prose.identity}</p>
-            <p className="text-base text-parchment-700">{player.prose.currentForm}</p>
+          {/* FIX-01: Overview body opens on currentForm. The identity line
+              is already carried by the hero subtitle above — rendering it
+              again here made the drop-cap decorate the wrong sentence and
+              forced the reader to read the identity twice. */}
+          <NarrativeBlock dropCap label="Current form">
+            <p>{player.prose.currentForm}</p>
           </NarrativeBlock>
 
           <section>
@@ -79,7 +93,12 @@ function PlayerProfile() {
             <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-parchment-500">
               Facts
             </h2>
-            <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm">
+            {/* FIX-02: no Experience row — the hero TierPill owns that
+                fact. The Facts list is for things the pill doesn't say. */}
+            <dl
+              data-testid="player-facts"
+              className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm"
+            >
               <dt className="text-parchment-500">Position</dt>
               <dd data-testid="player-facing" className="text-parchment-900">
                 {player.positionLabel}
@@ -95,12 +114,6 @@ function PlayerProfile() {
               <dt className="text-parchment-500">Club</dt>
               <dd data-testid="player-facing" className="text-parchment-900">
                 {player.club?.name ?? "Free Agent"}
-              </dd>
-              <dt className="text-parchment-500">Experience</dt>
-              <dd data-testid="player-facing" className="text-parchment-900">
-                <CertaintyText certainty={player.certainty}>
-                  {player.experience.toLowerCase()}
-                </CertaintyText>
               </dd>
             </dl>
           </section>
@@ -143,11 +156,22 @@ function PlayerProfile() {
             >
               {player.prose.identity}
             </p>
+            {/* FIX-06: overall certainty announces how confident the
+                manager is in the identity they're reading. Sits under the
+                subtitle, once per profile, in the Style Guide §2.6
+                typography treatment for the tier. */}
+            <p
+              data-testid="player-certainty"
+              className="mt-2 text-xs uppercase tracking-wide text-parchment-500"
+            >
+              Known <CertaintyText certainty={player.certainty}>{player.certainty}</CertaintyText>
+            </p>
           </div>
           <div className="flex items-start gap-6">
             <KeyNumber value={player.age} label="Age" allowlistReason="age" />
             <div className="flex flex-col items-start gap-2">
-              <TierPill label={player.experience} tier={player.experience} />
+              {/* FIX-05: TierPill defaults to the muted outlined variant. */}
+              <TierPill tier={player.experience} />
               <span className="text-xs uppercase tracking-wide text-parchment-500">Career</span>
             </div>
           </div>

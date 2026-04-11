@@ -8,6 +8,13 @@
 // selection carries `aria-selected`. Tab activation is click / Enter /
 // Space — arrow keys are NOT handled here because the Profile page's tabs
 // don't wrap focus; linear Tab key traversal is correct.
+//
+// FIX-04: the TabBar is UI chrome and MUST render in Inter (Style Guide
+// §4). It used to rely on the parent's font stack, which meant nesting a
+// TabBar inside a NarrativeBlock bled serif type into the labels. The
+// component now sets font-family explicitly on every tab button — both
+// via the Tailwind `font-sans` utility and via an inline font-family — so
+// serif inheritance can never reach these labels regardless of ancestor.
 
 import type { ReactNode } from "react";
 import { useState } from "react";
@@ -32,13 +39,21 @@ export function TabBar({ tabs, initialKey, onChange }: TabBarProps) {
     onChange?.(key);
   };
 
+  // Explicit sans stack so serif inheritance from a parent NarrativeBlock,
+  // Card, or prose container cannot reach the tab labels. Tailwind's
+  // font-sans utility plus an inline font-family together cover both
+  // runtime behavior and jsdom's lack of Tailwind CSS resolution.
+  const tabFontStyle: React.CSSProperties = {
+    fontFamily: "Inter, system-ui, -apple-system, sans-serif",
+  };
+
   return (
     <div>
       <div role="tablist" className="flex gap-8 border-b border-parchment-300">
         {tabs.map((tab) => {
           const isActive = tab.key === active;
           const baseClass =
-            "px-3 py-3 text-sm outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-moss-600 transition-colors";
+            "px-3 py-3 text-sm font-sans outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-moss-600 transition-colors";
           const activeClass = isActive
             ? "-mb-px border-b-2 border-moss-500 font-medium text-parchment-900"
             : "-mb-px border-b border-parchment-300 text-parchment-600 hover:text-parchment-900";
@@ -51,6 +66,7 @@ export function TabBar({ tabs, initialKey, onChange }: TabBarProps) {
               aria-controls={`tabpanel-${tab.key}`}
               id={`tab-${tab.key}`}
               className={`${baseClass} ${activeClass}`}
+              style={tabFontStyle}
               onClick={() => select(tab.key)}
             >
               {tab.label}

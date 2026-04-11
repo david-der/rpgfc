@@ -19,8 +19,11 @@ test.describe("player profile — Story 01", () => {
     const headingText = await heading.textContent();
     expect(headingText).toBeTruthy();
 
-    // NarrativeBlock with identity prose.
-    const narrative = page.locator('[aria-label="Player identity"]').first();
+    // NarrativeBlock with the current-form paragraph. Fix Spec 01 (FIX-01)
+    // moved the identity prose to the hero subtitle and gave the Overview
+    // body's drop cap to currentForm, so the NarrativeBlock's aria-label
+    // is now "Current form".
+    const narrative = page.locator('[aria-label="Current form"]').first();
     await expect(narrative).toBeVisible();
 
     // BadgeStack — at least the Overview panel exposes one chip.
