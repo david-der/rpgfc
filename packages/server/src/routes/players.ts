@@ -13,7 +13,12 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import type { DbClient } from "../db/client.js";
-import { renderPlayerById, renderPlayersPage, runPlayersSeed } from "../rendering/index.js";
+import {
+  getPlayerReports,
+  renderPlayerById,
+  renderPlayersPage,
+  runPlayersSeed,
+} from "../rendering/index.js";
 import type { RenderContext } from "../rendering/index.js";
 
 export interface PlayersRouteDeps {
@@ -42,18 +47,26 @@ export function createPlayersRoute(deps: PlayersRouteDeps) {
   const app = new Hono()
     .get("/", zValidator("query", listQuery), async (c) => {
       const q = c.req.valid("query");
-      const ctx: RenderContext = { viewerScoutLevel: 3, now: deps.now() };
+      const ctx: RenderContext = { now: deps.now() };
       const page = await renderPlayersPage(deps.db, q, ctx);
       return c.json(page);
     })
     .get("/:id", zValidator("param", idParam), async (c) => {
       const { id } = c.req.valid("param");
-      const ctx: RenderContext = { viewerScoutLevel: 3, now: deps.now() };
+      const ctx: RenderContext = { now: deps.now() };
       const rendered = await renderPlayerById(deps.db, id, ctx);
       if (!rendered) {
         return c.json({ error: { code: "not_found", message: "Player not found" } }, 404);
       }
       return c.json(rendered);
+    })
+    // Story 03 — scout reports for a specific player. Lives under
+    // /api/players/:id/reports per the story doc; the rendering layer's
+    // `getPlayerReports` does the join.
+    .get("/:id/reports", zValidator("param", idParam), async (c) => {
+      const { id } = c.req.valid("param");
+      const items = await getPlayerReports(deps.db, id);
+      return c.json({ items });
     });
 
   if (deps.devEndpointsEnabled) {

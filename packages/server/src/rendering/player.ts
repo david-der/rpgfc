@@ -1,4 +1,9 @@
-import type { CertaintyTier, RenderedPlayer } from "@rpgfc/shared";
+import type {
+  BadgeRef,
+  CertaintyTier,
+  RenderedClubRef,
+  RenderedPlayer,
+} from "@rpgfc/shared";
 import { ARCHETYPE_BY_ID, asRenderedPlayer } from "@rpgfc/shared";
 import type { HiddenPlayer } from "@rpgfc/shared/types/hidden";
 
@@ -13,9 +18,12 @@ import { generateIdentityProse } from "./prose/identity.js";
 // the codebase permitted to read HiddenPlayer.hiddenAttrs directly — enforced
 // by the `no-hidden-in-routes` ESLint rule and by architectural convention.
 //
-// Takes a HiddenPlayer plus viewer context and produces a RenderedPlayer
-// safe for the wire. Callers downstream (routes, response serialization)
-// must never see the input type.
+// Story 03 changes:
+//   - `findClub` returns the full RenderedClubRef (colors + reputation +
+//     nationality), not the Story 01 (id, name) stub.
+//   - Per-badge certainty is read from the knowledge graph snapshot on
+//     ctx, not the global player tier. A badge the manager has never been
+//     told about renders Unknown even if the player overall is Confident.
 
 function ageFromDob(dob: string, now: Date): number {
   const birth = new Date(dob + "T00:00:00Z");
@@ -28,8 +36,19 @@ function ageFromDob(dob: string, now: Date): number {
 }
 
 export interface RenderPlayerDeps {
-  /** Fetch club shell by id for the rendered output. */
-  findClub: (id: number) => { id: number; name: string } | null;
+  /** Fetch a fully-hydrated club ref by id. Returns null when the player
+   *  is a free agent or the club id can't be resolved. */
+  findClub: (id: number) => RenderedClubRef | null;
+}
+
+function badgeCertaintyFromKnowledge(
+  ctx: RenderContext,
+  badgeKey: string,
+  fallback: CertaintyTier,
+): CertaintyTier {
+  if (!ctx.knowledge) return fallback;
+  const obs = ctx.knowledge.best.get(`badge_presence:${badgeKey}`);
+  return obs?.certainty ?? "Unknown";
 }
 
 export function renderPlayer(
@@ -37,10 +56,23 @@ export function renderPlayer(
   ctx: RenderContext,
   deps: RenderPlayerDeps,
 ): RenderedPlayer {
-  const certainty: CertaintyTier = computeCertainty(hidden, ctx);
-  const precision = certainty === "Certain" || certainty === "Confident" ? "fine" : "coarse";
+  const overall: CertaintyTier = computeCertainty(hidden, ctx);
+  const precision = overall === "Certain" || overall === "Confident" ? "fine" : "coarse";
 
-  const badges = resolveBadges({ name: hidden.name, badgeKeys: hidden.badgeKeys }, certainty);
+  // Each badge gets its own per-fact certainty when the knowledge graph
+  // has an observation for it; falls back to the player's overall
+  // certainty otherwise. The legacy `resolveBadges(snapshot, certainty)`
+  // call assigned a single certainty across the whole stack — Story 03
+  // overrides per-badge after the fact.
+  const baseBadges = resolveBadges(
+    { name: hidden.name, badgeKeys: hidden.badgeKeys },
+    overall,
+  );
+  const badges: BadgeRef[] = baseBadges.map((b) => ({
+    ...b,
+    certainty: badgeCertaintyFromKnowledge(ctx, b.key, overall),
+  }));
+
   const identity = generateIdentityProse({ hidden, badges, precision });
   const currentForm = generateFormProse(hidden);
 
@@ -58,7 +90,7 @@ export function renderPlayer(
     club,
     badges,
     prose: { identity, currentForm },
-    certainty,
+    certainty: overall,
     experience: bucketExperience(hidden.experienceYears),
   });
 }

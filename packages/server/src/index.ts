@@ -21,6 +21,8 @@ import { join } from "node:path";
 import type { DbClient, Dialect } from "./db/client.js";
 import type { HealthSnapshot } from "./routes/health.js";
 import { createPlayersRoute } from "./routes/players.js";
+import { createScoutsRoute } from "./routes/scouts.js";
+import { createWorldRoute } from "./routes/world.js";
 
 export interface ApiDeps {
   dialect: Dialect;
@@ -43,14 +45,24 @@ export interface AppDeps extends ApiDeps {
 
 // API-only factory. The /api/health handler stays inline so Hono's RPC type
 // inference continues to surface its concrete response shape on the web
-// client. The /api/players sub-app is mounted via .route() — it's accessed
-// through the typed RPC client at `client.api.players.<method>`, which the
-// web client uses for data fetching.
+// client. Sub-apps for /api/players, /api/scouts, /api/world are mounted
+// via .route() and accessed through the typed RPC client at
+// `client.api.players.<method>`, etc.
 export function createApiApp(deps: ApiDeps) {
   const playersApp = createPlayersRoute({
     db: deps.db,
     devEndpointsEnabled: deps.devEndpointsEnabled,
     now: deps.now,
+  });
+  const scoutsApp = createScoutsRoute({
+    db: deps.db,
+    devEndpointsEnabled: deps.devEndpointsEnabled,
+    currentRunId: 1,
+  });
+  const worldApp = createWorldRoute({
+    db: deps.db,
+    devEndpointsEnabled: deps.devEndpointsEnabled,
+    currentRunId: 1,
   });
   return new Hono()
     .get("/api/health", (c) => {
@@ -61,7 +73,9 @@ export function createApiApp(deps: ApiDeps) {
       };
       return c.json(body);
     })
-    .route("/api/players", playersApp);
+    .route("/api/players", playersApp)
+    .route("/api/scouts", scoutsApp)
+    .route("/api/world", worldApp);
 }
 
 // AppType is derived from the API-only factory. The web package's RPC client

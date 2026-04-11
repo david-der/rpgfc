@@ -17,3 +17,11 @@ export { bucketExperience } from "./experience.js";
 export { tierWordFor } from "./thesaurus.js";
 export { renderPlayerById, renderPlayersPage, runPlayersSeed } from "./player-response.js";
 export type { RenderedPlayerPage } from "./player-response.js";
+export {
+  listScouts,
+  getScout,
+  getPlayerReports,
+  startScoutAssignment,
+  tickWorldObservations,
+} from "./scout-response.js";
+export type { ScoutWithAssignment } from "./scout-response.js";

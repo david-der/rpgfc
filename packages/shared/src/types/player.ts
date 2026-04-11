@@ -43,9 +43,29 @@ export interface HiddenPlayer {
   narrativeSeed: NarrativeSeed;
 }
 
+export const REPUTATION_TIERS = [
+  "Local",
+  "Regional",
+  "National",
+  "Continental",
+  "Elite",
+] as const;
+export type ReputationTier = (typeof REPUTATION_TIERS)[number];
+
+export interface ClubColors {
+  primary: string;
+  secondary: string;
+  stripe: string;
+  primaryInk: string;
+  secondaryInk: string;
+}
+
 export interface RenderedClubRef {
   id: number;
   name: string;
+  nationality: string;
+  reputation: ReputationTier;
+  colors: ClubColors;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -73,6 +93,10 @@ export interface WirePlayer {
   /** How confidently the current viewer knows this player overall. */
   certainty: CertaintyTier;
   experience: ExperienceTier;
+  /** Story 03: recent scout reports about this player. May be empty or
+   *  absent when the list endpoint wants to save bytes; the profile
+   *  endpoint always populates it. */
+  scoutReports?: import("./scout.js").ScoutReportRef[];
 }
 
 // RenderedPlayer is the server-internal branded flavor of WirePlayer. Only

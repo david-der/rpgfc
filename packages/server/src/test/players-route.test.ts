@@ -8,6 +8,8 @@ import { createDbClient, type DbClient } from "../db/client.js";
 import { runMigrations } from "../db/migrate.js";
 import { seedWorldIfEmpty } from "../application/players/index.js";
 import { seedContentIfMissing } from "../application/content-seed.js";
+import { seedClubIdentityIfMissing } from "../application/clubs/seed-identity.js";
+import { seedScoutsIfMissing } from "../application/scouting/seed-scouts.js";
 import { createApiApp } from "../index.js";
 
 const REFERENCE_DATE = new Date("2026-06-01T00:00:00Z");
@@ -35,6 +37,9 @@ describe("/api/players — Story 01 AC-11/12/13", () => {
       playersPerClub: 20,
       referenceDate: REFERENCE_DATE,
     });
+    // Story 03 side-tables so renderPlayer can resolve expanded RenderedClubRef.
+    await seedClubIdentityIfMissing(db);
+    await seedScoutsIfMissing(db, 1);
   });
 
   afterAll(() => {

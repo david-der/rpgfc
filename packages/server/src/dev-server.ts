@@ -9,7 +9,9 @@ import { runMigrations } from "./db/migrate.js";
 import { parseEnv } from "./env.js";
 import { createApp } from "./index.js";
 import { seedContentIfMissing } from "./application/content-seed.js";
+import { seedClubIdentityIfMissing } from "./application/clubs/seed-identity.js";
 import { seedWorldIfEmpty } from "./application/players/index.js";
+import { seedScoutsIfMissing } from "./application/scouting/seed-scouts.js";
 
 const env = parseEnv();
 
@@ -51,6 +53,18 @@ async function main() {
       { clubs: seedResult.clubsCreated, players: seedResult.playersCreated },
       "Seeded initial world",
     );
+  }
+
+  // Story 03: every seeded club gets a color + reputation + wage-budget
+  // row; every run gets 4 named scouts. Both idempotent — re-running
+  // dev after the first boot is a no-op.
+  const identityResult = await seedClubIdentityIfMissing(dbClient);
+  if (identityResult.clubsUpdated > 0) {
+    logger.info(identityResult, "Seeded club identity");
+  }
+  const scoutSeed = await seedScoutsIfMissing(dbClient, 1);
+  if (!scoutSeed.skipped) {
+    logger.info({ scouts: scoutSeed.scoutsInserted }, "Seeded scouts");
   }
 
   // WEB_DIST points at a built Vite bundle. In local dev Vite runs on :5173

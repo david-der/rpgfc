@@ -1,18 +1,39 @@
-// Story 01 AC-08, AC-09, AC-10 — rendering layer tests.
+// Story 01 + Story 03 — rendering layer tests.
+//
+// Story 03 replaced the synthetic viewerScoutLevel with a real knowledge
+// graph snapshot on RenderContext. The AC-08 / AC-09 / AC-10 contracts
+// from Story 01 still hold; the test fixtures just speak to the new
+// snapshot shape instead of the old level integer.
 import { describe, expect, it } from "vitest";
 
+import type { CertaintyTier, ClubColors } from "@rpgfc/shared";
 import { asHiddenPlayer } from "@rpgfc/shared/types/hidden";
 
 import { generateWorld } from "../application/generation/generate-world.js";
 import { tierWordFor } from "../rendering/thesaurus.js";
 import { bucketExperience } from "../rendering/experience.js";
+import type { FactObservation, PlayerKnowledge } from "../rendering/knowledge.js";
 import { renderPlayer } from "../rendering/player.js";
 import type { RenderContext, RenderPlayerDeps } from "../rendering/index.js";
 
 const REFERENCE_DATE = new Date("2026-06-01T00:00:00Z");
 
+const STUB_COLORS: ClubColors = {
+  primary: "#5C6B33",
+  secondary: "#865732",
+  stripe: "#363F1E",
+  primaryInk: "#FAF7F0",
+  secondaryInk: "#FAF7F0",
+};
+
 const deps: RenderPlayerDeps = {
-  findClub: (id) => ({ id, name: `Club ${id}` }),
+  findClub: (id) => ({
+    id,
+    name: `Club ${id}`,
+    nationality: "ES",
+    reputation: "Regional",
+    colors: STUB_COLORS,
+  }),
 };
 
 function world() {
@@ -24,6 +45,30 @@ function world() {
   });
 }
 
+// Build a deterministic knowledge snapshot at a chosen overall tier.
+// Story 03's aggregateOverallCertainty takes the min of max-per-fact-type,
+// so a snapshot with one Certain fact across each fact type yields the
+// requested ceiling.
+function snapshotAtTier(playerId: number, tier: CertaintyTier): PlayerKnowledge {
+  const observation = (factType: string, factKey: string): FactObservation => ({
+    factType,
+    factKey,
+    factValueTier: "tier",
+    certainty: tier,
+    observedAt: REFERENCE_DATE.toISOString(),
+    sourceScoutId: 1,
+  });
+  const all: FactObservation[] = [
+    observation("natural_gift_tier", "pace"),
+    observation("mental_trait_tier", "leadership"),
+    observation("badge_presence", "clutch_finisher"),
+    observation("club_membership", "current_club"),
+  ];
+  const best = new Map<string, FactObservation>();
+  for (const fact of all) best.set(`${fact.factType}:${fact.factKey}`, fact);
+  return { playerId, all, best };
+}
+
 describe("AC-08 — rendering prose never contains digits", () => {
   it("for every player in a seeded world at every certainty level", () => {
     const w = world();
@@ -31,48 +76,95 @@ describe("AC-08 — rendering prose never contains digits", () => {
       c.players.map((p, i) => asHiddenPlayer({ id: i + 1, ...p })),
     );
 
-    for (const level of [0, 1, 2, 3, 4, 5]) {
-      const ctx: RenderContext = { viewerScoutLevel: level, now: REFERENCE_DATE };
+    const tiers: CertaintyTier[] = [
+      "Unknown",
+      "Speculation",
+      "Likely",
+      "Confident",
+      "Certain",
+    ];
+    for (const tier of tiers) {
       for (const hidden of players) {
+        const ctx: RenderContext = {
+          now: REFERENCE_DATE,
+          knowledge: snapshotAtTier(hidden.id, tier),
+        };
         const rendered = renderPlayer(hidden, ctx, deps);
         expect(
           /\d/.test(rendered.prose.identity),
-          `identity prose contained a digit at level ${level}: "${rendered.prose.identity}"`,
+          `identity prose contained a digit at tier ${tier}: "${rendered.prose.identity}"`,
         ).toBe(false);
         expect(
           /\d/.test(rendered.prose.currentForm),
-          `form prose contained a digit at level ${level}: "${rendered.prose.currentForm}"`,
+          `form prose contained a digit at tier ${tier}: "${rendered.prose.currentForm}"`,
         ).toBe(false);
       }
     }
   });
 });
 
-describe("AC-09 — certainty masking", () => {
-  it("low scout level yields Speculation or worse", () => {
+describe("AC-09 — certainty is driven by the knowledge snapshot", () => {
+  it("an empty snapshot yields Unknown", () => {
     const w = world();
     const hidden = asHiddenPlayer({ id: 1, ...w.clubs[0]!.players[0]! });
-    const rendered = renderPlayer(hidden, { viewerScoutLevel: 0, now: REFERENCE_DATE }, deps);
-    expect(["Unknown", "Speculation", "Likely"]).toContain(rendered.certainty);
+    const empty: PlayerKnowledge = { playerId: 1, all: [], best: new Map() };
+    const rendered = renderPlayer(hidden, { now: REFERENCE_DATE, knowledge: empty }, deps);
+    expect(rendered.certainty).toBe("Unknown");
   });
 
-  it("max scout level yields Certain", () => {
+  it("a fully-Certain snapshot yields Certain overall", () => {
     const w = world();
     const hidden = asHiddenPlayer({ id: 1, ...w.clubs[0]!.players[0]! });
-    const rendered = renderPlayer(hidden, { viewerScoutLevel: 5, now: REFERENCE_DATE }, deps);
+    const ctx: RenderContext = {
+      now: REFERENCE_DATE,
+      knowledge: snapshotAtTier(1, "Certain"),
+    };
+    const rendered = renderPlayer(hidden, ctx, deps);
     expect(rendered.certainty).toBe("Certain");
   });
 
-  it("rendered badges carry per-badge certainty matching the viewer's tier", () => {
+  it("rendered badges fall back to overall certainty when no per-badge observation exists", () => {
     const w = world();
     const playerWithBadges = w.clubs.flatMap((c) => c.players).find((p) => p.badgeKeys.length > 0);
     expect(playerWithBadges).toBeDefined();
     const hidden = asHiddenPlayer({ id: 1, ...playerWithBadges! });
 
-    const rendered = renderPlayer(hidden, { viewerScoutLevel: 5, now: REFERENCE_DATE }, deps);
+    // Snapshot has no per-badge observations — every badge resolves to
+    // Unknown via the per-badge fallback rule.
+    const empty: PlayerKnowledge = { playerId: 1, all: [], best: new Map() };
+    const rendered = renderPlayer(
+      hidden,
+      { now: REFERENCE_DATE, knowledge: empty },
+      deps,
+    );
     for (const badge of rendered.badges) {
-      expect(badge.certainty).toBe("Certain");
+      expect(badge.certainty).toBe("Unknown");
     }
+  });
+
+  it("a per-badge observation overrides the overall certainty for that badge", () => {
+    const w = world();
+    const playerWithBadges = w.clubs.flatMap((c) => c.players).find((p) => p.badgeKeys.length > 0);
+    const hidden = asHiddenPlayer({ id: 1, ...playerWithBadges! });
+    const knownBadgeKey = hidden.badgeKeys[0]!;
+
+    // Build a snapshot that's overall Confident on the gifts but only
+    // Speculation on the specific badge — that one chip should be
+    // Speculation while every other chip is Unknown.
+    const snap = snapshotAtTier(1, "Confident");
+    snap.best.set(`badge_presence:${knownBadgeKey}`, {
+      factType: "badge_presence",
+      factKey: knownBadgeKey,
+      factValueTier: "present",
+      certainty: "Speculation",
+      observedAt: REFERENCE_DATE.toISOString(),
+      sourceScoutId: 2,
+    });
+    snap.all.unshift(snap.best.get(`badge_presence:${knownBadgeKey}`)!);
+
+    const rendered = renderPlayer(hidden, { now: REFERENCE_DATE, knowledge: snap }, deps);
+    const targetBadge = rendered.badges.find((b) => b.key === knownBadgeKey);
+    expect(targetBadge?.certainty).toBe("Speculation");
   });
 });
 
@@ -113,13 +205,21 @@ describe("experience bucketing", () => {
 });
 
 describe("renderPlayer composes all the pieces", () => {
-  it("populates every RenderedPlayer field", () => {
+  it("populates every RenderedPlayer field including the expanded club ref", () => {
     const w = world();
-    const hidden = asHiddenPlayer({ id: 7, ...w.clubs[0]!.players[0]! });
+    const hidden = asHiddenPlayer({ id: 7, ...w.clubs[0]!.players[0]!, clubId: 1 });
     const rendered = renderPlayer(
       hidden,
-      { viewerScoutLevel: 3, now: REFERENCE_DATE },
-      { findClub: () => ({ id: 1, name: "Real Madrid" }) },
+      { now: REFERENCE_DATE, knowledge: snapshotAtTier(7, "Confident") },
+      {
+        findClub: () => ({
+          id: 1,
+          name: "Real Madrid",
+          nationality: "ES",
+          reputation: "Elite",
+          colors: STUB_COLORS,
+        }),
+      },
     );
     expect(rendered.id).toBe(7);
     expect(rendered.name).toBe(hidden.name);
@@ -129,5 +229,7 @@ describe("renderPlayer composes all the pieces", () => {
     expect(rendered.prose.currentForm.length).toBeGreaterThan(10);
     expect(rendered.certainty).toBe("Confident");
     expect(rendered.experience).toBeDefined();
+    expect(rendered.club?.colors.primary).toBe(STUB_COLORS.primary);
+    expect(rendered.club?.reputation).toBe("Elite");
   });
 });

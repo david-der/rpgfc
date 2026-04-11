@@ -36,5 +36,27 @@ export type {
 
 export type { Thesaurus, ThesaurusEntry, ThesaurusKey, ThesaurusPrecision } from "./thesaurus.js";
 
-export type { RenderedPlayer, RenderedClubRef, NarrativeSeed, WirePlayer } from "./player.js";
-export { asRenderedPlayer } from "./player.js";
+export type {
+  RenderedPlayer,
+  RenderedClubRef,
+  NarrativeSeed,
+  WirePlayer,
+  ReputationTier,
+  ClubColors,
+} from "./player.js";
+export { REPUTATION_TIERS, asRenderedPlayer } from "./player.js";
+
+export type {
+  ScoutRegion,
+  ScoutVoice,
+  ScoutVoiceId,
+  ScoutTrustTier,
+  ScoutRef,
+  ScoutReportRef,
+  AssignmentRef,
+  AssignmentKind,
+} from "./scout.js";
+export { SCOUT_REGIONS, SCOUT_VOICE_IDS, SCOUT_TRUST_TIERS } from "./scout.js";
+
+export type { FactType, SubjectKind, KnowledgeNodeRef } from "./knowledge.js";
+export { FACT_TYPES } from "./knowledge.js";
