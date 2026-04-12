@@ -110,6 +110,46 @@ export async function fetchTransfers() {
   return res.json();
 }
 
+export async function fetchMyBids() {
+  const res = await api.api.transfers["my-bids"].$get();
+  if (!res.ok) throw new Error(`my-bids fetch failed: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchOffers() {
+  const res = await api.api.transfers.offers.$get();
+  if (!res.ok) throw new Error(`offers fetch failed: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchWatchlist() {
+  const res = await api.api.transfers.watchlist.$get();
+  if (!res.ok) throw new Error(`watchlist fetch failed: ${res.status}`);
+  return res.json();
+}
+
+export async function addToWatchlist(playerId: number) {
+  const res = await api.api.transfers.watchlist[":playerId"].$post({
+    param: { playerId: String(playerId) },
+  });
+  if (!res.ok) throw new Error(`watchlist add failed: ${res.status}`);
+  return res.json();
+}
+
+export async function removeFromWatchlist(playerId: number) {
+  const res = await api.api.transfers.watchlist[":playerId"].$delete({
+    param: { playerId: String(playerId) },
+  });
+  if (!res.ok) throw new Error(`watchlist remove failed: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchCompletedDeals() {
+  const res = await api.api.transfers.completed.$get();
+  if (!res.ok) throw new Error(`completed deals failed: ${res.status}`);
+  return res.json();
+}
+
 type CurrencyTier = "Minimal" | "Modest" | "Notable" | "Significant" | "Elite";
 type PlayingTimeRole =
   | "Star Player"

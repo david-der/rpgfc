@@ -6,7 +6,7 @@
 // link to player profiles and transfer bids.
 
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
 import {
@@ -19,7 +19,7 @@ import {
 import { BadgeChip } from "../components/ui/BadgeChip";
 import { CertaintyText } from "../components/ui/CertaintyText";
 import { SectionHeader } from "../components/ui/SectionHeader";
-import { fetchPlayers } from "../lib/api";
+import { addToWatchlist, fetchPlayers } from "../lib/api";
 
 export const Route = createFileRoute("/scouts/")({
   component: ScoutingSearch,
@@ -30,6 +30,11 @@ const POSITIONS = ["GK", "CB", "LB", "RB", "DM", "CM", "AM", "LW", "RW", "ST"];
 type PlayerItem = Awaited<ReturnType<typeof fetchPlayers>>["items"][number];
 
 function ScoutingSearch() {
+  const queryClient = useQueryClient();
+  const watchMutation = useMutation({
+    mutationFn: addToWatchlist,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["watchlist"] }),
+  });
   const [search, setSearch] = useState("");
   const [position, setPosition] = useState("");
   const [nationality, setNationality] = useState("");
@@ -272,13 +277,23 @@ function ScoutingSearch() {
                       </div>
                     </td>
                     <td className="px-3 py-3">
-                      <Link
-                        to="/transfers/$playerId"
-                        params={{ playerId: String(player.id) }}
-                        className="border border-moss-500 bg-parchment-50 px-2 py-1 font-sans text-xs font-medium uppercase tracking-wide text-moss-700 hover:bg-moss-50"
-                      >
-                        Bid
-                      </Link>
+                      <div className="flex gap-1">
+                        <Link
+                          to="/transfers/$playerId"
+                          params={{ playerId: String(player.id) }}
+                          className="border border-moss-500 bg-parchment-50 px-2 py-1 font-sans text-xs font-medium uppercase tracking-wide text-moss-700 hover:bg-moss-50"
+                        >
+                          Bid
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => watchMutation.mutate(player.id)}
+                          disabled={watchMutation.isPending}
+                          className="border border-parchment-400 bg-parchment-50 px-2 py-1 font-sans text-xs text-parchment-600 hover:border-parchment-700 hover:text-parchment-900"
+                        >
+                          Watch
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
