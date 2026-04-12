@@ -83,7 +83,7 @@ async function loadMyBids(client: DbClient, userClubId: number): Promise<BidRow[
        JOIN clubs fc ON fc.id = b.from_club_id
        JOIN clubs tc ON tc.id = b.to_club_id
        LEFT JOIN bid_proposals bp ON bp.id = b.current_proposal_id
-       WHERE b.from_club_id = ?
+       WHERE b.from_club_id = ? AND b.from_club_id != b.to_club_id
        ORDER BY b.id DESC`,
     )
     .all(userClubId);
@@ -105,7 +105,7 @@ async function loadOffersReceived(client: DbClient, userClubId: number): Promise
        JOIN clubs fc ON fc.id = b.from_club_id
        JOIN clubs tc ON tc.id = b.to_club_id
        LEFT JOIN bid_proposals bp ON bp.id = b.current_proposal_id
-       WHERE b.to_club_id = ?
+       WHERE b.to_club_id = ? AND b.from_club_id != b.to_club_id
        ORDER BY b.id DESC`,
     )
     .all(userClubId);
@@ -157,6 +157,7 @@ async function loadCompletedDeals(client: DbClient, userClubId: number): Promise
        JOIN clubs tc ON tc.id = b.to_club_id
        LEFT JOIN bid_proposals bp ON bp.id = b.current_proposal_id
        WHERE b.state = 'Signed'
+         AND b.from_club_id != b.to_club_id
          AND (b.from_club_id = ? OR b.to_club_id = ?)
        ORDER BY b.id DESC
        LIMIT 20`,
