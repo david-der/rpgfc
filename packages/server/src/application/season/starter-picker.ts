@@ -155,6 +155,17 @@ export async function pickStarters(client: DbClient, clubId: number): Promise<Si
         candidate.positionLabel,
         PITCH_SLOT_POSITION_FAMILIES[slot],
       ),
+      positionFamily: familyFromSlot(slot),
     })),
   };
+}
+
+// Map a PitchSlot to a coarse family the sim uses to pick stat
+// distributions. GK slot is the only unique one; everything else
+// groups into defender / midfielder / forward.
+function familyFromSlot(slot: string): "gk" | "defender" | "midfielder" | "forward" {
+  if (slot === "GK") return "gk";
+  if (/^(LB|RB|LWB|RWB|DC)/.test(slot)) return "defender";
+  if (/^(DMC|MC|AMC)/.test(slot)) return "midfielder";
+  return "forward"; // LW, RW, ST*
 }

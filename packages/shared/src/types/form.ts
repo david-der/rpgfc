@@ -38,6 +38,28 @@ export interface RenderedMatchPerformance {
   tier: FormTier;
   tierLabel: string;
   eventDescription: string | null;
+  // Opta-style facts. All allowlisted numerics in the UI — they
+  // describe what happened, not a quality judgement.
+  minutesPlayed: number;
+  shots: number;
+  shotsOnTarget: number;
+  xg: number; // already divided by 100 — e.g. 0.27
+  keyPasses: number;
+  passesAttempted: number;
+  passesCompleted: number;
+  passAccuracy: number; // 0..1
+  tacklesAttempted: number;
+  tacklesWon: number;
+  interceptions: number;
+  clearances: number;
+  aerialsWon: number;
+  aerialsContested: number;
+  dribblesCompleted: number;
+  foulsCommitted: number;
+  foulsDrawn: number;
+  saves: number;
+  yellowCards: number;
+  redCards: number;
 }
 
 export interface RenderedMatch {

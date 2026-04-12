@@ -131,24 +131,27 @@ export async function advanceMatchday(
       );
       const insertPerf = client.sqlite.prepare(
         `INSERT INTO player_match_performance
-           (match_id, player_id, club_id, goals, assists, tier, event_description)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+           (match_id, player_id, club_id, goals, assists, tier, event_description,
+            minutes_played, shots, shots_on_target, xg_x100, key_passes,
+            passes_attempted, passes_completed, tackles_attempted, tackles_won,
+            interceptions, clearances, aerials_won, aerials_contested,
+            dribbles_completed, fouls_committed, fouls_drawn, saves,
+            yellow_cards, red_cards)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
       for (const { row, result } of entries) {
         updateMatch.run(result.homeGoals, result.awayGoals, now, row.id);
         for (const perf of result.performances) {
-          // Skip the synthetic filler players the starter picker
-          // emits when a club has fewer than 11 contracted players —
-          // their playerId is negative and they don't FK to anything.
           if (perf.playerId < 0) continue;
           insertPerf.run(
-            row.id,
-            perf.playerId,
-            perf.clubId,
-            perf.goals,
-            perf.assists,
-            perf.tier,
-            perf.eventDescription,
+            row.id, perf.playerId, perf.clubId,
+            perf.goals, perf.assists, perf.tier, perf.eventDescription,
+            perf.minutesPlayed, perf.shots, perf.shotsOnTarget, perf.xgX100,
+            perf.keyPasses, perf.passesAttempted, perf.passesCompleted,
+            perf.tacklesAttempted, perf.tacklesWon, perf.interceptions,
+            perf.clearances, perf.aerialsWon, perf.aerialsContested,
+            perf.dribblesCompleted, perf.foulsCommitted, perf.foulsDrawn,
+            perf.saves, perf.yellowCards, perf.redCards,
           );
         }
       }
@@ -175,16 +178,23 @@ export async function advanceMatchday(
           if (perf.playerId < 0) continue;
           await conn.query(
             `INSERT INTO player_match_performance
-               (match_id, player_id, club_id, goals, assists, tier, event_description)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+               (match_id, player_id, club_id, goals, assists, tier, event_description,
+                minutes_played, shots, shots_on_target, xg_x100, key_passes,
+                passes_attempted, passes_completed, tackles_attempted, tackles_won,
+                interceptions, clearances, aerials_won, aerials_contested,
+                dribbles_completed, fouls_committed, fouls_drawn, saves,
+                yellow_cards, red_cards)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+                     $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)`,
             [
-              row.id,
-              perf.playerId,
-              perf.clubId,
-              perf.goals,
-              perf.assists,
-              perf.tier,
-              perf.eventDescription,
+              row.id, perf.playerId, perf.clubId,
+              perf.goals, perf.assists, perf.tier, perf.eventDescription,
+              perf.minutesPlayed, perf.shots, perf.shotsOnTarget, perf.xgX100,
+              perf.keyPasses, perf.passesAttempted, perf.passesCompleted,
+              perf.tacklesAttempted, perf.tacklesWon, perf.interceptions,
+              perf.clearances, perf.aerialsWon, perf.aerialsContested,
+              perf.dribblesCompleted, perf.foulsCommitted, perf.foulsDrawn,
+              perf.saves, perf.yellowCards, perf.redCards,
             ],
           );
         }

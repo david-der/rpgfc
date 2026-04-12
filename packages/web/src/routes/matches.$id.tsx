@@ -1,20 +1,22 @@
-// /matches/$id — Story 06 reading destination.
+// /matches/$id — Rich post-match report.
 //
-// Profile-archetype shape: hero with the two club names and the
-// scoreline (allowlisted), an eyebrow with the matchday number
-// (allowlisted), a Newsreader prose body of 2-3 paragraphs, and a
-// MatchPerformanceList grouped by club below.
+// Tabbed reading destination:
+//   - Report: prose narrative + team summary totals + standout list
+//   - Stats: Opta-style per-player table (both teams)
+//   - Players: compact MatchPerformanceList
 //
-// The narrative paragraphs are wrapped in a single
-// data-testid="player-facing" element so the doctrine scrape sees
-// the prose as a single content surface — if a digit ever leaks into
-// the prose, the doctrine spec catches it on the next CI run.
+// All numeric stats (goals, xG, passes, etc) are allowlisted facts.
+// The qualitative performance tier is the "rating" chip — it's the
+// quality judgement; everything numeric describes what happened.
 
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 
 import { MatchPerformanceList } from "../components/ui/MatchPerformanceList";
+import { MatchStatsTable } from "../components/ui/MatchStatsTable";
+import { MatchTeamSummary } from "../components/ui/MatchTeamSummary";
 import { SectionHeader } from "../components/ui/SectionHeader";
+import { TabBar, type TabDefinition } from "../components/ui/TabBar";
 import { fetchMatch } from "../lib/api";
 
 export const Route = createFileRoute("/matches/$id")({
@@ -47,8 +49,78 @@ function MatchReport() {
   const homeGoals = match.home.goals ?? 0;
   const awayGoals = match.away.goals ?? 0;
 
+  const tabs: TabDefinition[] = [
+    {
+      key: "report",
+      label: "Report",
+      content: (
+        <div className="space-y-8">
+          {match.narrative.length > 0 && (
+            <article
+              data-testid="match-narrative"
+              className="mx-auto max-w-prose space-y-6 font-serif text-lg leading-relaxed text-parchment-800"
+            >
+              {match.narrative.map((paragraph, idx) => (
+                <p
+                  key={idx}
+                  data-testid="player-facing"
+                  className={
+                    idx === 0
+                      ? "first-letter:float-left first-letter:mr-2 first-letter:font-serif first-letter:text-6xl first-letter:font-semibold first-letter:leading-none first-letter:text-parchment-900"
+                      : ""
+                  }
+                >
+                  {paragraph}
+                </p>
+              ))}
+            </article>
+          )}
+          {match.performances.length > 0 && (
+            <MatchTeamSummary
+              homeName={match.home.name}
+              awayName={match.away.name}
+              homeId={match.home.id}
+              awayId={match.away.id}
+              performances={match.performances}
+            />
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "stats",
+      label: "Stats",
+      content: match.performances.length > 0 ? (
+        <MatchStatsTable
+          homeName={match.home.name}
+          awayName={match.away.name}
+          homeId={match.home.id}
+          awayId={match.away.id}
+          performances={match.performances}
+        />
+      ) : (
+        <p className="text-sm italic text-parchment-500">No stats available yet.</p>
+      ),
+    },
+    {
+      key: "players",
+      label: "Players",
+      content: match.performances.length > 0 ? (
+        <MatchPerformanceList
+          homeName={match.home.name}
+          awayName={match.away.name}
+          homeId={match.home.id}
+          awayId={match.away.id}
+          performances={match.performances}
+        />
+      ) : (
+        <p className="text-sm italic text-parchment-500">No players to show yet.</p>
+      ),
+    },
+  ];
+
   return (
-    <div className="mx-auto max-w-5xl px-6 py-10">
+    <div className="mx-auto max-w-6xl px-6 py-10">
       <SectionHeader
         eyebrow={
           <>
@@ -83,43 +155,9 @@ function MatchReport() {
         </div>
       </header>
 
-      {/* Prose narrative — drop-cap on the lead. */}
-      {match.narrative.length > 0 && (
-        <article
-          data-testid="match-narrative"
-          className="mx-auto mt-10 max-w-prose space-y-6 font-serif text-lg leading-relaxed text-parchment-800"
-        >
-          {match.narrative.map((paragraph, idx) => (
-            <p
-              key={idx}
-              data-testid="player-facing"
-              className={
-                idx === 0
-                  ? "first-letter:float-left first-letter:mr-2 first-letter:font-serif first-letter:text-6xl first-letter:font-semibold first-letter:leading-none first-letter:text-parchment-900"
-                  : ""
-              }
-            >
-              {paragraph}
-            </p>
-          ))}
-        </article>
-      )}
-
-      {/* Performance list grouped by club */}
-      {match.performances.length > 0 && (
-        <section className="mt-10">
-          <h2 className="mb-4 text-xs font-medium uppercase tracking-wide text-parchment-500">
-            Performances
-          </h2>
-          <MatchPerformanceList
-            homeName={match.home.name}
-            awayName={match.away.name}
-            homeId={match.home.id}
-            awayId={match.away.id}
-            performances={match.performances}
-          />
-        </section>
-      )}
+      <div className="mt-8">
+        <TabBar tabs={tabs} />
+      </div>
     </div>
   );
 }

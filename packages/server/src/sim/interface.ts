@@ -10,6 +10,8 @@
 
 import type { FormTier } from "@rpgfc/shared";
 
+export type PositionFamily = "gk" | "defender" | "midfielder" | "forward";
+
 export interface SimPlayer {
   playerId: number;
   /** Sum of badge counts on this player. The stub uses this scalar
@@ -19,6 +21,9 @@ export interface SimPlayer {
   /** Whether the player is in a slot that fits their archetype.
    *  The stub bonuses fit and penalises misfit. */
   positionFit: boolean;
+  /** Coarse position family. Drives stat distributions (forwards get
+   *  more shots, defenders more tackles, etc). */
+  positionFamily: PositionFamily;
 }
 
 export interface SimSide {
@@ -49,6 +54,28 @@ export interface SimPerformance {
    *  null if the engine had nothing notable to say about this
    *  player. */
   eventDescription: string | null;
+  // ── Opta-style stats — all facts, not ratings ─────────────────────────
+  minutesPlayed: number;
+  shots: number;
+  shotsOnTarget: number;
+  /** Expected goals × 100 to keep it INTEGER (e.g. 27 = 0.27 xG). */
+  xgX100: number;
+  keyPasses: number;
+  passesAttempted: number;
+  passesCompleted: number;
+  tacklesAttempted: number;
+  tacklesWon: number;
+  interceptions: number;
+  clearances: number;
+  aerialsWon: number;
+  aerialsContested: number;
+  dribblesCompleted: number;
+  foulsCommitted: number;
+  foulsDrawn: number;
+  /** Goalkeepers only. */
+  saves: number;
+  yellowCards: number;
+  redCards: number;
 }
 
 export interface SimMatchResult {

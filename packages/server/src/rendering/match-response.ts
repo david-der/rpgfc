@@ -41,6 +41,25 @@ interface PerformanceJoinRow {
   assists: number;
   tier: string;
   event_description: string | null;
+  minutes_played: number;
+  shots: number;
+  shots_on_target: number;
+  xg_x100: number;
+  key_passes: number;
+  passes_attempted: number;
+  passes_completed: number;
+  tackles_attempted: number;
+  tackles_won: number;
+  interceptions: number;
+  clearances: number;
+  aerials_won: number;
+  aerials_contested: number;
+  dribbles_completed: number;
+  fouls_committed: number;
+  fouls_drawn: number;
+  saves: number;
+  yellow_cards: number;
+  red_cards: number;
 }
 
 interface ClubRow {
@@ -83,7 +102,13 @@ async function loadPerformances(
     return client.sqlite
       .prepare<[number], PerformanceJoinRow>(
         `SELECT pmp.player_id, p.name AS player_name, p.archetype_id,
-                pmp.club_id, pmp.goals, pmp.assists, pmp.tier, pmp.event_description
+                pmp.club_id, pmp.goals, pmp.assists, pmp.tier, pmp.event_description,
+                pmp.minutes_played, pmp.shots, pmp.shots_on_target, pmp.xg_x100,
+                pmp.key_passes, pmp.passes_attempted, pmp.passes_completed,
+                pmp.tackles_attempted, pmp.tackles_won, pmp.interceptions,
+                pmp.clearances, pmp.aerials_won, pmp.aerials_contested,
+                pmp.dribbles_completed, pmp.fouls_committed, pmp.fouls_drawn,
+                pmp.saves, pmp.yellow_cards, pmp.red_cards
          FROM player_match_performance pmp
          JOIN players p ON p.id = pmp.player_id
          WHERE pmp.match_id = ?
@@ -93,7 +118,13 @@ async function loadPerformances(
   }
   const res = await client.pool.query<PerformanceJoinRow>(
     `SELECT pmp.player_id, p.name AS player_name, p.archetype_id,
-            pmp.club_id, pmp.goals, pmp.assists, pmp.tier, pmp.event_description
+            pmp.club_id, pmp.goals, pmp.assists, pmp.tier, pmp.event_description,
+                pmp.minutes_played, pmp.shots, pmp.shots_on_target, pmp.xg_x100,
+                pmp.key_passes, pmp.passes_attempted, pmp.passes_completed,
+                pmp.tackles_attempted, pmp.tackles_won, pmp.interceptions,
+                pmp.clearances, pmp.aerials_won, pmp.aerials_contested,
+                pmp.dribbles_completed, pmp.fouls_committed, pmp.fouls_drawn,
+                pmp.saves, pmp.yellow_cards, pmp.red_cards
      FROM player_match_performance pmp
      JOIN players p ON p.id = pmp.player_id
      WHERE pmp.match_id = $1
@@ -120,6 +151,9 @@ async function loadClubMap(client: DbClient): Promise<Map<number, ClubRow>> {
 function buildPerformance(row: PerformanceJoinRow): RenderedMatchPerformance {
   const archetype = ARCHETYPE_BY_ID[row.archetype_id];
   const tier = (row.tier as FormTier) ?? "Average";
+  const passAccuracy = row.passes_attempted > 0
+    ? row.passes_completed / row.passes_attempted
+    : 0;
   return {
     playerId: row.player_id,
     playerName: row.player_name,
@@ -130,6 +164,26 @@ function buildPerformance(row: PerformanceJoinRow): RenderedMatchPerformance {
     tier,
     tierLabel: FORM_TIER_LABELS[tier],
     eventDescription: row.event_description,
+    minutesPlayed: row.minutes_played,
+    shots: row.shots,
+    shotsOnTarget: row.shots_on_target,
+    xg: row.xg_x100 / 100,
+    keyPasses: row.key_passes,
+    passesAttempted: row.passes_attempted,
+    passesCompleted: row.passes_completed,
+    passAccuracy,
+    tacklesAttempted: row.tackles_attempted,
+    tacklesWon: row.tackles_won,
+    interceptions: row.interceptions,
+    clearances: row.clearances,
+    aerialsWon: row.aerials_won,
+    aerialsContested: row.aerials_contested,
+    dribblesCompleted: row.dribbles_completed,
+    foulsCommitted: row.fouls_committed,
+    foulsDrawn: row.fouls_drawn,
+    saves: row.saves,
+    yellowCards: row.yellow_cards,
+    redCards: row.red_cards,
   };
 }
 
