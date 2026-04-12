@@ -1,8 +1,8 @@
 // /transfers — Story 04 List archetype.
 //
 // Two sections: pending bids by the user's club at the top, followed
-// by the full listings feed. The listings come pre-sorted so any
-// active-bid entries float to the top of the listings section.
+// by the full listings feed. Transfers are always open — no window
+// gating (the game is focused on transfers as a core strategic lever).
 
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -23,7 +23,7 @@ function TransfersList() {
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-10">
-      <SectionHeader eyebrow="Story 04" title="Transfer market" />
+      <SectionHeader eyebrow="Transfers" title="Transfer market" />
 
       {query.isPending && <p className="mt-8 text-parchment-600">Loading the market…</p>}
       {query.isError && (

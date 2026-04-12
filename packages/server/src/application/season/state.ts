@@ -4,7 +4,6 @@
 // shape for the rendering + route layers.
 
 import type { SeasonState } from "@rpgfc/shared";
-import { isTransferWindowOpen, nextWindowBoundary } from "@rpgfc/shared";
 
 import type { DbClient } from "../../db/client.js";
 
@@ -29,16 +28,8 @@ export async function loadSeasonState(client: DbClient): Promise<SeasonState> {
     row = res.rows[0] ?? null;
   }
 
-  const season = row?.season ?? 0;
-  const matchWeek = row?.next_match_week ?? 1;
-  const windowOpen = isTransferWindowOpen(matchWeek);
-  const boundary = nextWindowBoundary(matchWeek);
-
   return {
-    season,
-    matchWeek,
-    transferWindowOpen: windowOpen,
-    nextWindowOpens: boundary.opens,
-    nextWindowCloses: boundary.closes,
+    season: row?.season ?? 0,
+    matchWeek: row?.next_match_week ?? 1,
   };
 }

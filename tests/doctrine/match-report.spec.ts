@@ -5,7 +5,7 @@ import { expect, test } from "@playwright/test";
 // AC-18: every digit on the match report page is inside an element
 // with one of the four Story 06 allowlist suffixes:
 //   - match-score-allowlist-number   (scoreline)
-//   - matchday-allowlist-number      (matchday eyebrow)
+//   - match-week-allowlist-number     (match week eyebrow)
 //   - goals-allowlist-number         (per-player goals)
 //   - assists-allowlist-number       (per-player assists)
 //
@@ -57,9 +57,9 @@ test.describe("match report — Story 06", () => {
     const scores = page.locator('[data-testid="match-score-allowlist-number"]');
     expect(await scores.count()).toBeGreaterThanOrEqual(2);
 
-    // Matchday eyebrow exists.
-    const matchday = page.locator('[data-testid="matchday-allowlist-number"]').first();
-    await expect(matchday).toBeVisible();
+    // Match week eyebrow exists.
+    const matchWeek = page.locator('[data-testid="match-week-allowlist-number"]').first();
+    await expect(matchWeek).toBeVisible();
 
     // Goals + assists allowlists may or may not exist depending on
     // the random outcome, but if they exist, they should carry digits.

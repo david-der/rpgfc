@@ -236,3 +236,21 @@ export async function fetchPlayerForm(id: string) {
   if (!res.ok) throw new Error(`player form fetch failed: ${res.status}`);
   return res.json();
 }
+
+export async function fetchSeasonState() {
+  const res = await api.api.season.state.$get();
+  if (!res.ok) throw new Error(`season state failed: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchLeagueTable() {
+  const res = await api.api.season.table.$get();
+  if (!res.ok) throw new Error(`league table failed: ${res.status}`);
+  return res.json();
+}
+
+export async function endSeason() {
+  const res = await api.api.season.end.$post();
+  if (!res.ok) throw new Error(`season end failed: ${res.status}`);
+  return res.json();
+}

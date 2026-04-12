@@ -52,9 +52,9 @@ function MatchReport() {
       <SectionHeader
         eyebrow={
           <>
-            Matchday{" "}
+            Match Week{" "}
             <span
-              data-testid="matchday-allowlist-number"
+              data-testid="match-week-allowlist-number"
               className="font-mono tabular-nums text-parchment-700"
             >
               {match.matchday}

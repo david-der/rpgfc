@@ -84,7 +84,7 @@ export const PRIMARY_NAV: readonly NavItem[] = [
     label: "Fixtures",
     to: "/fixtures",
     icon: CalendarDays,
-    description: "View the half-season schedule and advance the matchday",
+    description: "View the season schedule and advance match weeks",
   },
 ] as const;
 

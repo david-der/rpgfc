@@ -26,7 +26,6 @@ import {
   renderTransfersPage,
   submitBidRendered,
 } from "../rendering/index.js";
-import { loadSeasonState } from "../application/season/state.js";
 import type { DbClient } from "../db/client.js";
 
 export interface TransfersRouteDeps {
@@ -66,22 +65,6 @@ export function createTransfersRoute(deps: TransfersRouteDeps) {
       async (c) => {
         const { playerId } = c.req.valid("param");
         const body = c.req.valid("json");
-
-        // Story 07: transfer window guard. Bids are only accepted
-        // during open windows (match weeks 1–4 and 19–22).
-        const seasonState = await loadSeasonState(deps.db);
-        if (!seasonState.transferWindowOpen) {
-          return c.json(
-            {
-              error: {
-                code: "transfer_window_closed",
-                message: "The transfer window is closed.",
-              },
-            },
-            403,
-          );
-        }
-
         const rendered = await submitBidRendered(deps.db, {
           playerId,
           fromClubId: deps.userClubId,
