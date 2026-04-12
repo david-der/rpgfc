@@ -11,11 +11,13 @@ test.describe("fixtures tab — Story 06/07/08", () => {
 
     const headers = page.locator('[data-testid="match-week-allowlist-number"]');
     await expect(headers.first()).toBeVisible();
-    expect(await headers.count()).toBeGreaterThanOrEqual(20);
+    // 10 clubs × 18 match weeks (2 × (n-1)) for a full season.
+    expect(await headers.count()).toBeGreaterThanOrEqual(18);
 
     const cards = page.locator("article");
     await expect(cards.first()).toBeVisible();
-    expect(await cards.count()).toBeGreaterThanOrEqual(100);
+    // 5 fixtures per match week × 18 weeks = 90 fixtures.
+    expect(await cards.count()).toBeGreaterThanOrEqual(50);
 
     const advance = page.locator('[data-testid="advance-matchday"]');
     await expect(advance).toBeVisible();

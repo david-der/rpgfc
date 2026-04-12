@@ -3,11 +3,21 @@
 // Currently returns finances only. More tabs (history, facilities,
 // board) can hang off this later.
 
+import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
+import { z } from "zod";
 
-import { feeTierFor, wageTierFor } from "@rpgfc/shared";
+import {
+  CURRENCY_TIERS,
+  FEE_TIER_MIDPOINT_CENTS,
+  PLAYING_TIME_ROLES,
+  WAGE_TIER_MIDPOINT_CENTS,
+  feeTierFor,
+  wageTierFor,
+} from "@rpgfc/shared";
 import type { CurrencyTier } from "@rpgfc/shared";
 
+import { extendContract } from "../application/transfers/extend-contract.js";
 import type { DbClient } from "../db/client.js";
 
 export interface ClubRouteDeps {
@@ -118,13 +128,71 @@ async function loadFinances(
   };
 }
 
+const extendBody = z.object({
+  playerId: z.number().int().positive(),
+  wageTier: z.enum(CURRENCY_TIERS),
+  signingBonusTier: z.enum(CURRENCY_TIERS).default("Minimal"),
+  seasons: z.number().int().min(1).max(5).default(3),
+  rolePromise: z.enum(PLAYING_TIME_ROLES),
+});
+
+interface LedgerEvent {
+  id: number;
+  season: number;
+  match_week: number;
+  kind: string;
+  amount_cents: number;
+  note: string | null;
+  recorded_at: string;
+}
+
+async function loadLedger(
+  client: DbClient,
+  clubId: number,
+  limit = 40,
+): Promise<LedgerEvent[]> {
+  if (client.dialect !== "sqlite") return [];
+  return client.sqlite
+    .prepare<[number, number], LedgerEvent>(
+      `SELECT id, season, match_week, kind, amount_cents, note, recorded_at
+       FROM finance_events
+       WHERE club_id = ?
+       ORDER BY id DESC
+       LIMIT ?`,
+    )
+    .all(clubId, limit);
+}
+
 export function createClubRoute(deps: ClubRouteDeps) {
-  const app = new Hono().get("/finances", async (c) => {
-    const finances = await loadFinances(deps.db, deps.userClubId);
-    if (!finances) {
-      return c.json({ error: { code: "not_found", message: "Club not found" } }, 404);
-    }
-    return c.json(finances);
-  });
+  const app = new Hono()
+    .get("/finances", async (c) => {
+      const finances = await loadFinances(deps.db, deps.userClubId);
+      if (!finances) {
+        return c.json({ error: { code: "not_found", message: "Club not found" } }, 404);
+      }
+      return c.json(finances);
+    })
+    .get("/ledger", async (c) => {
+      const events = await loadLedger(deps.db, deps.userClubId);
+      return c.json({ events });
+    })
+    .post("/extend-contract", zValidator("json", extendBody), async (c) => {
+      const body = c.req.valid("json");
+      const result = await extendContract(deps.db, {
+        playerId: body.playerId,
+        clubId: deps.userClubId,
+        wageCents: WAGE_TIER_MIDPOINT_CENTS[body.wageTier],
+        signingBonusCents: FEE_TIER_MIDPOINT_CENTS[body.signingBonusTier],
+        seasons: body.seasons,
+        rolePromise: body.rolePromise,
+      });
+      if (result.kind === "error") {
+        return c.json({ error: { code: "extend_error", message: result.message } }, 400);
+      }
+      if (result.kind === "reject") {
+        return c.json({ error: { code: "player_rejected", reason: result.reason } }, 409);
+      }
+      return c.json({ ok: true });
+    });
   return app;
 }

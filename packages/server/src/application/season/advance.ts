@@ -15,6 +15,7 @@
 import type { DbClient } from "../../db/client.js";
 import type { SimEngine, SimMatchInput } from "../../sim/interface.js";
 import { createSimStub } from "../../sim/stub.js";
+import { tickWeeklyFinance } from "../finance/weekly-tick.js";
 import { generateAiBids } from "../transfers/ai-bids.js";
 import { tickBids } from "../transfers/bid-ticker.js";
 import { pickStarters } from "./starter-picker.js";
@@ -201,9 +202,19 @@ export async function advanceMatchday(
     }
   }
 
-  // Story 08: tick the transfer market after match results are written.
-  // Order matters: tick existing bids first (so they can resolve), THEN
-  // generate new AI bids using the current match week.
+  // Load current season from save_state for the finance tick.
+  let currentSeason = 0;
+  if (client.dialect === "sqlite") {
+    const s = client.sqlite
+      .prepare<[], { season: number }>(`SELECT season FROM save_state WHERE id = 1`)
+      .get();
+    currentSeason = s?.season ?? 0;
+  }
+
+  // Finance v2: weekly revenue + wage expenses.
+  await tickWeeklyFinance(client, currentSeason, matchday);
+
+  // Story 08: tick the transfer market after match results.
   await tickBids(client, matchday);
   await generateAiBids(client, matchday);
 

@@ -29,6 +29,7 @@ import type { PromiseMood } from "@rpgfc/shared";
 import { BadgeStack } from "../components/ui/BadgeStack";
 import { CertaintyText } from "../components/ui/CertaintyText";
 import { ContractCard } from "../components/ui/ContractCard";
+import { ExtendContractForm } from "../components/ui/ExtendContractForm";
 import { FormSparkline } from "../components/ui/FormSparkline";
 import { KeyNumber } from "../components/ui/KeyNumber";
 import { NarrativeBlock } from "../components/ui/NarrativeBlock";
@@ -165,13 +166,24 @@ function PlayerProfile() {
       key: "contract",
       label: "Contract",
       content: (
-        <section className="space-y-4">
+        <section className="space-y-6">
           {contractQuery.isPending && <p className="text-parchment-600">Loading contract…</p>}
           {contractQuery.isError && (
             <p className="text-semantic-error">Could not load the contract.</p>
           )}
           {contractQuery.data?.contract ? (
-            <ContractCard contract={contractQuery.data.contract} />
+            <>
+              <ContractCard contract={contractQuery.data.contract} />
+              {/* Finance v2: extend-contract form only appears for the
+                  user's own players. Club id 1 is hardcoded until auth
+                  lands. */}
+              {player.club?.id === 1 && (
+                <ExtendContractForm
+                  playerId={player.id}
+                  currentRolePromise={contractQuery.data.contract.rolePromise}
+                />
+              )}
+            </>
           ) : contractQuery.isSuccess ? (
             <p className="text-sm italic text-parchment-500">
               No contract on file yet. Sign this player through the transfer market to populate this

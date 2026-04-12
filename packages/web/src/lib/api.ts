@@ -163,6 +163,26 @@ export async function fetchClubDetail(id: string) {
   return res.json();
 }
 
+export async function fetchClubLedger() {
+  const res = await api.api.club.ledger.$get();
+  if (!res.ok) throw new Error(`ledger failed: ${res.status}`);
+  return res.json();
+}
+
+export async function extendContract(body: {
+  playerId: number;
+  wageTier: CurrencyTier;
+  signingBonusTier?: CurrencyTier;
+  seasons?: number;
+  rolePromise: PlayingTimeRole;
+}) {
+  const res = await api.api.club["extend-contract"].$post({ json: body });
+  if (!res.ok) {
+    throw new Error(`extend-contract failed: ${res.status}`);
+  }
+  return res.json();
+}
+
 type CurrencyTier = "Minimal" | "Modest" | "Notable" | "Significant" | "Elite";
 type PlayingTimeRole =
   | "Star Player"

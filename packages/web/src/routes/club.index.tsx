@@ -9,7 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { TabBar, type TabDefinition } from "../components/ui/TabBar";
-import { fetchClubFinances } from "../lib/api";
+import { fetchClubFinances, fetchClubLedger } from "../lib/api";
 
 export const Route = createFileRoute("/club/")({
   component: ClubDashboard,
@@ -18,6 +18,7 @@ export const Route = createFileRoute("/club/")({
 function ClubDashboard() {
   const tabs: TabDefinition[] = [
     { key: "finances", label: "Finances", content: <FinancesTab /> },
+    { key: "ledger", label: "Ledger", content: <LedgerTab /> },
   ];
 
   return (
@@ -33,16 +34,18 @@ function ClubDashboard() {
 // Format cents as "$12.3M" / "$450K" / "$2.1B". Short form for the
 // finance tiles — this is the user's own club, so numbers are fine.
 function formatCents(cents: number): string {
-  if (cents >= 1_000_000_000_00) {
-    return `$${(cents / 1_000_000_000_00).toFixed(1)}B`;
+  const sign = cents < 0 ? "-" : "";
+  const abs = Math.abs(cents);
+  if (abs >= 1_000_000_000_00) {
+    return `${sign}$${(abs / 1_000_000_000_00).toFixed(1)}B`;
   }
-  if (cents >= 1_000_000_00) {
-    return `$${(cents / 1_000_000_00).toFixed(1)}M`;
+  if (abs >= 1_000_000_00) {
+    return `${sign}$${(abs / 1_000_000_00).toFixed(1)}M`;
   }
-  if (cents >= 1_000_00) {
-    return `$${(cents / 1_000_00).toFixed(0)}K`;
+  if (abs >= 1_000_00) {
+    return `${sign}$${(abs / 1_000_00).toFixed(0)}K`;
   }
-  return `$${(cents / 100).toFixed(0)}`;
+  return `${sign}$${(abs / 100).toFixed(0)}`;
 }
 
 function FinancesTab() {
@@ -201,6 +204,81 @@ function FinanceTile({
       {tier && (
         <div className="mt-1 text-xs italic text-parchment-500">{tier} tier</div>
       )}
+    </div>
+  );
+}
+
+// ── Ledger tab ───────────────────────────────────────────────────────────
+
+const KIND_LABEL: Record<string, string> = {
+  revenue_tv: "TV rights",
+  revenue_sponsor: "Sponsorship",
+  revenue_matchday: "Matchday",
+  expense_wages: "Weekly wages",
+  signing_bonus: "Signing bonus",
+  transfer_in: "Transfer income",
+  transfer_out: "Transfer fee",
+};
+
+function LedgerTab() {
+  const query = useQuery({ queryKey: ["club-ledger"], queryFn: fetchClubLedger });
+
+  if (query.isPending) return <p className="text-parchment-600">Loading…</p>;
+  if (query.isError || !query.data) {
+    return <p className="text-semantic-error">Could not load ledger.</p>;
+  }
+  const events = query.data.events;
+
+  if (events.length === 0) {
+    return (
+      <p className="text-sm italic text-parchment-500">
+        No finance events yet. Advance a match week to start recording income and expenses.
+      </p>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto border border-parchment-300 bg-parchment-50">
+      <table className="w-full text-left text-sm">
+        <thead>
+          <tr className="border-b border-parchment-300 bg-parchment-100 text-xs uppercase tracking-wide text-parchment-500">
+            <th className="px-3 py-2">Season</th>
+            <th className="px-3 py-2">Week</th>
+            <th className="px-3 py-2">Kind</th>
+            <th className="px-3 py-2">Note</th>
+            <th className="px-3 py-2 text-right">Amount</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-parchment-200">
+          {events.map((e) => {
+            const positive = e.amount_cents > 0;
+            return (
+              <tr key={e.id} className="hover:bg-parchment-100">
+                <td className="px-3 py-1.5 font-mono tabular-nums text-parchment-700">
+                  {e.season}
+                </td>
+                <td className="px-3 py-1.5 font-mono tabular-nums text-parchment-700">
+                  {e.match_week}
+                </td>
+                <td className="px-3 py-1.5 text-parchment-900">
+                  {KIND_LABEL[e.kind] ?? e.kind}
+                </td>
+                <td className="px-3 py-1.5 text-xs italic text-parchment-500">
+                  {e.note ?? ""}
+                </td>
+                <td
+                  className={`px-3 py-1.5 text-right font-mono font-semibold tabular-nums ${
+                    positive ? "text-moss-700" : "text-clay-700"
+                  }`}
+                >
+                  {positive ? "+" : ""}
+                  {formatCents(e.amount_cents)}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
