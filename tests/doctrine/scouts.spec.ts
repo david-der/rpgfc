@@ -20,7 +20,7 @@ test.describe("scouting search — rework", () => {
     await expect(active).toHaveText("Scouting");
 
     // Search input is visible.
-    const searchInput = page.locator('input[placeholder*="Player name"]');
+    const searchInput = page.locator('input[placeholder*="Search"]');
     await expect(searchInput).toBeVisible();
   });
 

@@ -1,13 +1,9 @@
-// /tactics — Story 05 Editor archetype.
+// /tactics — Formation editor with pitch diagram.
 //
-// Left work area: eleven SlotRow rows for the current formation.
-// Right configuration panel: formation, playing style, instruction
-// toggles. Bottom persistent action bar: Save / Reset. Every slot row
-// is a dropdown (no pitch-diagram drag-and-drop in Story 05).
-//
-// The slot dropdowns are filtered against PITCH_SLOT_POSITION_FAMILIES
-// to keep the options readable — you shouldn't see your goalkeepers
-// listed under a striker slot.
+// Left: a pitch diagram showing the formation with player markers.
+// Clicking a marker opens a player picker below the pitch.
+// Right: formation, playing style, and instruction controls.
+// Bottom: Save / Reset action bar.
 
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -26,8 +22,8 @@ import {
 } from "@rpgfc/shared";
 
 import { InstructionToggleList } from "../components/ui/InstructionToggleList";
+import { PitchDiagram, type PitchSlotData } from "../components/ui/PitchDiagram";
 import { SectionHeader } from "../components/ui/SectionHeader";
-import { SlotRow, type SlotRowPlayer } from "../components/ui/SlotRow";
 import {
   fetchSquad,
   fetchTactics,
@@ -50,22 +46,13 @@ function matchesFamily(positionLabel: string, families: readonly string[]): bool
 function TacticsEditor() {
   const queryClient = useQueryClient();
 
-  const tacticsQuery = useQuery({
-    queryKey: ["tactics"],
-    queryFn: fetchTactics,
-  });
-  const squadQuery = useQuery({
-    queryKey: ["squad"],
-    queryFn: fetchSquad,
-  });
+  const tacticsQuery = useQuery({ queryKey: ["tactics"], queryFn: fetchTactics });
+  const squadQuery = useQuery({ queryKey: ["squad"], queryFn: fetchSquad });
 
-  // Local editor state for the config panel. Seeded from the server
-  // response on first load so refreshes don't lose the user's in-flight
-  // edits — but we do seed from the latest server value whenever the
-  // query key refreshes (after a save).
   const [formation, setFormation] = useState<Formation>("4-3-3");
   const [playingStyle, setPlayingStyle] = useState<PlayingStyle>("Balanced");
   const [instructions, setInstructions] = useState<TeamInstruction[]>([]);
+  const [activeSlot, setActiveSlot] = useState<PitchSlot | null>(null);
 
   useEffect(() => {
     if (!tacticsQuery.data) return;
@@ -85,6 +72,7 @@ function TacticsEditor() {
     mutationFn: setTacticsAssignment,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tactics"] });
+      setActiveSlot(null);
     },
   });
 
@@ -106,51 +94,75 @@ function TacticsEditor() {
   const tactics: TacticsResponse = tacticsQuery.data;
   const squad: SquadResponse = squadQuery.data;
 
-  const squadPlayers: SlotRowPlayer[] = squad.entries.map((entry) => ({
-    id: entry.playerId,
-    name: entry.playerName,
-    positionLabel: entry.positionLabel,
+  const pitchSlots: PitchSlotData[] = tactics.assignments.map((a) => ({
+    slot: a.slot as PitchSlot,
+    slotLabel: a.slotLabel,
+    playerId: a.playerId,
+    playerName: a.playerName,
   }));
+
+  const slotFamilies = activeSlot ? PITCH_SLOT_POSITION_FAMILIES[activeSlot] : [];
+  const eligiblePlayers = squad.entries
+    .filter((e) => matchesFamily(e.positionLabel, slotFamilies))
+    .sort((a, b) => a.playerName.localeCompare(b.playerName));
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-10">
-      <SectionHeader eyebrow="Story 05" title="Tactics" />
+      <SectionHeader eyebrow={tactics.formationLabel} title="Tactics" />
 
-      <div className="mt-8 grid gap-8 md:grid-cols-[2fr_1fr]">
-        {/* Left work area */}
-        <section className="border border-parchment-300 bg-parchment-100 p-6">
-          <h2 className="mb-4 text-xs font-medium uppercase tracking-wide text-parchment-500">
-            Starting eleven — {tactics.formationLabel}
-          </h2>
-          <div>
-            {tactics.assignments.map((assignment) => {
-              const families = PITCH_SLOT_POSITION_FAMILIES[assignment.slot as PitchSlot];
-              const eligible = squadPlayers.filter((player) =>
-                matchesFamily(player.positionLabel, families),
-              );
-              return (
-                <SlotRow
-                  key={assignment.slot}
-                  slot={assignment.slot as PitchSlot}
-                  slotLabel={assignment.slotLabel}
-                  eligible={eligible}
-                  pinnedPlayerId={assignment.playerId}
-                  pinnedPlayerName={assignment.playerName}
-                  pinnedPositionLabel={assignment.positionLabel}
-                  busy={assignMutation.isPending}
-                  onChange={(playerId) =>
-                    assignMutation.mutate({
-                      slot: assignment.slot as PitchSlot,
-                      playerId,
-                    })
+      <div className="mt-8 grid gap-8 md:grid-cols-[1fr_280px]">
+        {/* Left: pitch diagram */}
+        <section>
+          <PitchDiagram
+            formation={formation}
+            assignments={pitchSlots}
+            onSlotClick={(slot) =>
+              setActiveSlot(activeSlot === slot ? null : slot)
+            }
+          />
+
+          {activeSlot && (
+            <div className="mt-4 border border-parchment-300 bg-parchment-100 p-4">
+              <div className="mb-2 text-xs font-medium uppercase tracking-wide text-parchment-500">
+                Assign to {activeSlot}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    assignMutation.mutate({ slot: activeSlot, playerId: null })
                   }
-                />
-              );
-            })}
-          </div>
+                  className="border border-parchment-400 bg-parchment-50 px-3 py-1 font-sans text-xs text-parchment-700 hover:border-parchment-700"
+                >
+                  Clear
+                </button>
+                {eligiblePlayers.map((player) => (
+                  <button
+                    key={player.playerId}
+                    type="button"
+                    onClick={() =>
+                      assignMutation.mutate({
+                        slot: activeSlot,
+                        playerId: player.playerId,
+                      })
+                    }
+                    disabled={assignMutation.isPending}
+                    className="border border-moss-500 bg-parchment-50 px-3 py-1 font-sans text-xs text-parchment-900 hover:bg-moss-50"
+                  >
+                    {player.playerName} · {player.positionLabel}
+                  </button>
+                ))}
+                {eligiblePlayers.length === 0 && (
+                  <span className="text-xs italic text-parchment-500">
+                    No eligible players for this slot.
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </section>
 
-        {/* Right config panel */}
+        {/* Right: config panel */}
         <aside className="border border-parchment-300 bg-parchment-100 p-6">
           <h2 className="text-xs font-medium uppercase tracking-wide text-parchment-500">
             Configuration
@@ -165,9 +177,7 @@ function TacticsEditor() {
               onChange={(e) => setFormation(e.target.value as Formation)}
             >
               {FORMATIONS.map((f) => (
-                <option key={f} value={f}>
-                  {f}
-                </option>
+                <option key={f} value={f}>{f}</option>
               ))}
             </select>
           </label>
@@ -181,9 +191,7 @@ function TacticsEditor() {
               onChange={(e) => setPlayingStyle(e.target.value as PlayingStyle)}
             >
               {PLAYING_STYLES.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
+                <option key={s} value={s}>{s}</option>
               ))}
             </select>
           </label>
@@ -205,11 +213,9 @@ function TacticsEditor() {
       <div className="mt-8 flex items-center gap-3 border-t border-parchment-300 bg-parchment-50 py-4">
         <button
           type="button"
-          onClick={() =>
-            saveMutation.mutate({ formation, playingStyle, instructions })
-          }
+          onClick={() => saveMutation.mutate({ formation, playingStyle, instructions })}
           disabled={saveMutation.isPending}
-          className="border border-moss-600 bg-moss-500 px-4 py-2 font-sans text-sm font-semibold uppercase tracking-wide text-parchment-50 outline-offset-2 transition-colors hover:bg-moss-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-moss-600 disabled:cursor-not-allowed disabled:opacity-60"
+          className="border border-moss-600 bg-moss-500 px-4 py-2 font-sans text-sm font-semibold uppercase tracking-wide text-parchment-50 hover:bg-moss-600 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {saveMutation.isPending ? "Saving…" : "Save changes"}
         </button>

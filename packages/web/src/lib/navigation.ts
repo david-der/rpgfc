@@ -17,7 +17,6 @@ import {
   Handshake,
   Home,
   Search,
-  Users,
   UsersRound,
 } from "lucide-react";
 
@@ -43,13 +42,6 @@ export const PRIMARY_NAV: readonly NavItem[] = [
     to: "/",
     icon: Home,
     description: "Return to the landing page",
-  },
-  {
-    key: "players",
-    label: "Players",
-    to: "/players",
-    icon: Users,
-    description: "Browse the player roster",
   },
   {
     key: "scouts",
