@@ -29,6 +29,7 @@ import { loadFullClubMap } from "./club.js";
 import type { RenderContext } from "./context.js";
 import { knowPlayer, knowPlayers } from "./knowledge.js";
 import { renderPlayer } from "./player.js";
+import { computeMarketValue } from "../application/transfers/market-value.js";
 import { currentFormFor } from "./player-form.js";
 import { loadPromiseMoodForPlayer } from "./squad-response.js";
 
@@ -45,6 +46,15 @@ async function withPromiseMoodAndForm(
     loadPromiseMoodForPlayer(db, player.id),
     currentFormFor(db, player.id),
   ]);
+  // Story 08: compute market value from observable attributes.
+  const mv = computeMarketValue({
+    positionLabel: player.positionLabel,
+    age: player.age,
+    formTier: form.tier,
+    badgeCount: player.badges.length,
+    contractSeasonsRemaining: null, // TODO: load from contracts table for accuracy
+  });
+
   return {
     ...player,
     ...(mood.squadRole ? { squadRole: mood.squadRole } : {}),
@@ -53,6 +63,7 @@ async function withPromiseMoodAndForm(
     ...(mood.promiseMoodLabel ? { promiseMoodLabel: mood.promiseMoodLabel } : {}),
     formTier: form.tier,
     formTierLabel: form.label,
+    marketValue: mv.tier,
   };
 }
 

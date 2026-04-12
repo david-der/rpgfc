@@ -211,6 +211,7 @@ function ScoutingSearch() {
                   <th className="px-3 py-3">Pos</th>
                   <th className="hidden px-3 py-3 md:table-cell">Club</th>
                   <th className="hidden px-3 py-3 lg:table-cell">Nat</th>
+                  <th className="px-3 py-3">Value</th>
                   <th className="px-3 py-3">Experience</th>
                   <th className="hidden px-3 py-3 md:table-cell">Certainty</th>
                   <th className="hidden px-3 py-3 lg:table-cell">Form</th>
@@ -221,7 +222,7 @@ function ScoutingSearch() {
               <tbody className="divide-y divide-parchment-200 bg-parchment-50">
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="px-4 py-6 text-center italic text-parchment-500">
+                    <td colSpan={10} className="px-4 py-6 text-center italic text-parchment-500">
                       No players match your filters.
                     </td>
                   </tr>
@@ -245,6 +246,9 @@ function ScoutingSearch() {
                     </td>
                     <td className="hidden px-3 py-3 text-parchment-700 lg:table-cell">
                       {player.nationality}
+                    </td>
+                    <td className="px-3 py-3 text-xs font-medium text-parchment-700">
+                      {player.marketValue ?? "—"}
                     </td>
                     <td className="px-3 py-3 text-parchment-700">{player.experience}</td>
                     <td className="hidden px-3 py-3 md:table-cell">

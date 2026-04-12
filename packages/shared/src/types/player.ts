@@ -2,6 +2,7 @@ import type { MentalTraits, NaturalGifts, PreferredFoot } from "./attributes.js"
 import type { BadgeRef } from "./badge.js";
 import type { CertaintyTier } from "./certainty.js";
 import type { PlayingTimeRole } from "./contract.js";
+import type { CurrencyTier } from "./currency.js";
 import type { ExperienceTier } from "./experience.js";
 import type { FormTier } from "./form.js";
 import type { ScoutReportRef } from "./scout.js";
@@ -115,6 +116,9 @@ export interface WirePlayer {
    *  generated player has no matches yet. */
   formTier?: FormTier | undefined;
   formTierLabel?: string | undefined;
+  /** Story 08: market value tier. Computed at render time from
+   *  position, age, form, badges, and contract situation. */
+  marketValue?: CurrencyTier | undefined;
 }
 
 // RenderedPlayer is the server-internal branded flavor of WirePlayer. Only
