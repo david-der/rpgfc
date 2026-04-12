@@ -93,6 +93,7 @@ export const PITCH_SLOT_LABELS: Record<PitchSlot, string> = {
 // E.g., 4-4-2's wide positions are midfielders (LM/RM), not wingers.
 export const FORMATION_LABEL_OVERRIDES: Partial<Record<Formation, Partial<Record<PitchSlot, string>>>> = {
   "4-4-2": { LW: "LM", RW: "RM" },
+  "4-2-3-1": { MCC: "CDM" },
 };
 
 export function slotLabelFor(formation: Formation, slot: PitchSlot): string {
