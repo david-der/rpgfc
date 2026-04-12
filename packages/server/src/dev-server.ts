@@ -52,7 +52,7 @@ async function main() {
   }
   const seedResult = await seedWorldIfEmpty(dbClient, {
     seed: 42,
-    clubCount: 20,
+    clubCount: 10,
     playersPerClub: 20,
     referenceDate: new Date("2026-06-01T00:00:00Z"),
   });
