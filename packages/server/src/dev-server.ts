@@ -114,6 +114,22 @@ async function main() {
   // WEB_DIST is set and Hono serves the SPA from the same process.
   const staticDir = process.env["WEB_DIST"];
 
+  // Story 07: resolve the saves directory and current DB file path for
+  // the save-slot management endpoints.
+  const dbUrl = env.DATABASE_URL;
+  const savesDir = dbUrl.startsWith("sqlite:") && !dbUrl.includes(":memory:")
+    ? (() => {
+        const { dirname, resolve } = require("node:path") as typeof import("node:path");
+        return dirname(resolve(dbUrl.replace(/^sqlite:/, "")));
+      })()
+    : undefined;
+  const currentDbPath = dbUrl.startsWith("sqlite:") && !dbUrl.includes(":memory:")
+    ? (() => {
+        const { resolve } = require("node:path") as typeof import("node:path");
+        return resolve(dbUrl.replace(/^sqlite:/, ""));
+      })()
+    : undefined;
+
   const app = createApp({
     dialect: dbClient.dialect,
     commit: env.GIT_SHA ?? "dev",
@@ -121,6 +137,8 @@ async function main() {
     devEndpointsEnabled: env.AUTH_MODE === "dev",
     now: () => new Date(),
     ...(staticDir ? { staticDir } : {}),
+    ...(savesDir ? { savesDir } : {}),
+    ...(currentDbPath ? { currentDbPath } : {}),
   });
 
   const port = env.PORT;

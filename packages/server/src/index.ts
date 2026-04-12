@@ -22,6 +22,7 @@ import type { DbClient, Dialect } from "./db/client.js";
 import type { HealthSnapshot } from "./routes/health.js";
 import { createMatchesRoute } from "./routes/matches.js";
 import { createPlayersRoute } from "./routes/players.js";
+import { createSavesRoute } from "./routes/saves.js";
 import { createScoutsRoute } from "./routes/scouts.js";
 import { createSeasonRoute } from "./routes/season.js";
 import { createSquadRoute } from "./routes/squad.js";
@@ -33,12 +34,12 @@ export interface ApiDeps {
   dialect: Dialect;
   commit: string;
   db: DbClient;
-  /** Story 01: dev-only endpoints (e.g. POST /api/players/generate).
-   *  Driven from env.AUTH_MODE === "dev" in dev-server.ts. Tests set it
-   *  explicitly. */
   devEndpointsEnabled: boolean;
-  /** Clock used for age math in rendering. Injected so tests can pin it. */
   now: () => Date;
+  /** Story 07: filesystem paths for save-slot management. Optional so
+   *  tests that don't need saves can skip them. */
+  savesDir?: string;
+  currentDbPath?: string;
 }
 
 export interface AppDeps extends ApiDeps {
@@ -89,6 +90,10 @@ export function createApiApp(deps: ApiDeps) {
     userClubId: 1,
   });
   const matchesApp = createMatchesRoute({ db: deps.db });
+  const savesApp = createSavesRoute({
+    savesDir: deps.savesDir ?? "./saves",
+    currentDbPath: deps.currentDbPath ?? "./saves/dev.db",
+  });
   return new Hono()
     .get("/api/health", (c) => {
       const body: HealthSnapshot = {
@@ -105,7 +110,8 @@ export function createApiApp(deps: ApiDeps) {
     .route("/api/tactics", tacticsApp)
     .route("/api/squad", squadApp)
     .route("/api/season", seasonApp)
-    .route("/api/matches", matchesApp);
+    .route("/api/matches", matchesApp)
+    .route("/api/saves", savesApp);
 }
 
 // AppType is derived from the API-only factory. The web package's RPC client

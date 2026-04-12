@@ -254,3 +254,17 @@ export async function endSeason() {
   if (!res.ok) throw new Error(`season end failed: ${res.status}`);
   return res.json();
 }
+
+// ── Story 07 — save slots ──────────────────────────────────────────────────
+
+export async function fetchSaves() {
+  const res = await api.api.saves.$get();
+  if (!res.ok) throw new Error(`saves fetch failed: ${res.status}`);
+  return res.json();
+}
+
+export async function createSave(name: string) {
+  const res = await api.api.saves.$post({ json: { name } });
+  if (!res.ok) throw new Error(`save create failed: ${res.status}`);
+  return res.json();
+}
