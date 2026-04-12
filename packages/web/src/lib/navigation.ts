@@ -12,6 +12,7 @@
 
 import type { LucideIcon } from "lucide-react";
 import {
+  Building2,
   CalendarDays,
   ClipboardList,
   Handshake,
@@ -77,6 +78,13 @@ export const PRIMARY_NAV: readonly NavItem[] = [
     to: "/fixtures",
     icon: CalendarDays,
     description: "View the season schedule and advance match weeks",
+  },
+  {
+    key: "club",
+    label: "Club",
+    to: "/club",
+    icon: Building2,
+    description: "Club finances and identity",
   },
 ] as const;
 

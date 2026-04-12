@@ -15,6 +15,7 @@
 import type { DbClient } from "../../db/client.js";
 import type { SimEngine, SimMatchInput } from "../../sim/interface.js";
 import { createSimStub } from "../../sim/stub.js";
+import { generateAiBids } from "../transfers/ai-bids.js";
 import { tickBids } from "../transfers/bid-ticker.js";
 import { pickStarters } from "./starter-picker.js";
 
@@ -201,9 +202,10 @@ export async function advanceMatchday(
   }
 
   // Story 08: tick the transfer market after match results are written.
-  // This evaluates pending bids, expires old ones, and signs completed
-  // deals. The matchday number used here is the one we just played.
+  // Order matters: tick existing bids first (so they can resolve), THEN
+  // generate new AI bids using the current match week.
   await tickBids(client, matchday);
+  await generateAiBids(client, matchday);
 
   const remaining = await countRemaining(client);
   return { matchday, played: results.length, remaining };

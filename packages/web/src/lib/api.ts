@@ -150,6 +150,12 @@ export async function fetchCompletedDeals() {
   return res.json();
 }
 
+export async function fetchClubFinances() {
+  const res = await api.api.club.finances.$get();
+  if (!res.ok) throw new Error(`club finances failed: ${res.status}`);
+  return res.json();
+}
+
 type CurrencyTier = "Minimal" | "Modest" | "Notable" | "Significant" | "Elite";
 type PlayingTimeRole =
   | "Star Player"

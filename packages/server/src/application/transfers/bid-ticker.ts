@@ -80,7 +80,8 @@ function updateState(
 async function signFromTick(client: DbClient, bid: ActiveBidRow): Promise<void> {
   if (client.dialect !== "sqlite") return;
   const now = new Date().toISOString();
-  // Create contract.
+  // Replace any existing contract (unique on player_id).
+  client.sqlite.prepare(`DELETE FROM contracts WHERE player_id = ?`).run(bid.player_id);
   client.sqlite
     .prepare(
       `INSERT INTO contracts
