@@ -17,6 +17,8 @@ import type {
 } from "@rpgfc/shared";
 import {
   FORMATIONS,
+  FORMATION_SLOTS,
+  PITCH_SLOT_LABELS,
   PITCH_SLOT_POSITION_FAMILIES,
   PLAYING_STYLES,
 } from "@rpgfc/shared";
@@ -94,12 +96,22 @@ function TacticsEditor() {
   const tactics: TacticsResponse = tacticsQuery.data;
   const squad: SquadResponse = squadQuery.data;
 
-  const pitchSlots: PitchSlotData[] = tactics.assignments.map((a) => ({
-    slot: a.slot as PitchSlot,
-    slotLabel: a.slotLabel,
-    playerId: a.playerId,
-    playerName: a.playerName,
-  }));
+  // Build pitch slots from the LOCAL formation (not server state) so
+  // the diagram updates immediately when the user changes formation in
+  // the dropdown — before saving. Look up any existing assignment by
+  // slot key from the server data.
+  const assignmentMap = new Map(
+    tactics.assignments.map((a) => [a.slot, a]),
+  );
+  const pitchSlots: PitchSlotData[] = FORMATION_SLOTS[formation].map((slot) => {
+    const existing = assignmentMap.get(slot);
+    return {
+      slot,
+      slotLabel: PITCH_SLOT_LABELS[slot],
+      playerId: existing?.playerId ?? null,
+      playerName: existing?.playerName ?? null,
+    };
+  });
 
   const slotFamilies = activeSlot ? PITCH_SLOT_POSITION_FAMILIES[activeSlot] : [];
   const eligiblePlayers = squad.entries
@@ -108,7 +120,7 @@ function TacticsEditor() {
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-10">
-      <SectionHeader eyebrow={tactics.formationLabel} title="Tactics" />
+      <SectionHeader eyebrow={formation} title="Tactics" />
 
       <div className="mt-8 grid gap-8 md:grid-cols-[1fr_280px]">
         {/* Left: pitch diagram */}
