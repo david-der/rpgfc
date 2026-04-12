@@ -99,6 +99,7 @@ export type {
 } from "./tactics.js";
 export {
   FORMATIONS,
+  FORMATION_LABEL_OVERRIDES,
   FORMATION_SLOTS,
   PITCH_SLOTS,
   PITCH_SLOT_LABELS,
@@ -106,6 +107,7 @@ export {
   PLAYING_STYLES,
   TEAM_INSTRUCTIONS,
   TEAM_INSTRUCTION_LABELS,
+  slotLabelFor,
 } from "./tactics.js";
 
 export type {

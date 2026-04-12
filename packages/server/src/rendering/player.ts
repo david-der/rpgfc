@@ -79,6 +79,7 @@ export function renderPlayer(
     nationality: hidden.nationality,
     preferredFoot: hidden.preferredFoot,
     positionLabel,
+    preferredPositions: hidden.preferredPositions,
     club,
     badges,
     prose: { identity, currentForm },

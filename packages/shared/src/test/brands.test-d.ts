@@ -54,6 +54,7 @@ const hidden: HiddenPlayer = asHiddenPlayer({
   hiddenAttrs: blankGifts,
   mentalTraits: blankTraits,
   badgeKeys: [],
+  preferredPositions: ["LW", "ST"],
   experienceYears: 3,
   narrativeSeed: { hometown: "Málaga", story: "academy product" },
 });
@@ -65,6 +66,7 @@ const rendered: RenderedPlayer = asRenderedPlayer({
   nationality: "ES",
   preferredFoot: "Left",
   positionLabel: "LW",
+  preferredPositions: ["LW", "ST"],
   club: null,
   badges: [] as BadgeRef[],
   prose: { identity: "", currentForm: "" },

@@ -44,6 +44,7 @@ describe("rendering boundary brands", () => {
       hiddenAttrs: blankGifts,
       mentalTraits: blankTraits,
       badgeKeys: [],
+      preferredPositions: ["LW", "ST"],
       experienceYears: 0,
       narrativeSeed: { hometown: "Málaga", story: "academy product" },
     });
@@ -60,6 +61,7 @@ describe("rendering boundary brands", () => {
       nationality: "PT",
       preferredFoot: "Left",
       positionLabel: "LW",
+      preferredPositions: ["LW", "ST"],
       club: null,
       badges: [],
       prose: { identity: "A left winger.", currentForm: "Fresh." },

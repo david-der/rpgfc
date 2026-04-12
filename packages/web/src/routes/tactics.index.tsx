@@ -18,9 +18,9 @@ import type {
 import {
   FORMATIONS,
   FORMATION_SLOTS,
-  PITCH_SLOT_LABELS,
   PITCH_SLOT_POSITION_FAMILIES,
   PLAYING_STYLES,
+  slotLabelFor,
 } from "@rpgfc/shared";
 
 import { InstructionToggleList } from "../components/ui/InstructionToggleList";
@@ -107,7 +107,7 @@ function TacticsEditor() {
     const existing = assignmentMap.get(slot);
     return {
       slot,
-      slotLabel: PITCH_SLOT_LABELS[slot],
+      slotLabel: slotLabelFor(formation, slot),
       playerId: existing?.playerId ?? null,
       playerName: existing?.playerName ?? null,
     };

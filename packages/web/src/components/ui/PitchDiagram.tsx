@@ -32,7 +32,7 @@ const SLOT_POSITIONS: Record<Formation, Record<string, { x: number; y: number }>
   "4-4-2": {
     GK: { x: 50, y: 92 },
     LB: { x: 15, y: 72 }, DC1: { x: 37, y: 75 }, DC2: { x: 63, y: 75 }, RB: { x: 85, y: 72 },
-    MCL: { x: 20, y: 48 }, MCC: { x: 40, y: 50 }, MCR: { x: 60, y: 50 }, LW: { x: 80, y: 48 },
+    LW: { x: 12, y: 48 }, MCL: { x: 37, y: 50 }, MCR: { x: 63, y: 50 }, RW: { x: 88, y: 48 },
     ST1: { x: 35, y: 18 }, ST2: { x: 65, y: 18 },
   },
   "4-3-3": {

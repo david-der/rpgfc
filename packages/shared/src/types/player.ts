@@ -43,6 +43,8 @@ export interface HiddenPlayer {
   mentalTraits: MentalTraits;
   /** Stable string keys from the badge library (e.g. "clutch_finisher"). */
   badgeKeys: string[];
+  /** 1-3 positions the player can play effectively (e.g. ["ST", "LW"]). */
+  preferredPositions: string[];
   experienceYears: number;
   narrativeSeed: NarrativeSeed;
 }
@@ -82,6 +84,10 @@ export interface WirePlayer {
   preferredFoot: PreferredFoot;
   /** Short position label derived from the archetype (e.g. "ST", "CB"). */
   positionLabel: string;
+  /** 1-3 positions the player can play effectively. The first is
+   *  their primary; the rest are secondary. Used by the tactics
+   *  slot picker to show versatile players in multiple positions. */
+  preferredPositions: string[];
   club: RenderedClubRef | null;
   badges: BadgeRef[];
   prose: {

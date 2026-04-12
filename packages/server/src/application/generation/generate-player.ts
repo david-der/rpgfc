@@ -165,6 +165,8 @@ export function generatePlayer(ctx: GenerationContext): NewHiddenPlayer {
   const preferredFoot = pickFoot(rng, archetype);
   const dob = buildDob(age, referenceDate, rng);
 
+  const preferredPositions = derivePreferredPositions(archetype.positionLabel, rng);
+
   return asNewHiddenPlayer({
     runId,
     clubId,
@@ -176,7 +178,38 @@ export function generatePlayer(ctx: GenerationContext): NewHiddenPlayer {
     hiddenAttrs,
     mentalTraits,
     badgeKeys: allKeys,
+    preferredPositions,
     experienceYears,
     narrativeSeed,
   });
+}
+
+// Adjacent position families — a player's secondary positions are
+// drawn from these pools based on their primary. A CM might also
+// play CAM or CDM; a ST might also play LW; an FB might also play
+// LWB. The generator picks 0-2 secondary positions deterministically.
+const ADJACENT_POSITIONS: Record<string, readonly string[]> = {
+  GK: [],
+  CB: ["CDM"],
+  FB: ["LWB", "RWB", "LM", "RM"],
+  DM: ["CM", "CB"],
+  CM: ["CDM", "CAM", "LM", "RM"],
+  AM: ["CM", "LW", "RW", "ST"],
+  LW: ["LM", "ST", "RW"],
+  ST: ["LW", "RW", "CAM"],
+};
+
+function derivePreferredPositions(primary: string, rng: Random): string[] {
+  const positions = [primary];
+  const adjacents = ADJACENT_POSITIONS[primary] ?? [];
+  if (adjacents.length === 0) return positions;
+  // 60% chance of one secondary, 25% chance of two.
+  if (rng.chance(0.6) && adjacents.length > 0) {
+    positions.push(rng.pick(adjacents));
+  }
+  if (rng.chance(0.25) && adjacents.length > 1) {
+    const remaining = adjacents.filter((p) => !positions.includes(p));
+    if (remaining.length > 0) positions.push(rng.pick(remaining));
+  }
+  return positions.slice(0, 3);
 }

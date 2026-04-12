@@ -67,25 +67,37 @@ export const PITCH_SLOTS = [
 ] as const;
 export type PitchSlot = (typeof PITCH_SLOTS)[number];
 
+// Default display labels for each slot. These are the standard
+// abbreviations unless overridden by a formation-specific label.
 export const PITCH_SLOT_LABELS: Record<PitchSlot, string> = {
   GK: "GK",
-  DC1: "DC",
-  DC2: "DC",
-  DC3: "DC",
+  DC1: "CB",
+  DC2: "CB",
+  DC3: "CB",
   LB: "LB",
   RB: "RB",
   LWB: "LWB",
   RWB: "RWB",
-  DMC: "DMC",
-  MCL: "MC",
-  MCC: "MC",
-  MCR: "MC",
-  AMC: "AMC",
+  DMC: "CDM",
+  MCL: "CM",
+  MCC: "CM",
+  MCR: "CM",
+  AMC: "CAM",
   LW: "LW",
   RW: "RW",
   ST1: "ST",
   ST2: "ST",
 };
+
+// Some formations use the same slot IDs but display differently.
+// E.g., 4-4-2's wide positions are midfielders (LM/RM), not wingers.
+export const FORMATION_LABEL_OVERRIDES: Partial<Record<Formation, Partial<Record<PitchSlot, string>>>> = {
+  "4-4-2": { LW: "LM", RW: "RM" },
+};
+
+export function slotLabelFor(formation: Formation, slot: PitchSlot): string {
+  return FORMATION_LABEL_OVERRIDES[formation]?.[slot] ?? PITCH_SLOT_LABELS[slot];
+}
 
 // Compatible position families per slot. Used by the SlotRow dropdown
 // to filter the squad-player options. Position labels come from Story
@@ -115,7 +127,7 @@ export const PITCH_SLOT_POSITION_FAMILIES: Record<PitchSlot, readonly string[]> 
 // back-to-front reading order the UI renders. Assignments for slots
 // outside this set are ignored and cleared when the formation changes.
 export const FORMATION_SLOTS: Record<Formation, readonly PitchSlot[]> = {
-  "4-4-2": ["GK", "LB", "DC1", "DC2", "RB", "MCL", "MCC", "MCR", "LW", "ST1", "ST2"],
+  "4-4-2": ["GK", "LB", "DC1", "DC2", "RB", "LW", "MCL", "MCR", "RW", "ST1", "ST2"],
   "4-3-3": ["GK", "LB", "DC1", "DC2", "RB", "DMC", "MCL", "MCR", "LW", "RW", "ST1"],
   "4-2-3-1": ["GK", "LB", "DC1", "DC2", "RB", "DMC", "MCC", "LW", "AMC", "RW", "ST1"],
   "3-5-2": ["GK", "DC1", "DC2", "DC3", "LWB", "MCL", "MCC", "MCR", "RWB", "ST1", "ST2"],

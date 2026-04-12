@@ -34,9 +34,16 @@ interface PlayerRow {
   mental_traits_json: string;
   experience_years: number;
   narrative_seed_json: string;
+  preferred_positions_json: string;
 }
 
 function rowToHidden(row: PlayerRow): HiddenPlayer {
+  let preferredPositions: string[] = [];
+  try {
+    preferredPositions = JSON.parse(row.preferred_positions_json ?? "[]");
+  } catch {
+    preferredPositions = [];
+  }
   return asHiddenPlayer({
     id: row.id,
     runId: row.run_id,
@@ -48,7 +55,8 @@ function rowToHidden(row: PlayerRow): HiddenPlayer {
     archetypeId: row.archetype_id,
     hiddenAttrs: JSON.parse(row.hidden_attrs_json),
     mentalTraits: JSON.parse(row.mental_traits_json),
-    badgeKeys: [], // joined separately — see loadBadgeKeys below
+    badgeKeys: [],
+    preferredPositions,
     experienceYears: row.experience_years,
     narrativeSeed: JSON.parse(row.narrative_seed_json),
   });
@@ -67,6 +75,7 @@ function newPlayerToInsert(p: NewHiddenPlayer, clubId: number | null, now: strin
     mental_traits_json: JSON.stringify(p.mentalTraits),
     experience_years: p.experienceYears,
     narrative_seed_json: JSON.stringify(p.narrativeSeed),
+    preferred_positions_json: JSON.stringify(p.preferredPositions),
     created_at: now,
   };
 }
@@ -96,7 +105,7 @@ export async function getPlayerById(client: DbClient, id: number): Promise<Hidde
       .prepare<[number], PlayerRow>(
         `SELECT id, run_id, club_id, name, dob, nationality, preferred_foot,
                 archetype_id, hidden_attrs_json, mental_traits_json,
-                experience_years, narrative_seed_json
+                experience_years, narrative_seed_json, preferred_positions_json
          FROM players WHERE id = ?`,
       )
       .get(id);
@@ -160,7 +169,7 @@ export async function listPlayers(client: DbClient, query: ListQuery): Promise<L
       .prepare<[number, number], PlayerRow>(
         `SELECT id, run_id, club_id, name, dob, nationality, preferred_foot,
                 archetype_id, hidden_attrs_json, mental_traits_json,
-                experience_years, narrative_seed_json
+                experience_years, narrative_seed_json, preferred_positions_json
          FROM players
          WHERE id > ?
          ORDER BY id ASC
@@ -196,7 +205,7 @@ export async function listPlayers(client: DbClient, query: ListQuery): Promise<L
   let sql = `
     SELECT id, run_id, club_id, name, dob, nationality, preferred_foot,
            archetype_id, hidden_attrs_json, mental_traits_json,
-           experience_years, narrative_seed_json
+           experience_years, narrative_seed_json, preferred_positions_json
     FROM players
     WHERE id > $1`;
   if (query.clubId !== undefined) {
@@ -263,8 +272,8 @@ export async function seedWorldIfEmpty(client: DbClient, config: SeedConfig): Pr
     const insertPlayer = sqlite.prepare(
       `INSERT INTO players (run_id, club_id, name, dob, nationality, preferred_foot,
                             archetype_id, hidden_attrs_json, mental_traits_json,
-                            experience_years, narrative_seed_json, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                            experience_years, narrative_seed_json, preferred_positions_json, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     const insertBadge = sqlite.prepare(
       `INSERT INTO player_badges (player_id, badge_key, tier, awarded_at, awarded_reason)
@@ -297,6 +306,7 @@ export async function seedWorldIfEmpty(client: DbClient, config: SeedConfig): Pr
             insert.mental_traits_json,
             insert.experience_years,
             insert.narrative_seed_json,
+            insert.preferred_positions_json,
             now,
           );
           const playerId = Number(pInfo.lastInsertRowid);
@@ -340,8 +350,8 @@ export async function seedWorldIfEmpty(client: DbClient, config: SeedConfig): Pr
         const pRes = await pg.query<{ id: number }>(
           `INSERT INTO players (run_id, club_id, name, dob, nationality, preferred_foot,
                                 archetype_id, hidden_attrs_json, mental_traits_json,
-                                experience_years, narrative_seed_json, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                                experience_years, narrative_seed_json, preferred_positions_json, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
            RETURNING id`,
           [
             runId,
@@ -355,6 +365,7 @@ export async function seedWorldIfEmpty(client: DbClient, config: SeedConfig): Pr
             insert.mental_traits_json,
             insert.experience_years,
             insert.narrative_seed_json,
+            insert.preferred_positions_json,
             now,
           ],
         );
