@@ -29,13 +29,19 @@ import type { PromiseMood } from "@rpgfc/shared";
 import { BadgeStack } from "../components/ui/BadgeStack";
 import { CertaintyText } from "../components/ui/CertaintyText";
 import { ContractCard } from "../components/ui/ContractCard";
+import { FormSparkline } from "../components/ui/FormSparkline";
 import { KeyNumber } from "../components/ui/KeyNumber";
 import { NarrativeBlock } from "../components/ui/NarrativeBlock";
 import { PromiseMoodChip } from "../components/ui/PromiseMoodChip";
 import { ScoutReportCard } from "../components/ui/ScoutReportCard";
 import { TabBar, type TabDefinition } from "../components/ui/TabBar";
 import { TierPill } from "../components/ui/TierPill";
-import { fetchPlayer, fetchPlayerContract, fetchPlayerReports } from "../lib/api";
+import {
+  fetchPlayer,
+  fetchPlayerContract,
+  fetchPlayerForm,
+  fetchPlayerReports,
+} from "../lib/api";
 
 export const Route = createFileRoute("/players/$id")({
   component: PlayerProfile,
@@ -64,6 +70,10 @@ function PlayerProfile() {
   const contractQuery = useQuery({
     queryKey: ["player-contract", id],
     queryFn: () => fetchPlayerContract(id),
+  });
+  const formQuery = useQuery({
+    queryKey: ["player-form", id],
+    queryFn: () => fetchPlayerForm(id),
   });
 
   if (query.isPending) {
@@ -96,6 +106,15 @@ function PlayerProfile() {
           <NarrativeBlock dropCap label="Current form">
             <p>{player.prose.currentForm}</p>
           </NarrativeBlock>
+
+          {formQuery.data && formQuery.data.points.length > 0 && (
+            <section>
+              <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-parchment-500">
+                Recent form
+              </h2>
+              <FormSparkline series={formQuery.data} />
+            </section>
+          )}
 
           <section>
             <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-parchment-500">

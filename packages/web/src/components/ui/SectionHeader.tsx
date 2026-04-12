@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 
 interface SectionHeaderProps {
   title: string;
-  eyebrow?: string;
+  eyebrow?: ReactNode;
   actions?: ReactNode;
 }
 

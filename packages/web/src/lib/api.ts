@@ -209,3 +209,30 @@ export async function setSquadRole(playerId: number, role: SquadRole) {
   if (!res.ok) throw new Error(`squad role update failed: ${res.status}`);
   return res.json();
 }
+
+// ── Story 06 — fixtures, matches, form ─────────────────────────────────────
+
+export async function fetchFixtures() {
+  const res = await api.api.season.fixtures.$get();
+  if (!res.ok) throw new Error(`fixtures fetch failed: ${res.status}`);
+  return res.json();
+}
+
+export async function advanceMatchday() {
+  const res = await api.api.season.advance.$post();
+  if (!res.ok) throw new Error(`advance failed: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchMatch(id: string) {
+  const res = await api.api.matches[":id"].$get({ param: { id } });
+  if (res.status === 404) throw new Error("Match not found");
+  if (!res.ok) throw new Error(`match fetch failed: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchPlayerForm(id: string) {
+  const res = await api.api.players[":id"].form.$get({ param: { id } });
+  if (!res.ok) throw new Error(`player form fetch failed: ${res.status}`);
+  return res.json();
+}
