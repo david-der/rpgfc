@@ -346,6 +346,10 @@ export async function submitBid(client: DbClient, input: SubmitBidInput): Promis
   if (!player || player.club_id === null) {
     throw new Error("Player has no current club");
   }
+  // Guard: you can't buy your own players.
+  if (player.club_id === input.fromClubId) {
+    throw new Error("Cannot bid on a player already at your club");
+  }
 
   const stance = stanceFor(input.feeCents, listing.asking_price_cents);
 

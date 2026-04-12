@@ -68,17 +68,20 @@ describe("transfers end-to-end — Story 04", () => {
   it("AC-06: happy-path force-accept creates a contract and moves the player", async () => {
     if (db.dialect !== "sqlite") return;
 
-    // Pick any listed player.
+    // Pick a listed player NOT on club 1 (the buying club).
     const listed = db.sqlite
       .prepare<
         [],
         { player_id: number; asking_price_cents: number }
-      >(`SELECT player_id, asking_price_cents FROM listing LIMIT 1`)
+      >(
+        `SELECT l.player_id, l.asking_price_cents
+         FROM listing l JOIN players p ON p.id = l.player_id
+         WHERE p.club_id != 1 LIMIT 1`,
+      )
       .get();
     expect(listed).toBeDefined();
     const playerId = listed!.player_id;
 
-    // Note the player's current club (we'll assert it changes).
     const playerBefore = db.sqlite
       .prepare<[number], { club_id: number | null }>(`SELECT club_id FROM players WHERE id = ?`)
       .get(playerId);
@@ -128,12 +131,16 @@ describe("transfers end-to-end — Story 04", () => {
   it("AC-07: a fee 30% below asking produces a SellerRejected state", async () => {
     if (db.dialect !== "sqlite") return;
 
-    // Pick a listing that still exists.
+    // Pick a listing that still exists AND isn't on the buying club.
     const listed = db.sqlite
       .prepare<
         [],
         { player_id: number; asking_price_cents: number }
-      >(`SELECT player_id, asking_price_cents FROM listing LIMIT 1`)
+      >(
+        `SELECT l.player_id, l.asking_price_cents
+         FROM listing l JOIN players p ON p.id = l.player_id
+         WHERE p.club_id != 1 LIMIT 1`,
+      )
       .get();
     if (!listed) return;
 

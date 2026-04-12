@@ -218,7 +218,9 @@ export async function renderTransfersPage(
   deps: TransfersDeps,
 ): Promise<TransfersPage> {
   const clubs = await loadFullClubMap(db);
-  const listingRows = await loadListingRows(db);
+  const allListingRows = await loadListingRows(db);
+  // Exclude the user's own club — you can't buy your own players.
+  const listingRows = allListingRows.filter((r) => r.club_id !== deps.userClubId);
   const latestStateByPlayer = await loadLatestBidStateByPlayer(db, deps.userClubId);
   const now = deps.now();
 

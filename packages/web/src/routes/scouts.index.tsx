@@ -278,21 +278,30 @@ function ScoutingSearch() {
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex gap-1">
-                        <Link
-                          to="/transfers/$playerId"
-                          params={{ playerId: String(player.id) }}
-                          className="border border-moss-500 bg-parchment-50 px-2 py-1 font-sans text-xs font-medium uppercase tracking-wide text-moss-700 hover:bg-moss-50"
-                        >
-                          Bid
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={() => watchMutation.mutate(player.id)}
-                          disabled={watchMutation.isPending}
-                          className="border border-parchment-400 bg-parchment-50 px-2 py-1 font-sans text-xs text-parchment-600 hover:border-parchment-700 hover:text-parchment-900"
-                        >
-                          Watch
-                        </button>
+                        {/* User club id is hardcoded to 1 until auth lands.
+                            Can't bid on your own players. */}
+                        {player.club?.id !== 1 && (
+                          <Link
+                            to="/transfers/$playerId"
+                            params={{ playerId: String(player.id) }}
+                            className="border border-moss-500 bg-parchment-50 px-2 py-1 font-sans text-xs font-medium uppercase tracking-wide text-moss-700 hover:bg-moss-50"
+                          >
+                            Bid
+                          </Link>
+                        )}
+                        {player.club?.id !== 1 && (
+                          <button
+                            type="button"
+                            onClick={() => watchMutation.mutate(player.id)}
+                            disabled={watchMutation.isPending}
+                            className="border border-parchment-400 bg-parchment-50 px-2 py-1 font-sans text-xs text-parchment-600 hover:border-parchment-700 hover:text-parchment-900"
+                          >
+                            Watch
+                          </button>
+                        )}
+                        {player.club?.id === 1 && (
+                          <span className="text-xs italic text-parchment-500">Your player</span>
+                        )}
                       </div>
                     </td>
                   </tr>
