@@ -18,6 +18,7 @@ import {
 } from "./application/transfers/seed-listings.js";
 import { seedTacticsIfEmpty } from "./application/tactics/seed.js";
 import { seedSquadIfEmpty } from "./application/squad/seed.js";
+import { seedFixturesIfEmpty } from "./application/season/seed.js";
 
 const env = parseEnv();
 
@@ -93,6 +94,15 @@ async function main() {
   const squadSeed = await seedSquadIfEmpty(dbClient);
   if (!squadSeed.skipped) {
     logger.info({ squad: squadSeed.entriesCreated }, "Seeded squad entries");
+  }
+
+  // Story 06: round-robin half-season for the seeded clubs. Idempotent.
+  const fixturesSeed = await seedFixturesIfEmpty(dbClient);
+  if (!fixturesSeed.skipped) {
+    logger.info(
+      { matches: fixturesSeed.matchesCreated, matchdays: fixturesSeed.matchdays },
+      "Seeded fixtures",
+    );
   }
 
   // WEB_DIST points at a built Vite bundle. In local dev Vite runs on :5173

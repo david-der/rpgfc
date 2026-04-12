@@ -29,6 +29,7 @@ import { loadFullClubMap } from "./club.js";
 import type { RenderContext } from "./context.js";
 import { knowPlayer, knowPlayers } from "./knowledge.js";
 import { renderPlayer } from "./player.js";
+import { currentFormFor } from "./player-form.js";
 import { loadPromiseMoodForPlayer } from "./squad-response.js";
 
 // Story 05: attach the promise-mood fields to a base rendered player.
@@ -36,17 +37,22 @@ import { loadPromiseMoodForPlayer } from "./squad-response.js";
 // qualitative mood/label. Written as a helper so both the byId and the
 // page paths can share the merge — the mood fields are optional on
 // WirePlayer, so callers that don't need them can skip the lookup.
-async function withPromiseMood(
+async function withPromiseMoodAndForm(
   db: DbClient,
   player: RenderedPlayer,
 ): Promise<RenderedPlayer> {
-  const mood = await loadPromiseMoodForPlayer(db, player.id);
+  const [mood, form] = await Promise.all([
+    loadPromiseMoodForPlayer(db, player.id),
+    currentFormFor(db, player.id),
+  ]);
   return {
     ...player,
     ...(mood.squadRole ? { squadRole: mood.squadRole } : {}),
     ...(mood.rolePromise ? { rolePromise: mood.rolePromise } : {}),
     ...(mood.promiseMood ? { promiseMood: mood.promiseMood } : {}),
     ...(mood.promiseMoodLabel ? { promiseMoodLabel: mood.promiseMoodLabel } : {}),
+    formTier: form.tier,
+    formTierLabel: form.label,
   };
 }
 
@@ -66,7 +72,7 @@ export async function renderPlayerById(
     { ...baseCtx, knowledge },
     { findClub: (cid) => clubs.get(cid) ?? null },
   );
-  return withPromiseMood(db, rendered);
+  return withPromiseMoodAndForm(db, rendered);
 }
 
 export interface RenderedPlayerPage {

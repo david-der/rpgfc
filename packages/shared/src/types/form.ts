@@ -1,0 +1,94 @@
+// Form tiers — Story 06.
+//
+// The qualitative axis the match engine writes to and the form
+// sparkline reads from. Five stops, paired with the form gradient
+// from Style Guide §2.3 (form-dreadful → form-excellent).
+
+export const FORM_TIERS = ["Excellent", "Good", "Average", "Poor", "Dreadful"] as const;
+export type FormTier = (typeof FORM_TIERS)[number];
+
+export const FORM_TIER_LABELS: Record<FormTier, string> = {
+  Excellent: "Excellent",
+  Good: "Good",
+  Average: "Average",
+  Poor: "Poor",
+  Dreadful: "Dreadful",
+};
+
+// Match state — Scheduled before kick-off, Played after the engine
+// writes a result. Story 07 may add more states (Postponed, Cancelled).
+export const MATCH_STATES = ["Scheduled", "Played"] as const;
+export type MatchState = (typeof MATCH_STATES)[number];
+
+// ── wire shapes ───────────────────────────────────────────────────────────
+
+export interface RenderedMatchClub {
+  id: number;
+  name: string;
+  goals: number | null;
+}
+
+export interface RenderedMatchPerformance {
+  playerId: number;
+  playerName: string;
+  positionLabel: string;
+  clubId: number;
+  goals: number;
+  assists: number;
+  tier: FormTier;
+  tierLabel: string;
+  eventDescription: string | null;
+}
+
+export interface RenderedMatch {
+  id: number;
+  matchday: number;
+  state: MatchState;
+  home: RenderedMatchClub;
+  away: RenderedMatchClub;
+  /** 2–3 short paragraphs of prose stitched from the highest-tier
+   *  performers and the scoreline. Empty array when state is
+   *  Scheduled. */
+  narrative: string[];
+  performances: RenderedMatchPerformance[];
+}
+
+export interface RenderedFixture {
+  id: number;
+  matchday: number;
+  state: MatchState;
+  home: RenderedMatchClub;
+  away: RenderedMatchClub;
+  /** "W" / "D" / "L" from the user-club's perspective when this
+   *  fixture has been played and the user club is one of the two
+   *  sides. Null otherwise. */
+  userResult: "W" | "D" | "L" | null;
+}
+
+export interface RenderedFixturesPage {
+  /** All matchday groups, ordered ascending. */
+  matchdays: Array<{
+    matchday: number;
+    fixtures: RenderedFixture[];
+  }>;
+  /** The matchday number the next Advance call will simulate, or
+   *  null if every fixture in the half-season is already Played. */
+  nextMatchday: number | null;
+}
+
+export interface FormSeriesPoint {
+  matchday: number;
+  matchId: number;
+  tier: FormTier;
+  tierLabel: string;
+}
+
+export interface FormSeries {
+  playerId: number;
+  /** Most recent first… NO, ascending matchday order so the
+   *  sparkline reads left-to-right naturally. */
+  points: FormSeriesPoint[];
+  /** The player's current form tier — `recentFormFor(player, 5)`. */
+  currentTier: FormTier;
+  currentTierLabel: string;
+}

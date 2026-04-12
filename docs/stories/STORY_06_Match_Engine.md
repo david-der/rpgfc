@@ -528,8 +528,9 @@ returns `{ remaining: 0 }` and does not re-simulate.
 
 **AC-10** — `recentFormFor` averages tiers correctly.
 - **Given** five performances at tiers
-  `[Excellent, Good, Average, Average, Poor]`.
-- **Then** `recentFormFor` returns `Good`.
+  `[Excellent, Good, Average, Average, Poor]` (weights
+  4 + 3 + 2 + 2 + 1 = 12, avg 2.4, rounded to bucket 2).
+- **Then** `recentFormFor` returns `Average`.
 - **Verified by** `packages/server/src/test/form.test.ts`.
 
 **AC-11** — A player with no performances reports `Average`.

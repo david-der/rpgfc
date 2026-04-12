@@ -3,6 +3,7 @@ import type { BadgeRef } from "./badge.js";
 import type { CertaintyTier } from "./certainty.js";
 import type { PlayingTimeRole } from "./contract.js";
 import type { ExperienceTier } from "./experience.js";
+import type { FormTier } from "./form.js";
 import type { ScoutReportRef } from "./scout.js";
 import type { PromiseMood, SquadRole } from "./squad.js";
 
@@ -103,6 +104,11 @@ export interface WirePlayer {
   rolePromise?: PlayingTimeRole | undefined;
   promiseMood?: PromiseMood | undefined;
   promiseMoodLabel?: string | undefined;
+  /** Story 06: rolling form tier from the player's last 5
+   *  player_match_performance rows. Optional because a freshly-
+   *  generated player has no matches yet. */
+  formTier?: FormTier | undefined;
+  formTierLabel?: string | undefined;
 }
 
 // RenderedPlayer is the server-internal branded flavor of WirePlayer. Only

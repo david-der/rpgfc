@@ -16,6 +16,7 @@ import type { DbClient } from "../db/client.js";
 import {
   getContractForPlayer,
   getPlayerReports,
+  renderFormSeriesFor,
   renderPlayerById,
   renderPlayersPage,
   runPlayersSeed,
@@ -78,6 +79,12 @@ export function createPlayersRoute(deps: PlayersRouteDeps) {
         return c.json({ contract: null });
       }
       return c.json({ contract });
+    })
+    // Story 06 — form series for the profile sparkline.
+    .get("/:id/form", zValidator("param", idParam), async (c) => {
+      const { id } = c.req.valid("param");
+      const series = await renderFormSeriesFor(deps.db, id);
+      return c.json(series);
     });
 
   if (deps.devEndpointsEnabled) {
