@@ -147,7 +147,8 @@ describe("transfers end-to-end — Story 04", () => {
       rolePromise: "Rotation",
       now: REFERENCE_DATE,
     });
-    expect(bid.state).toBe("SellerRejected");
-    expect(bid.rejectionReasonCode).toBe("SELLER_FEE_TOO_LOW");
+    // Story 08: bids are now time-based. The bid enters Submitted
+    // and the seller evaluates on the next advanceMatchday tick.
+    expect(bid.state).toBe("Submitted");
   });
 });

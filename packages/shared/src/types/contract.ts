@@ -59,6 +59,7 @@ export const BID_STATES = [
   "PlayerAccepted",
   "Signed",
   "Expired",
+  "Cancelled",
 ] as const;
 export type BidState = (typeof BID_STATES)[number];
 

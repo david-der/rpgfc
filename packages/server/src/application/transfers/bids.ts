@@ -22,23 +22,20 @@ import type { BidRef, BidState, LoanTerms, PlayingTimeRole, RejectionReason } fr
 import { stanceFor } from "@rpgfc/shared";
 
 import type { DbClient } from "../../db/client.js";
-import {
-  REJECTION_PROSE,
-  evaluatePlayerProposal,
-  evaluateSellerProposal,
-  type PlayerEvalInput,
-} from "./evaluators.js";
+import { REJECTION_PROSE } from "./evaluators.js";
 
 // ── types ─────────────────────────────────────────────────────────────────
 
 export interface SubmitBidInput {
   playerId: number;
-  fromClubId: number; // the user's buying club
+  fromClubId: number;
   feeCents: number;
   wageCents: number;
   signingBonusCents: number;
   rolePromise: PlayingTimeRole;
   loanOffer?: LoanTerms | null;
+  /** Story 08: the current match week. Used to set the bid deadline. */
+  matchWeek?: number;
   now?: Date;
 }
 
@@ -81,12 +78,6 @@ interface PlayerRow {
   nationality: string;
 }
 
-interface ClubBudgetRow {
-  club_id: number;
-  nationality: string;
-  cash_reserve_cents: number;
-  wage_budget_cents_per_week: number;
-}
 
 // ── loaders ───────────────────────────────────────────────────────────────
 
@@ -167,75 +158,6 @@ async function loadPlayer(client: DbClient, id: number): Promise<PlayerRow | nul
   return res.rows[0] ?? null;
 }
 
-async function loadClubBudget(client: DbClient, clubId: number): Promise<ClubBudgetRow | null> {
-  if (client.dialect === "sqlite") {
-    return (
-      client.sqlite
-        .prepare<[number], ClubBudgetRow>(
-          `SELECT c.id AS club_id, c.nationality,
-                  ie.cash_reserve_cents, ie.wage_budget_cents_per_week
-           FROM clubs c
-           LEFT JOIN club_identity_ext ie ON ie.club_id = c.id
-           WHERE c.id = ?`,
-        )
-        .get(clubId) ?? null
-    );
-  }
-  const res = await client.pool.query<ClubBudgetRow>(
-    `SELECT c.id AS club_id, c.nationality,
-            ie.cash_reserve_cents, ie.wage_budget_cents_per_week
-     FROM clubs c
-     LEFT JOIN club_identity_ext ie ON ie.club_id = c.id
-     WHERE c.id = $1`,
-    [clubId],
-  );
-  return res.rows[0] ?? null;
-}
-
-async function loadCurrentWageOut(client: DbClient, clubId: number): Promise<number> {
-  if (client.dialect === "sqlite") {
-    const row = client.sqlite
-      .prepare<
-        [number],
-        { total: number | null }
-      >(`SELECT SUM(weekly_wage_cents) AS total FROM contracts WHERE club_id = ?`)
-      .get(clubId);
-    return Number(row?.total ?? 0);
-  }
-  const res = await client.pool.query<{ total: string | null }>(
-    `SELECT SUM(weekly_wage_cents)::text AS total FROM contracts WHERE club_id = $1`,
-    [clubId],
-  );
-  return Number(res.rows[0]?.total ?? 0);
-}
-
-interface PreferencesRow {
-  wage_floor_cents: number;
-  min_playing_time: string;
-  preferred_regions_json: string;
-  forbidden_club_ids_json: string;
-}
-
-async function loadPreferences(client: DbClient, playerId: number): Promise<PreferencesRow | null> {
-  if (client.dialect === "sqlite") {
-    return (
-      client.sqlite
-        .prepare<[number], PreferencesRow>(
-          `SELECT wage_floor_cents, min_playing_time,
-                  preferred_regions_json, forbidden_club_ids_json
-           FROM player_preferences WHERE player_id = ?`,
-        )
-        .get(playerId) ?? null
-    );
-  }
-  const res = await client.pool.query<PreferencesRow>(
-    `SELECT wage_floor_cents, min_playing_time,
-            preferred_regions_json, forbidden_club_ids_json
-     FROM player_preferences WHERE player_id = $1`,
-    [playerId],
-  );
-  return res.rows[0] ?? null;
-}
 
 // ── row → ref conversion ──────────────────────────────────────────────────
 
@@ -276,6 +198,8 @@ async function insertBid(
     toClubId: number;
     state: BidState;
     stance: BidRef["stance"];
+    submittedMatchWeek?: number;
+    deadlineMatchWeek?: number;
     now: string;
   },
 ): Promise<number> {
@@ -284,19 +208,29 @@ async function insertBid(
       .prepare(
         `INSERT INTO bids
            (player_id, from_club_id, to_club_id, state, stance,
-            rejection_reason, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, NULL, ?, ?)`,
+            rejection_reason, submitted_match_week, deadline_match_week,
+            created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)`,
       )
-      .run(row.playerId, row.fromClubId, row.toClubId, row.state, row.stance, row.now, row.now);
+      .run(
+        row.playerId, row.fromClubId, row.toClubId, row.state, row.stance,
+        row.submittedMatchWeek ?? null, row.deadlineMatchWeek ?? null,
+        row.now, row.now,
+      );
     return Number(result.lastInsertRowid);
   }
   const res = await client.pool.query<{ id: number }>(
     `INSERT INTO bids
        (player_id, from_club_id, to_club_id, state, stance,
-        rejection_reason, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, NULL, $6, $7)
+        rejection_reason, submitted_match_week, deadline_match_week,
+        created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, NULL, $6, $7, $8, $9)
      RETURNING id`,
-    [row.playerId, row.fromClubId, row.toClubId, row.state, row.stance, row.now, row.now],
+    [
+      row.playerId, row.fromClubId, row.toClubId, row.state, row.stance,
+      row.submittedMatchWeek ?? null, row.deadlineMatchWeek ?? null,
+      row.now, row.now,
+    ],
   );
   return res.rows[0]!.id;
 }
@@ -413,29 +347,22 @@ export async function submitBid(client: DbClient, input: SubmitBidInput): Promis
     throw new Error("Player has no current club");
   }
 
-  const buyerBudget = await loadClubBudget(client, input.fromClubId);
-  if (!buyerBudget) throw new Error("Buying club not found");
-  const buyerCurrentWage = await loadCurrentWageOut(client, input.fromClubId);
-
-  const sellerResult = evaluateSellerProposal({
-    feeCents: input.feeCents,
-    wageCents: input.wageCents,
-    askingCents: listing.asking_price_cents,
-    buyerCashReserveCents: buyerBudget.cash_reserve_cents,
-    buyerWageBudgetCentsPerWeek: buyerBudget.wage_budget_cents_per_week,
-    buyerCurrentWageOutCents: buyerCurrentWage,
-  });
-
   const stance = stanceFor(input.feeCents, listing.asking_price_cents);
 
-  // Every submit starts with a SellerReviewing state so the evaluator's
-  // result can be baked into the same row update in one transaction.
+  // Story 08: bids are now time-based. Submit enters Submitted state
+  // with a 4-week deadline. The bid ticker in advanceMatchday handles
+  // seller evaluation, player evaluation, and expiry.
+  const submittedMatchWeek = input.matchWeek ?? 1;
+  const deadlineMatchWeek = submittedMatchWeek + 4;
+
   const bidId = await insertBid(client, {
     playerId: input.playerId,
     fromClubId: input.fromClubId,
     toClubId: player.club_id,
-    state: "SellerReviewing",
+    state: "Submitted",
     stance,
+    submittedMatchWeek,
+    deadlineMatchWeek,
     now,
   });
   const proposalId = await insertProposal(client, {
@@ -453,90 +380,7 @@ export async function submitBid(client: DbClient, input: SubmitBidInput): Promis
     updated_at: now,
   });
 
-  // Apply the seller decision immediately.
-  if (sellerResult.kind === "reject") {
-    await updateBid(client, bidId, {
-      state: "SellerRejected",
-      rejection_reason: sellerResult.reason,
-      updated_at: now,
-    });
-  } else if (sellerResult.kind === "counter") {
-    // Write the seller's counter-proposal row and point the bid at it.
-    const counterProposalId = await insertProposal(client, {
-      bidId,
-      authorKind: "seller",
-      feeCents: sellerResult.counterFeeCents,
-      wageCents: input.wageCents,
-      signingBonusCents: input.signingBonusCents,
-      rolePromise: input.rolePromise,
-      loanOffer: input.loanOffer ?? null,
-      now,
-    });
-    await updateBid(client, bidId, {
-      state: "SellerCountered",
-      current_proposal_id: counterProposalId,
-      stance: stanceFor(sellerResult.counterFeeCents, listing.asking_price_cents),
-      updated_at: now,
-    });
-  } else {
-    // Seller accepted — run the player evaluator next.
-    await updateBid(client, bidId, {
-      state: "SellerAccepted",
-      updated_at: now,
-    });
-
-    const playerResult = await evaluateAgainstPlayer(client, {
-      playerId: input.playerId,
-      toClubId: input.fromClubId,
-      toClubNationality: buyerBudget.nationality,
-      wageCents: input.wageCents,
-      rolePromise: input.rolePromise,
-    });
-
-    if (playerResult.kind === "accept") {
-      await signBid(client, bidId, now);
-    } else {
-      await updateBid(client, bidId, {
-        state: "PlayerRejected",
-        rejection_reason: playerResult.reason,
-        updated_at: now,
-      });
-    }
-  }
-
   return (await getBidById(client, bidId))!;
-}
-
-// ── player evaluator bridge (loads preferences + player row) ──────────────
-
-async function evaluateAgainstPlayer(
-  client: DbClient,
-  input: {
-    playerId: number;
-    toClubId: number;
-    toClubNationality: string;
-    wageCents: number;
-    rolePromise: PlayingTimeRole;
-  },
-) {
-  const prefs = await loadPreferences(client, input.playerId);
-  if (!prefs) {
-    // No preferences row → treat as "happy enough" for Story 04.
-    return { kind: "accept" as const };
-  }
-  const playerEvalInput: PlayerEvalInput = {
-    wageCents: input.wageCents,
-    rolePromise: input.rolePromise,
-    toClubId: input.toClubId,
-    toClubNationality: input.toClubNationality,
-    preferences: {
-      wageFloorCents: prefs.wage_floor_cents,
-      minPlayingTime: prefs.min_playing_time as PlayingTimeRole,
-      preferredRegions: JSON.parse(prefs.preferred_regions_json) as string[],
-      forbiddenClubIds: JSON.parse(prefs.forbidden_club_ids_json) as number[],
-    },
-  };
-  return evaluatePlayerProposal(playerEvalInput);
 }
 
 // ── sign: create contract + move player + delete listing ─────────────────

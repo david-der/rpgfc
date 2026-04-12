@@ -86,13 +86,9 @@ describe("transfer routes — Story 04", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { id: number; state: string };
     expect(typeof body.id).toBe("number");
-    expect([
-      "SellerRejected",
-      "SellerCountered",
-      "SellerAccepted",
-      "PlayerRejected",
-      "Signed",
-    ]).toContain(body.state);
+    // Story 08: bids enter Submitted state; resolution happens during
+    // advanceMatchday. The state should be Submitted immediately.
+    expect(body.state).toBe("Submitted");
   });
 
   it("AC-14: GET /api/players/:id/contract returns null when no contract exists", async () => {

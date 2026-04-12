@@ -15,6 +15,7 @@
 import type { DbClient } from "../../db/client.js";
 import type { SimEngine, SimMatchInput } from "../../sim/interface.js";
 import { createSimStub } from "../../sim/stub.js";
+import { tickBids } from "../transfers/bid-ticker.js";
 import { pickStarters } from "./starter-picker.js";
 
 export interface AdvanceMatchdayResult {
@@ -198,6 +199,11 @@ export async function advanceMatchday(
       conn.release();
     }
   }
+
+  // Story 08: tick the transfer market after match results are written.
+  // This evaluates pending bids, expires old ones, and signs completed
+  // deals. The matchday number used here is the one we just played.
+  await tickBids(client, matchday);
 
   const remaining = await countRemaining(client);
   return { matchday, played: results.length, remaining };
