@@ -125,6 +125,17 @@ export {
 } from "./squad.js";
 
 export type {
+  LeagueTableRow,
+  SeasonState,
+  SeasonSummary,
+} from "./season.js";
+export {
+  TRANSFER_WINDOWS,
+  isTransferWindowOpen,
+  nextWindowBoundary,
+} from "./season.js";
+
+export type {
   FormSeries,
   FormSeriesPoint,
   FormTier,

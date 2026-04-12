@@ -76,17 +76,18 @@ describe("advanceMatchday — Story 06", () => {
     expect(result.played).toBe(5);
   });
 
-  it("AC-09: advancing to the end of the half-season returns remaining=0", async () => {
-    // We've already played 2 matchdays (10 fixtures). 7 to go.
+  it("AC-09: advancing to the end of the full season returns remaining=0", async () => {
+    // Full season for 10 clubs: 18 matchdays × 5 fixtures each = 90
+    // total. We've played 2 matchdays (10 fixtures). 80 remain.
     let last: { matchday: number | null; played: number; remaining: number } = {
       matchday: 2,
       played: 5,
-      remaining: 35,
+      remaining: 80,
     };
     while (last.remaining > 0) {
       last = await advanceMatchday(db, { now: REFERENCE_DATE });
     }
-    expect(last.matchday).toBe(9);
+    expect(last.matchday).toBe(18);
     expect(last.remaining).toBe(0);
 
     // One more call: terminal state, no work done.

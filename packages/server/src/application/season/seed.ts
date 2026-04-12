@@ -6,7 +6,30 @@
 // sim engine produces the same result on every re-run.
 
 import type { DbClient } from "../../db/client.js";
-import { generateRoundRobin } from "./schedule.js";
+import { generateFullSeason } from "./schedule.js";
+
+// ── save_state auto-create ───────────────────────────────────────────────
+
+export async function ensureSaveState(client: DbClient): Promise<void> {
+  const now = new Date().toISOString();
+  if (client.dialect === "sqlite") {
+    client.sqlite
+      .prepare(
+        `INSERT OR IGNORE INTO save_state
+           (id, save_name, season, next_match_week, created_at, updated_at)
+         VALUES (1, 'Default', 0, 1, ?, ?)`,
+      )
+      .run(now, now);
+    return;
+  }
+  await client.pool.query(
+    `INSERT INTO save_state
+       (id, save_name, season, next_match_week, created_at, updated_at)
+     VALUES (1, 'Default', 0, 1, $1, $2)
+     ON CONFLICT (id) DO NOTHING`,
+    [now, now],
+  );
+}
 
 export interface FixturesSeedResult {
   matchesCreated: number;
@@ -47,13 +70,13 @@ export async function seedFixturesIfEmpty(client: DbClient): Promise<FixturesSee
   const clubIds = await loadClubIds(client);
   if (clubIds.length < 2) return { matchesCreated: 0, matchdays: 0, skipped: false };
 
-  const schedule = generateRoundRobin(clubIds);
+  const schedule = generateFullSeason(clubIds);
   let created = 0;
 
   for (const md of schedule) {
     for (const fx of md.fixtures) {
       const seed = hashSeed(md.matchday, fx.homeClubId, fx.awayClubId);
-      await insertMatch(client, md.matchday, fx.homeClubId, fx.awayClubId, seed);
+      await insertMatch(client, md.matchday, fx.homeClubId, fx.awayClubId, seed, 0);
       created++;
     }
   }
@@ -80,21 +103,22 @@ async function insertMatch(
   homeClubId: number,
   awayClubId: number,
   seed: number,
+  season: number,
 ): Promise<void> {
   if (client.dialect === "sqlite") {
     client.sqlite
       .prepare(
         `INSERT INTO matches
-           (matchday, home_club_id, away_club_id, state, seed)
-         VALUES (?, ?, ?, 'Scheduled', ?)`,
+           (matchday, home_club_id, away_club_id, state, seed, season)
+         VALUES (?, ?, ?, 'Scheduled', ?, ?)`,
       )
-      .run(matchday, homeClubId, awayClubId, seed);
+      .run(matchday, homeClubId, awayClubId, seed, season);
     return;
   }
   await client.pool.query(
     `INSERT INTO matches
-       (matchday, home_club_id, away_club_id, state, seed)
-     VALUES ($1, $2, $3, 'Scheduled', $4)`,
-    [matchday, homeClubId, awayClubId, seed],
+       (matchday, home_club_id, away_club_id, state, seed, season)
+     VALUES ($1, $2, $3, 'Scheduled', $4, $5)`,
+    [matchday, homeClubId, awayClubId, seed, season],
   );
 }

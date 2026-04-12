@@ -87,12 +87,14 @@ describe("fixtures seed — Story 06", () => {
     if (db.dialect === "sqlite") db.close();
   });
 
-  it("AC-06: writes n*(n-1)/2 = 45 matches for 10 clubs", () => {
+  it("AC-06: writes n*(n-1) = 90 matches for 10 clubs (full season)", () => {
     if (db.dialect !== "sqlite") return;
     const row = db.sqlite
       .prepare<[], { n: number }>(`SELECT COUNT(*) AS n FROM matches`)
       .get();
-    expect(row?.n).toBe(45);
+    // Full season: each club plays every other twice (home + away).
+    // 10 clubs → 10 * 9 = 90 total fixtures.
+    expect(row?.n).toBe(90);
   });
 
   it("every match starts in the Scheduled state", () => {

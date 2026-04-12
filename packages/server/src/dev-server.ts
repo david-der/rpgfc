@@ -18,7 +18,7 @@ import {
 } from "./application/transfers/seed-listings.js";
 import { seedTacticsIfEmpty } from "./application/tactics/seed.js";
 import { seedSquadIfEmpty } from "./application/squad/seed.js";
-import { seedFixturesIfEmpty } from "./application/season/seed.js";
+import { ensureSaveState, seedFixturesIfEmpty } from "./application/season/seed.js";
 
 const env = parseEnv();
 
@@ -51,7 +51,7 @@ async function main() {
   }
   const seedResult = await seedWorldIfEmpty(dbClient, {
     seed: 42,
-    clubCount: 10,
+    clubCount: 20,
     playersPerClub: 20,
     referenceDate: new Date("2026-06-01T00:00:00Z"),
   });
@@ -96,7 +96,7 @@ async function main() {
     logger.info({ squad: squadSeed.entriesCreated }, "Seeded squad entries");
   }
 
-  // Story 06: round-robin half-season for the seeded clubs. Idempotent.
+  // Story 06/07: full-season fixtures (38 match weeks for 20 clubs).
   const fixturesSeed = await seedFixturesIfEmpty(dbClient);
   if (!fixturesSeed.skipped) {
     logger.info(
@@ -104,6 +104,9 @@ async function main() {
       "Seeded fixtures",
     );
   }
+
+  // Story 07: ensure the save_state singleton row exists.
+  await ensureSaveState(dbClient);
 
   // WEB_DIST points at a built Vite bundle. In local dev Vite runs on :5173
   // and proxies /api to this server, so WEB_DIST is unset and createApp

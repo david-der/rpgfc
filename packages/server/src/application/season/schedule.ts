@@ -76,10 +76,18 @@ export function generateRoundRobin(clubIds: readonly number[]): ScheduleMatchday
     rotating.unshift(rotating.pop()!);
   }
 
-  // Touch flipHomeAway so the unused-export check stays clean while
-  // leaving the helper available for the future Story 07 second-half
-  // mirroring step.
-  void flipHomeAway;
-
   return matchdays;
+}
+
+// Story 07: full season — both halves. The second half mirrors the
+// first with home/away swapped and matchday numbers offset by the
+// half-season length. For 20 clubs this yields 38 match weeks.
+export function generateFullSeason(clubIds: readonly number[]): ScheduleMatchday[] {
+  const firstHalf = generateRoundRobin(clubIds);
+  const offset = firstHalf.length;
+  const secondHalf: ScheduleMatchday[] = firstHalf.map((md) => ({
+    matchday: md.matchday + offset,
+    fixtures: md.fixtures.map(flipHomeAway),
+  }));
+  return [...firstHalf, ...secondHalf];
 }

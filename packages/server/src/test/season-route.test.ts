@@ -56,7 +56,8 @@ describe("season + matches + form routes — Story 06", () => {
       matchdays: Array<{ matchday: number; fixtures: unknown[] }>;
       nextMatchday: number | null;
     };
-    expect(body.matchdays).toHaveLength(9);
+    // Full season for 10 clubs: 2*(10-1) = 18 matchdays.
+    expect(body.matchdays).toHaveLength(18);
     expect(body.nextMatchday).toBe(1);
     const raw = JSON.stringify(body);
     expect(raw.toLowerCase()).not.toContain("cents");
@@ -73,7 +74,8 @@ describe("season + matches + form routes — Story 06", () => {
     };
     expect(body.matchday).toBe(1);
     expect(body.played).toBe(5);
-    expect(body.remaining).toBe(40);
+    // Full season: 90 total - 5 played = 85 remaining.
+    expect(body.remaining).toBe(85);
   });
 
   it("AC-13: GET /api/matches/:id returns prose narrative after the fixture is played", async () => {

@@ -149,6 +149,12 @@ export async function advanceMatchday(
           );
         }
       }
+      // Advance the save_state pointer.
+      client.sqlite
+        .prepare(
+          `UPDATE save_state SET next_match_week = ?, updated_at = ? WHERE id = 1`,
+        )
+        .run(matchday + 1, now);
     });
     tx(results);
   } else {
@@ -180,6 +186,10 @@ export async function advanceMatchday(
           );
         }
       }
+      await conn.query(
+        `UPDATE save_state SET next_match_week = $1, updated_at = $2 WHERE id = 1`,
+        [matchday + 1, now],
+      );
       await conn.query("COMMIT");
     } catch (err) {
       await conn.query("ROLLBACK");

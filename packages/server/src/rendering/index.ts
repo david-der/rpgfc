@@ -48,3 +48,4 @@ export type { PromiseMoodForPlayer } from "./squad-response.js";
 export { renderMatchById, advanceMatchdayRendered } from "./match-response.js";
 export { renderFixturesForUser } from "./fixtures-response.js";
 export { renderFormSeriesFor, currentFormFor } from "./player-form.js";
+export { computeLeagueTable } from "./league-table.js";
