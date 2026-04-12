@@ -44,11 +44,24 @@ function renderContract(
     name: "Unknown",
   };
   const hasRelease = contract.releaseClauseCents !== null;
+  // Per-season schedule: take the slice starting from the current
+  // season (index totalLen - seasonsRemaining) forward.
+  const schedule = contract.wagesBySeasonCents ?? [];
+  const startIdx = Math.max(0, schedule.length - contract.seasonsRemaining);
+  const remainingSchedule = schedule.slice(startIdx);
+  const wageTiersBySeason =
+    remainingSchedule.length > 0
+      ? remainingSchedule.map((c) => wageTierFor(c))
+      : Array.from({ length: contract.seasonsRemaining }, () =>
+          wageTierFor(contract.weeklyWageCents),
+        );
+
   return {
     id: contract.id,
     playerId: contract.playerId,
     club: { id: club.id, name: club.name },
     wageTier: wageTierFor(contract.weeklyWageCents),
+    wageTiersBySeason,
     signingBonusTier: feeTierFor(contract.signingBonusCents),
     seasonsRemaining: contract.seasonsRemaining,
     rolePromise: contract.rolePromise,
@@ -335,6 +348,7 @@ interface ContractRow {
   release_clause_cents: number | null;
   is_loan: number;
   loan_details_json: string | null;
+  wages_by_season_json: string | null;
   signed_at: string;
 }
 
@@ -346,7 +360,7 @@ async function loadContractForPlayer(db: DbClient, playerId: number): Promise<Co
           .prepare<[number], ContractRow>(
             `SELECT id, player_id, club_id, weekly_wage_cents, signing_bonus_cents,
                     seasons_remaining, role_promise, release_clause_cents,
-                    is_loan, loan_details_json, signed_at
+                    is_loan, loan_details_json, wages_by_season_json, signed_at
              FROM contracts WHERE player_id = ?`,
           )
           .get(playerId) ?? null
@@ -355,7 +369,7 @@ async function loadContractForPlayer(db: DbClient, playerId: number): Promise<Co
     const res = await db.pool.query<ContractRow>(
       `SELECT id, player_id, club_id, weekly_wage_cents, signing_bonus_cents,
               seasons_remaining, role_promise, release_clause_cents,
-              is_loan, loan_details_json, signed_at
+              is_loan, loan_details_json, wages_by_season_json, signed_at
        FROM contracts WHERE player_id = $1`,
       [playerId],
     );
@@ -363,11 +377,20 @@ async function loadContractForPlayer(db: DbClient, playerId: number): Promise<Co
   })();
 
   if (!row) return null;
+  let wagesBySeasonCents: number[] = [];
+  try {
+    wagesBySeasonCents = row.wages_by_season_json
+      ? (JSON.parse(row.wages_by_season_json) as number[])
+      : [];
+  } catch {
+    wagesBySeasonCents = [];
+  }
   return {
     id: row.id,
     playerId: row.player_id,
     clubId: row.club_id,
     weeklyWageCents: row.weekly_wage_cents,
+    wagesBySeasonCents,
     signingBonusCents: row.signing_bonus_cents,
     seasonsRemaining: row.seasons_remaining,
     rolePromise: row.role_promise as PlayingTimeRole,

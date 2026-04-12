@@ -19,12 +19,21 @@ interface FinancesResponse {
   clubId: number;
   clubName: string;
   reputationTier: string;
+  // Tier words (for display consistency / future cross-club views).
   cashTier: CurrencyTier;
   wageBillTier: CurrencyTier;
   wageBudgetTier: CurrencyTier;
   wageBillVsBudget: "healthy" | "tight" | "overspent";
   recentSpendingTier: CurrencyTier;
   recentIncomeTier: CurrencyTier;
+  // Real cents — you always know your own club's exact numbers.
+  cashCents: number;
+  wageBillCents: number;
+  wageBudgetCents: number;
+  recentSpendingCents: number;
+  recentIncomeCents: number;
+  // Projected annual wage total (52 match weeks).
+  projectedAnnualWageCents: number;
 }
 
 async function loadFinances(
@@ -100,6 +109,12 @@ async function loadFinances(
     wageBillVsBudget,
     recentSpendingTier: feeTierFor(recentSpendingCents),
     recentIncomeTier: feeTierFor(recentIncomeCents),
+    cashCents: club.cash_reserve_cents,
+    wageBillCents: weeklyWageCents,
+    wageBudgetCents: club.wage_budget_cents_per_week,
+    recentSpendingCents,
+    recentIncomeCents,
+    projectedAnnualWageCents: weeklyWageCents * 52,
   };
 }
 

@@ -1,8 +1,8 @@
 // /club — Club dashboard.
 //
-// First tab: Finances. Shows cash, wage bill vs budget, recent
-// spending and income. More tabs (board, facilities, history) to
-// come later.
+// First tab: Finances. Shows exact cash balance, wage bill, budget,
+// plus season transfer activity. You always know your own club's
+// finances precisely — opposing clubs show tier words only.
 
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -30,7 +30,20 @@ function ClubDashboard() {
   );
 }
 
-// ── Finances tab ──────────────────────────────────────────────────────────
+// Format cents as "$12.3M" / "$450K" / "$2.1B". Short form for the
+// finance tiles — this is the user's own club, so numbers are fine.
+function formatCents(cents: number): string {
+  if (cents >= 1_000_000_000_00) {
+    return `$${(cents / 1_000_000_000_00).toFixed(1)}B`;
+  }
+  if (cents >= 1_000_000_00) {
+    return `$${(cents / 1_000_000_00).toFixed(1)}M`;
+  }
+  if (cents >= 1_000_00) {
+    return `$${(cents / 1_000_00).toFixed(0)}K`;
+  }
+  return `$${(cents / 100).toFixed(0)}`;
+}
 
 function FinancesTab() {
   const query = useQuery({ queryKey: ["club-finances"], queryFn: fetchClubFinances });
@@ -54,6 +67,9 @@ function FinancesTab() {
         ? "Tight"
         : "Overspent";
 
+  const budgetUsedPct =
+    f.wageBudgetCents > 0 ? Math.round((f.wageBillCents / f.wageBudgetCents) * 100) : 0;
+
   return (
     <div className="space-y-8">
       {/* Club identity row */}
@@ -64,27 +80,54 @@ function FinancesTab() {
         <h2 className="mt-1 font-serif text-2xl text-parchment-900">{f.clubName}</h2>
       </div>
 
-      {/* Finance cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <FinanceCard label="Cash reserve" value={f.cashTier} accent="moss" />
-        <FinanceCard label="Weekly wage bill" value={f.wageBillTier} accent="parchment" />
-        <FinanceCard label="Weekly wage budget" value={f.wageBudgetTier} accent="parchment" />
-        <FinanceCard
-          label="Spent on transfers"
-          value={f.recentSpendingTier}
-          accent="clay"
-          subtle
-        />
-        <FinanceCard
-          label="Earned from transfers"
-          value={f.recentIncomeTier}
-          accent="moss"
-          subtle
-        />
-      </div>
+      {/* Finance tiles — real numbers for the user's own club. */}
+      <section>
+        <h3 className="mb-3 text-xs font-medium uppercase tracking-wide text-parchment-500">
+          Balance sheet
+        </h3>
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+          <FinanceTile
+            label="Cash reserve"
+            value={formatCents(f.cashCents)}
+            tier={f.cashTier}
+            accent="moss"
+          />
+          <FinanceTile
+            label="Weekly wages"
+            value={formatCents(f.wageBillCents)}
+            tier={f.wageBillTier}
+            accent="parchment"
+          />
+          <FinanceTile
+            label="Weekly budget"
+            value={formatCents(f.wageBudgetCents)}
+            tier={f.wageBudgetTier}
+            accent="parchment"
+          />
+          <FinanceTile
+            label="Projected annual wages"
+            value={formatCents(f.projectedAnnualWageCents)}
+            tier={null}
+            accent="parchment"
+            subtle
+          />
+          <FinanceTile
+            label="Spent on transfers"
+            value={formatCents(f.recentSpendingCents)}
+            tier={f.recentSpendingTier}
+            accent="clay"
+          />
+          <FinanceTile
+            label="Earned from transfers"
+            value={formatCents(f.recentIncomeCents)}
+            tier={f.recentIncomeTier}
+            accent="moss"
+          />
+        </div>
+      </section>
 
       {/* Budget health */}
-      <div>
+      <section>
         <h3 className="mb-3 text-xs font-medium uppercase tracking-wide text-parchment-500">
           Wage budget health
         </h3>
@@ -94,28 +137,46 @@ function FinancesTab() {
           >
             {healthLabel}
           </span>
-          <p className="text-sm text-parchment-700">
-            {f.wageBillVsBudget === "healthy" &&
-              "You have room to sign more players without financial strain."}
-            {f.wageBillVsBudget === "tight" &&
-              "Wages are approaching the budget ceiling. New signings will need to be selective."}
-            {f.wageBillVsBudget === "overspent" &&
-              "Wages exceed the budget. Seller clubs will notice and demand premium fees."}
-          </p>
+          <span className="font-mono text-sm tabular-nums text-parchment-700">
+            {budgetUsedPct}% of budget used
+          </span>
         </div>
-      </div>
+        {/* Simple progress bar */}
+        <div className="mt-3 h-2 w-full bg-parchment-200">
+          <div
+            className={`h-full ${
+              f.wageBillVsBudget === "healthy"
+                ? "bg-moss-500"
+                : f.wageBillVsBudget === "tight"
+                  ? "bg-parchment-600"
+                  : "bg-clay-500"
+            }`}
+            style={{ width: `${Math.min(100, budgetUsedPct)}%` }}
+          />
+        </div>
+        <p className="mt-3 text-sm text-parchment-700">
+          {f.wageBillVsBudget === "healthy" &&
+            "You have room to sign more players without financial strain."}
+          {f.wageBillVsBudget === "tight" &&
+            "Wages are approaching the budget ceiling. New signings will need to be selective."}
+          {f.wageBillVsBudget === "overspent" &&
+            "Wages exceed the budget. Seller clubs will notice and demand premium fees."}
+        </p>
+      </section>
     </div>
   );
 }
 
-function FinanceCard({
+function FinanceTile({
   label,
   value,
+  tier,
   accent,
   subtle,
 }: {
   label: string;
   value: string;
+  tier: string | null;
   accent: "moss" | "clay" | "parchment";
   subtle?: boolean;
 }) {
@@ -132,11 +193,14 @@ function FinanceCard({
         ? "text-clay-700"
         : "text-parchment-900";
   return (
-    <div
-      className={`border bg-parchment-50 p-4 ${border} ${subtle ? "opacity-90" : ""}`}
-    >
+    <div className={`border bg-parchment-50 p-4 ${border} ${subtle ? "opacity-80" : ""}`}>
       <div className="text-xs uppercase tracking-wide text-parchment-500">{label}</div>
-      <div className={`mt-2 font-serif text-2xl font-semibold ${text}`}>{value}</div>
+      <div className={`mt-2 font-mono text-2xl font-semibold tabular-nums ${text}`}>
+        {value}
+      </div>
+      {tier && (
+        <div className="mt-1 text-xs italic text-parchment-500">{tier} tier</div>
+      )}
     </div>
   );
 }

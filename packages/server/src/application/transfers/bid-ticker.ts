@@ -77,9 +77,20 @@ function updateState(
     .run(state, rejectionReason, stance, now, bidId);
 }
 
+// Build a 3-season wage schedule with a 10% year-on-year raise.
+function buildWageSchedule(startingWageCents: number): number[] {
+  return [
+    startingWageCents,
+    Math.round(startingWageCents * 1.1),
+    Math.round(startingWageCents * 1.21),
+  ];
+}
+
 async function signFromTick(client: DbClient, bid: ActiveBidRow): Promise<void> {
   if (client.dialect !== "sqlite") return;
   const now = new Date().toISOString();
+  const schedule = buildWageSchedule(bid.wage_cents);
+  const scheduleJson = JSON.stringify(schedule);
   // Replace any existing contract (unique on player_id).
   client.sqlite.prepare(`DELETE FROM contracts WHERE player_id = ?`).run(bid.player_id);
   client.sqlite
@@ -87,10 +98,13 @@ async function signFromTick(client: DbClient, bid: ActiveBidRow): Promise<void> 
       `INSERT INTO contracts
          (player_id, club_id, weekly_wage_cents, signing_bonus_cents,
           seasons_remaining, role_promise, release_clause_cents, is_loan,
-          loan_details_json, signed_at)
-       VALUES (?, ?, ?, ?, 3, ?, NULL, 0, NULL, ?)`,
+          loan_details_json, wages_by_season_json, signed_at)
+       VALUES (?, ?, ?, ?, 3, ?, NULL, 0, NULL, ?, ?)`,
     )
-    .run(bid.player_id, bid.from_club_id, bid.wage_cents, bid.signing_bonus_cents, bid.role_promise, now);
+    .run(
+      bid.player_id, bid.from_club_id, bid.wage_cents, bid.signing_bonus_cents,
+      bid.role_promise, scheduleJson, now,
+    );
   // Move player.
   client.sqlite.prepare(`UPDATE players SET club_id = ? WHERE id = ?`).run(bid.from_club_id, bid.player_id);
   // Remove listing.

@@ -396,6 +396,12 @@ async function signBid(client: DbClient, bidId: number, now: string): Promise<vo
   if (!proposal) return;
 
   const isLoan = proposal.loan_details_json !== null && proposal.loan_details_json !== "";
+  const wageSchedule = [
+    proposal.wage_cents,
+    Math.round(proposal.wage_cents * 1.1),
+    Math.round(proposal.wage_cents * 1.21),
+  ];
+  const scheduleJson = JSON.stringify(wageSchedule);
 
   // Upsert the contract. Story 04 treats contracts as one-per-player
   // (unique index on player_id) — update-or-insert.
@@ -407,28 +413,26 @@ async function signBid(client: DbClient, bidId: number, now: string): Promise<vo
         `INSERT INTO contracts
            (player_id, club_id, weekly_wage_cents, signing_bonus_cents,
             seasons_remaining, role_promise, release_clause_cents,
-            is_loan, loan_details_json, signed_at)
-         VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`,
+            is_loan, loan_details_json, wages_by_season_json, signed_at)
+         VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)`,
       )
       .run(
         bid.player_id,
-        // Loans keep ownership with the seller; permanents move it.
         isLoan ? bid.to_club_id : bid.from_club_id,
         proposal.wage_cents,
         proposal.signing_bonus_cents,
-        3, // default 3-season length for Story 04; Story 05 makes it a prop
+        3,
         proposal.role_promise,
         isLoan ? 1 : 0,
         proposal.loan_details_json,
+        scheduleJson,
         now,
       );
 
-    // Move the player if it's a permanent transfer.
     if (!isLoan) {
       client.sqlite
         .prepare(`UPDATE players SET club_id = ? WHERE id = ?`)
         .run(bid.from_club_id, bid.player_id);
-      // And remove the listing — the player is no longer on the market.
       client.sqlite.prepare(`DELETE FROM listing WHERE player_id = ?`).run(bid.player_id);
     }
   } else {
@@ -437,8 +441,8 @@ async function signBid(client: DbClient, bidId: number, now: string): Promise<vo
       `INSERT INTO contracts
          (player_id, club_id, weekly_wage_cents, signing_bonus_cents,
           seasons_remaining, role_promise, release_clause_cents,
-          is_loan, loan_details_json, signed_at)
-       VALUES ($1, $2, $3, $4, $5, $6, NULL, $7, $8, $9)`,
+          is_loan, loan_details_json, wages_by_season_json, signed_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NULL, $7, $8, $9, $10)`,
       [
         bid.player_id,
         isLoan ? bid.to_club_id : bid.from_club_id,
@@ -448,6 +452,7 @@ async function signBid(client: DbClient, bidId: number, now: string): Promise<vo
         proposal.role_promise,
         isLoan ? 1 : 0,
         proposal.loan_details_json,
+        scheduleJson,
         now,
       ],
     );

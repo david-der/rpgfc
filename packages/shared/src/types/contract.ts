@@ -35,7 +35,13 @@ export interface Contract {
   id: number;
   playerId: number;
   clubId: number;
+  /** Current season's weekly wage in cents. Shifts to the next
+   *  entry in wagesBySeasonCents on season rollover. */
   weeklyWageCents: number;
+  /** Per-season wage schedule. wagesBySeasonCents[i] is the weekly
+   *  wage in season i of the contract (0-indexed). Length matches
+   *  the original contract length. */
+  wagesBySeasonCents: number[];
   signingBonusCents: number;
   seasonsRemaining: number;
   rolePromise: PlayingTimeRole;
@@ -104,6 +110,11 @@ export interface RenderedContract {
   playerId: number;
   club: { id: number; name: string };
   wageTier: CurrencyTier;
+  /** Per-season wage tier breakdown, starting from the CURRENT season
+   *  forward. Length equals seasonsRemaining. Each entry is a tier
+   *  word for the opposition; the user's own club gets real cents
+   *  from the /club/finances endpoint. */
+  wageTiersBySeason: CurrencyTier[];
   signingBonusTier: CurrencyTier;
   seasonsRemaining: number;
   rolePromise: PlayingTimeRole;

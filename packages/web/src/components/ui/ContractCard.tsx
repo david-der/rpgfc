@@ -36,6 +36,14 @@ export function ContractCard({ contract }: ContractCardProps) {
         <dd data-testid="player-facing" className="text-parchment-900">
           {contract.wageTier}
         </dd>
+        {contract.wageTiersBySeason.length > 1 && (
+          <>
+            <dt className="text-parchment-500">Wage schedule</dt>
+            <dd data-testid="player-facing" className="text-parchment-900">
+              {contract.wageTiersBySeason.join(" → ")}
+            </dd>
+          </>
+        )}
         <dt className="text-parchment-500">Signing bonus</dt>
         <dd data-testid="player-facing" className="text-parchment-900">
           {contract.signingBonusTier}
