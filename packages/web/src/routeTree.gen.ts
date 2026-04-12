@@ -14,10 +14,10 @@ import { Route as TransfersIndexRouteImport } from './routes/transfers.index'
 import { Route as TacticsIndexRouteImport } from './routes/tactics.index'
 import { Route as SquadIndexRouteImport } from './routes/squad.index'
 import { Route as ScoutsIndexRouteImport } from './routes/scouts.index'
+import { Route as SavesIndexRouteImport } from './routes/saves.index'
 import { Route as PlayersIndexRouteImport } from './routes/players.index'
 import { Route as FixturesIndexRouteImport } from './routes/fixtures.index'
 import { Route as TransfersPlayerIdRouteImport } from './routes/transfers.$playerId'
-import { Route as ScoutsIdRouteImport } from './routes/scouts.$id'
 import { Route as PlayersIdRouteImport } from './routes/players.$id'
 import { Route as MatchesIdRouteImport } from './routes/matches.$id'
 
@@ -46,6 +46,11 @@ const ScoutsIndexRoute = ScoutsIndexRouteImport.update({
   path: '/scouts/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SavesIndexRoute = SavesIndexRouteImport.update({
+  id: '/saves/',
+  path: '/saves/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlayersIndexRoute = PlayersIndexRouteImport.update({
   id: '/players/',
   path: '/players/',
@@ -59,11 +64,6 @@ const FixturesIndexRoute = FixturesIndexRouteImport.update({
 const TransfersPlayerIdRoute = TransfersPlayerIdRouteImport.update({
   id: '/transfers/$playerId',
   path: '/transfers/$playerId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ScoutsIdRoute = ScoutsIdRouteImport.update({
-  id: '/scouts/$id',
-  path: '/scouts/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PlayersIdRoute = PlayersIdRouteImport.update({
@@ -81,10 +81,10 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/matches/$id': typeof MatchesIdRoute
   '/players/$id': typeof PlayersIdRoute
-  '/scouts/$id': typeof ScoutsIdRoute
   '/transfers/$playerId': typeof TransfersPlayerIdRoute
   '/fixtures/': typeof FixturesIndexRoute
   '/players/': typeof PlayersIndexRoute
+  '/saves/': typeof SavesIndexRoute
   '/scouts/': typeof ScoutsIndexRoute
   '/squad/': typeof SquadIndexRoute
   '/tactics/': typeof TacticsIndexRoute
@@ -94,10 +94,10 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/matches/$id': typeof MatchesIdRoute
   '/players/$id': typeof PlayersIdRoute
-  '/scouts/$id': typeof ScoutsIdRoute
   '/transfers/$playerId': typeof TransfersPlayerIdRoute
   '/fixtures': typeof FixturesIndexRoute
   '/players': typeof PlayersIndexRoute
+  '/saves': typeof SavesIndexRoute
   '/scouts': typeof ScoutsIndexRoute
   '/squad': typeof SquadIndexRoute
   '/tactics': typeof TacticsIndexRoute
@@ -108,10 +108,10 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/matches/$id': typeof MatchesIdRoute
   '/players/$id': typeof PlayersIdRoute
-  '/scouts/$id': typeof ScoutsIdRoute
   '/transfers/$playerId': typeof TransfersPlayerIdRoute
   '/fixtures/': typeof FixturesIndexRoute
   '/players/': typeof PlayersIndexRoute
+  '/saves/': typeof SavesIndexRoute
   '/scouts/': typeof ScoutsIndexRoute
   '/squad/': typeof SquadIndexRoute
   '/tactics/': typeof TacticsIndexRoute
@@ -123,10 +123,10 @@ export interface FileRouteTypes {
     | '/'
     | '/matches/$id'
     | '/players/$id'
-    | '/scouts/$id'
     | '/transfers/$playerId'
     | '/fixtures/'
     | '/players/'
+    | '/saves/'
     | '/scouts/'
     | '/squad/'
     | '/tactics/'
@@ -136,10 +136,10 @@ export interface FileRouteTypes {
     | '/'
     | '/matches/$id'
     | '/players/$id'
-    | '/scouts/$id'
     | '/transfers/$playerId'
     | '/fixtures'
     | '/players'
+    | '/saves'
     | '/scouts'
     | '/squad'
     | '/tactics'
@@ -149,10 +149,10 @@ export interface FileRouteTypes {
     | '/'
     | '/matches/$id'
     | '/players/$id'
-    | '/scouts/$id'
     | '/transfers/$playerId'
     | '/fixtures/'
     | '/players/'
+    | '/saves/'
     | '/scouts/'
     | '/squad/'
     | '/tactics/'
@@ -163,10 +163,10 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   MatchesIdRoute: typeof MatchesIdRoute
   PlayersIdRoute: typeof PlayersIdRoute
-  ScoutsIdRoute: typeof ScoutsIdRoute
   TransfersPlayerIdRoute: typeof TransfersPlayerIdRoute
   FixturesIndexRoute: typeof FixturesIndexRoute
   PlayersIndexRoute: typeof PlayersIndexRoute
+  SavesIndexRoute: typeof SavesIndexRoute
   ScoutsIndexRoute: typeof ScoutsIndexRoute
   SquadIndexRoute: typeof SquadIndexRoute
   TacticsIndexRoute: typeof TacticsIndexRoute
@@ -210,6 +210,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ScoutsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/saves/': {
+      id: '/saves/'
+      path: '/saves'
+      fullPath: '/saves/'
+      preLoaderRoute: typeof SavesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/players/': {
       id: '/players/'
       path: '/players'
@@ -229,13 +236,6 @@ declare module '@tanstack/react-router' {
       path: '/transfers/$playerId'
       fullPath: '/transfers/$playerId'
       preLoaderRoute: typeof TransfersPlayerIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/scouts/$id': {
-      id: '/scouts/$id'
-      path: '/scouts/$id'
-      fullPath: '/scouts/$id'
-      preLoaderRoute: typeof ScoutsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/players/$id': {
@@ -259,10 +259,10 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   MatchesIdRoute: MatchesIdRoute,
   PlayersIdRoute: PlayersIdRoute,
-  ScoutsIdRoute: ScoutsIdRoute,
   TransfersPlayerIdRoute: TransfersPlayerIdRoute,
   FixturesIndexRoute: FixturesIndexRoute,
   PlayersIndexRoute: PlayersIndexRoute,
+  SavesIndexRoute: SavesIndexRoute,
   ScoutsIndexRoute: ScoutsIndexRoute,
   SquadIndexRoute: SquadIndexRoute,
   TacticsIndexRoute: TacticsIndexRoute,

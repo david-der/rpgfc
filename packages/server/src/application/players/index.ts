@@ -12,6 +12,7 @@
 // boundary — nothing deep in the stack cares that storage is TEXT.
 
 import type { PreferredFoot } from "@rpgfc/shared";
+import { ARCHETYPE_BY_ID } from "@rpgfc/shared";
 import type { HiddenPlayer, NewHiddenPlayer } from "@rpgfc/shared/types/hidden";
 import { asHiddenPlayer } from "@rpgfc/shared/types/hidden";
 
@@ -121,8 +122,14 @@ export async function getPlayerById(client: DbClient, id: number): Promise<Hidde
 
 export interface ListQuery {
   clubId?: number | undefined;
-  cursor?: number | undefined; // cursor = last id seen; null = start
-  limit: number; // Zod-validated at the route boundary
+  cursor?: number | undefined;
+  limit: number;
+  /** Story 07: search by name substring (case-insensitive). */
+  search?: string | undefined;
+  /** Story 07: filter to players currently on the transfer market. */
+  onMarket?: boolean | undefined;
+  /** Story 07: filter by archetype position label (e.g. "ST", "CB"). */
+  position?: string | undefined;
 }
 
 export interface ListResult {
@@ -130,14 +137,25 @@ export interface ListResult {
   nextCursor: number | null;
 }
 
+// Set of listed player ids (cached per call, populated lazily).
+async function loadListedPlayerIds(client: DbClient): Promise<Set<number>> {
+  if (client.dialect === "sqlite") {
+    const rows = client.sqlite
+      .prepare<[], { player_id: number }>(`SELECT player_id FROM listing`)
+      .all();
+    return new Set(rows.map((r) => r.player_id));
+  }
+  const res = await client.pool.query<{ player_id: number }>(
+    `SELECT player_id FROM listing`,
+  );
+  return new Set(res.rows.map((r) => r.player_id));
+}
+
 export async function listPlayers(client: DbClient, query: ListQuery): Promise<ListResult> {
   const limit = Math.min(Math.max(query.limit, 1), 100);
+  const listedIds = query.onMarket ? await loadListedPlayerIds(client) : null;
 
   if (client.dialect === "sqlite") {
-    // Keep the SQL simple: paginate by id cursor, then apply the clubId
-    // filter in JS. Story 01's largest realistic list (all players, one
-    // page of 100) is small enough that this is effectively free, and it
-    // avoids the `? IS NULL` sentinel gymnastics across dialects.
     const rows = client.sqlite
       .prepare<[number, number], PlayerRow>(
         `SELECT id, run_id, club_id, name, dob, nationality, preferred_foot,
@@ -150,8 +168,21 @@ export async function listPlayers(client: DbClient, query: ListQuery): Promise<L
       )
       .all(query.cursor ?? 0, limit);
 
-    const filtered =
-      query.clubId !== undefined ? rows.filter((r) => r.club_id === query.clubId) : rows;
+    let filtered = rows;
+    if (query.clubId !== undefined) filtered = filtered.filter((r) => r.club_id === query.clubId);
+    if (query.search) {
+      const q = query.search.toLowerCase();
+      filtered = filtered.filter((r) => r.name.toLowerCase().includes(q));
+    }
+    if (listedIds) filtered = filtered.filter((r) => listedIds.has(r.id));
+    if (query.position) {
+      const pos = query.position.toUpperCase();
+      filtered = filtered.filter((r) => {
+        const arch = ARCHETYPE_BY_ID[r.archetype_id];
+        return arch?.positionLabel?.toUpperCase() === pos;
+      });
+    }
+
     const items = filtered.map(rowToHidden);
     for (const item of items) {
       item.badgeKeys = await loadBadgeKeys(client, item.id);
@@ -161,8 +192,6 @@ export async function listPlayers(client: DbClient, query: ListQuery): Promise<L
     return { items, nextCursor };
   }
 
-  // Postgres path — raw SQL keeps the parameter shape consistent with the
-  // SQLite branch above.
   const params: unknown[] = [query.cursor ?? 0, limit];
   let sql = `
     SELECT id, run_id, club_id, name, dob, nationality, preferred_foot,
@@ -171,12 +200,27 @@ export async function listPlayers(client: DbClient, query: ListQuery): Promise<L
     FROM players
     WHERE id > $1`;
   if (query.clubId !== undefined) {
-    sql += ` AND club_id = $3`;
+    sql += ` AND club_id = $${params.length + 1}`;
     params.push(query.clubId);
   }
   sql += ` ORDER BY id ASC LIMIT $2`;
   const res = await client.pool.query<PlayerRow>(sql, params);
-  const items = res.rows.map(rowToHidden);
+
+  let rows = res.rows;
+  if (query.search) {
+    const q = query.search.toLowerCase();
+    rows = rows.filter((r) => r.name.toLowerCase().includes(q));
+  }
+  if (listedIds) rows = rows.filter((r) => listedIds.has(r.id));
+  if (query.position) {
+    const pos = query.position.toUpperCase();
+    rows = rows.filter((r) => {
+      const arch = ARCHETYPE_BY_ID[r.archetype_id];
+      return arch?.positionLabel?.toUpperCase() === pos;
+    });
+  }
+
+  const items = rows.map(rowToHidden);
   for (const item of items) {
     item.badgeKeys = await loadBadgeKeys(client, item.id);
   }

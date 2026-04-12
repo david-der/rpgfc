@@ -14,9 +14,9 @@ import type { LucideIcon } from "lucide-react";
 import {
   CalendarDays,
   ClipboardList,
-  Eye,
   Handshake,
   Home,
+  Search,
   Users,
   UsersRound,
 } from "lucide-react";
@@ -53,10 +53,10 @@ export const PRIMARY_NAV: readonly NavItem[] = [
   },
   {
     key: "scouts",
-    label: "Scouts",
+    label: "Scouting",
     to: "/scouts",
-    icon: Eye,
-    description: "Manage the scout network",
+    icon: Search,
+    description: "Search and filter the player database",
   },
   {
     key: "transfers",

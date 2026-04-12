@@ -26,10 +26,23 @@ export async function fetchHealth() {
 // Thin wrappers around the Hono RPC client. Return types flow through the
 // typed AppType import so the UI never accidentally consumes a hidden field.
 
-export async function fetchPlayers(params: { limit?: number; cursor?: number } = {}) {
+export async function fetchPlayers(
+  params: {
+    limit?: number;
+    cursor?: number;
+    search?: string;
+    onMarket?: boolean;
+    position?: string;
+    clubId?: number;
+  } = {},
+) {
   const qs: Record<string, string> = {};
   if (params.limit !== undefined) qs.limit = String(params.limit);
   if (params.cursor !== undefined) qs.cursor = String(params.cursor);
+  if (params.search) qs.search = params.search;
+  if (params.onMarket !== undefined) qs.onMarket = String(params.onMarket);
+  if (params.position) qs.position = params.position;
+  if (params.clubId !== undefined) qs.clubId = String(params.clubId);
   const res = await api.api.players.$get({ query: qs });
   if (!res.ok) throw new Error(`players list failed: ${res.status}`);
   return res.json();

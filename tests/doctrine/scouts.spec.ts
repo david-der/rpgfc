@@ -1,53 +1,52 @@
 import { expect, test } from "@playwright/test";
 
-// Story 03 — /scouts and /scouts/$id Playwright coverage.
-// AC-14: /scouts is reachable from the primary nav and lists 4 scouts.
-// AC-15: /scouts/$id Profile composes the expected shape and leaks no
-// digits inside data-testid="player-facing".
+// Scouting rework — /scouts is now a search/filter page, not a
+// scout-card list.
 
 const NUMBER_RE = /\b\d+(\.\d+)?\b/;
 
-test.describe("scouts — Story 03", () => {
-  test("AC-14: Scouts entry in primary nav navigates to /scouts and lists 4 cards", async ({
+test.describe("scouting search — rework", () => {
+  test("Scouting entry in primary nav navigates to /scouts and shows a search bar", async ({
     page,
   }) => {
     await page.goto("/");
-    const scoutsLink = page.getByRole("link", { name: "Scouts" });
+    const scoutsLink = page.getByRole("link", { name: "Scouting" });
     await expect(scoutsLink).toBeVisible();
     await scoutsLink.click();
     await expect(page).toHaveURL(/\/scouts$/);
 
     const nav = page.getByRole("navigation", { name: "Primary" });
     const active = nav.locator('a[aria-current="page"]');
-    await expect(active).toHaveText("Scouts");
+    await expect(active).toHaveText("Scouting");
 
-    const cards = page.locator("article");
-    await expect(cards.first()).toBeVisible();
-    expect(await cards.count()).toBe(4);
+    // Search input is visible.
+    const searchInput = page.locator('input[placeholder*="Player name"]');
+    await expect(searchInput).toBeVisible();
   });
 
-  test("AC-15: /scouts/$id renders the Profile shape with no player-facing digit leaks", async ({
-    page,
-  }) => {
-    await page.goto("/scouts/1");
-
-    const heading = page.locator("h1");
-    await expect(heading).toBeVisible();
-    const headingText = await heading.textContent();
-    expect(headingText).toBeTruthy();
-
-    // TabBar has Overview + Recent reports tabs.
-    const tabs = page.getByRole("tab");
-    expect(await tabs.count()).toBeGreaterThanOrEqual(2);
-    const activeTab = page.locator('[role="tab"][aria-selected="true"]');
-    await expect(activeTab).toHaveText("Overview");
-
-    // No player-facing digit leaks anywhere on the page.
-    const playerFacing = page.locator('[data-testid="player-facing"]');
-    const count = await playerFacing.count();
+  test("/scouts search results show player names with no digit leaks", async ({ page }) => {
+    await page.goto("/scouts");
+    // Wait for results to load.
+    const results = page.locator('[data-testid="player-facing"]');
+    await expect(results.first()).toBeVisible();
+    const count = await results.count();
+    expect(count).toBeGreaterThan(0);
     for (let i = 0; i < count; i++) {
-      const text = (await playerFacing.nth(i).textContent()) ?? "";
-      expect(NUMBER_RE.test(text), `player-facing leak: "${text}"`).toBe(false);
+      const text = (await results.nth(i).textContent()) ?? "";
+      expect(NUMBER_RE.test(text), `digit leak: "${text}"`).toBe(false);
     }
+  });
+
+  test("position filter narrows the result set", async ({ page }) => {
+    await page.goto("/scouts");
+    await page.locator('[data-testid="player-facing"]').first().waitFor();
+    const allCount = await page.locator('[data-testid="player-facing"]').count();
+
+    // Filter to ST only.
+    await page.locator("select").first().selectOption("ST");
+    await page.waitForTimeout(300);
+    const filteredCount = await page.locator('[data-testid="player-facing"]').count();
+    expect(filteredCount).toBeLessThan(allCount);
+    expect(filteredCount).toBeGreaterThan(0);
   });
 });

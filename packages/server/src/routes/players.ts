@@ -35,6 +35,9 @@ const listQuery = z.object({
   clubId: z.coerce.number().int().positive().optional(),
   cursor: z.coerce.number().int().nonnegative().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(20),
+  search: z.string().optional(),
+  onMarket: z.enum(["true", "false"]).transform((v) => v === "true").optional(),
+  position: z.string().optional(),
 });
 
 const idParam = z.object({ id: z.coerce.number().int().positive() });
