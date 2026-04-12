@@ -12,6 +12,7 @@ import { createApp } from "./index.js";
 import { seedContentIfMissing } from "./application/content-seed.js";
 import { seedClubIdentityIfMissing } from "./application/clubs/seed-identity.js";
 import { seedWorldIfEmpty } from "./application/players/index.js";
+import { seedContractsIfEmpty } from "./application/players/seed-contracts.js";
 import { seedScoutsIfMissing } from "./application/scouting/seed-scouts.js";
 import {
   seedListingsIfEmpty,
@@ -95,6 +96,13 @@ async function main() {
   const squadSeed = await seedSquadIfEmpty(dbClient);
   if (!squadSeed.skipped) {
     logger.info({ squad: squadSeed.entriesCreated }, "Seeded squad entries");
+  }
+
+  // Finance v2: ensure every contracted player has a contract on world
+  // gen. Without this, most clubs have $0 weekly wages.
+  const contractSeed = await seedContractsIfEmpty(dbClient);
+  if (!contractSeed.skipped) {
+    logger.info({ contracts: contractSeed.contractsCreated }, "Seeded initial contracts");
   }
 
   // Story 06/07: full-season fixtures (38 match weeks for 20 clubs).

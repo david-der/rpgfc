@@ -15,6 +15,7 @@ import { runMigrations } from "../db/migrate.js";
 import { seedContentIfMissing } from "../application/content-seed.js";
 import { seedClubIdentityIfMissing } from "../application/clubs/seed-identity.js";
 import { seedWorldIfEmpty } from "../application/players/index.js";
+import { seedContractsIfEmpty } from "../application/players/seed-contracts.js";
 import {
   seedListingsIfEmpty,
   seedPreferencesIfEmpty,
@@ -276,6 +277,7 @@ async function runOnDb(
   await seedPreferencesIfEmpty(db);
   await seedTacticsIfEmpty(db);
   await seedSquadIfEmpty(db);
+  await seedContractsIfEmpty(db);
   await seedFixturesIfEmpty(db);
   await ensureSaveState(db);
 

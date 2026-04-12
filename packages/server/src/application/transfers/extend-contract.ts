@@ -69,17 +69,39 @@ export async function extendContract(
     )
     .get(input.playerId);
 
+  // Extensions are more forgiving than initial signings. The player
+  // is already at the club, so:
+  //
+  //  - Wage: compared to their CURRENT weekly wage (or floor if no
+  //    contract exists), not just the static wage floor. A 10% pay cut
+  //    is the max they'll tolerate — anything above current wage is
+  //    always accepted.
+  //  - Role promise: must meet their minimum playing time preference.
+  //  - Region / forbidden clubs: skipped (they're already here).
+  const currentContract = client.sqlite
+    .prepare<[number], { weekly_wage_cents: number }>(
+      `SELECT weekly_wage_cents FROM contracts WHERE player_id = ?`,
+    )
+    .get(input.playerId);
+  const currentWage = currentContract?.weekly_wage_cents ?? 0;
+  const wageFloor = prefs?.wage_floor_cents ?? 0;
+  // Acceptance threshold: 90% of max(current, floor). So you can lowball
+  // a veteran by up to 10% and they'll still renew, but you can't slash
+  // them from $5M/wk to $1M/wk.
+  const threshold = Math.floor(Math.max(currentWage, wageFloor) * 0.9);
+  if (input.wageCents < threshold) {
+    return { kind: "reject", reason: "PLAYER_WAGE_FLOOR" };
+  }
+
   if (prefs) {
-    // Extensions skip the forbidden-club and region checks — the player
-    // is already at this club, so those don't apply. Only wage floor and
-    // role promise matter for a renewal.
+    // Role promise: evaluate against minPlayingTime only.
     const result = evaluatePlayerProposal({
       wageCents: input.wageCents,
       rolePromise: input.rolePromise,
       toClubId: input.clubId,
       toClubNationality: "",
       preferences: {
-        wageFloorCents: prefs.wage_floor_cents,
+        wageFloorCents: 0, // skip wage floor — we just checked it
         minPlayingTime: prefs.min_playing_time as PlayingTimeRole,
         preferredRegions: [], // skip region check
         forbiddenClubIds: [], // skip forbidden check
