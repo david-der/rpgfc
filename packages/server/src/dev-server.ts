@@ -2,6 +2,7 @@
 // Used by both `pnpm dev` (via tsx watch) and the Docker entrypoint script.
 
 import { serve } from "@hono/node-server";
+import { dirname, resolve } from "node:path";
 import pino from "pino";
 
 import { createDbClient } from "./db/client.js";
@@ -117,18 +118,10 @@ async function main() {
   // Story 07: resolve the saves directory and current DB file path for
   // the save-slot management endpoints.
   const dbUrl = env.DATABASE_URL;
-  const savesDir = dbUrl.startsWith("sqlite:") && !dbUrl.includes(":memory:")
-    ? (() => {
-        const { dirname, resolve } = require("node:path") as typeof import("node:path");
-        return dirname(resolve(dbUrl.replace(/^sqlite:/, "")));
-      })()
-    : undefined;
-  const currentDbPath = dbUrl.startsWith("sqlite:") && !dbUrl.includes(":memory:")
-    ? (() => {
-        const { resolve } = require("node:path") as typeof import("node:path");
-        return resolve(dbUrl.replace(/^sqlite:/, ""));
-      })()
-    : undefined;
+  const isSqliteFile = dbUrl.startsWith("sqlite:") && !dbUrl.includes(":memory:");
+  const sqlitePath = isSqliteFile ? resolve(dbUrl.replace(/^sqlite:/, "")) : undefined;
+  const savesDir = sqlitePath ? dirname(sqlitePath) : undefined;
+  const currentDbPath = sqlitePath;
 
   const app = createApp({
     dialect: dbClient.dialect,
