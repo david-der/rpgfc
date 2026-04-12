@@ -21,6 +21,7 @@ import { join } from "node:path";
 import type { DbClient, Dialect } from "./db/client.js";
 import type { HealthSnapshot } from "./routes/health.js";
 import { createClubRoute } from "./routes/club.js";
+import { createClubsRoute } from "./routes/clubs.js";
 import { createMatchesRoute } from "./routes/matches.js";
 import { createPlayersRoute } from "./routes/players.js";
 import { createSavesRoute } from "./routes/saves.js";
@@ -96,6 +97,7 @@ export function createApiApp(deps: ApiDeps) {
     currentDbPath: deps.currentDbPath ?? "./saves/dev.db",
   });
   const clubApp = createClubRoute({ db: deps.db, userClubId: 1 });
+  const clubsApp = createClubsRoute({ db: deps.db });
   return new Hono()
     .get("/api/health", (c) => {
       const body: HealthSnapshot = {
@@ -114,7 +116,8 @@ export function createApiApp(deps: ApiDeps) {
     .route("/api/season", seasonApp)
     .route("/api/matches", matchesApp)
     .route("/api/saves", savesApp)
-    .route("/api/club", clubApp);
+    .route("/api/club", clubApp)
+    .route("/api/clubs", clubsApp);
 }
 
 // AppType is derived from the API-only factory. The web package's RPC client

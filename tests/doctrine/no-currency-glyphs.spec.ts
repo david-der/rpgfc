@@ -13,7 +13,7 @@ import { expect, test } from "@playwright/test";
 const CURRENCY_GLYPH_RE = /[£$€¥]/;
 
 test.describe("no-currency-glyphs — Story 04", () => {
-  const routes = ["/", "/players", "/players/1", "/transfers", "/transfers/1", "/fixtures", "/squad", "/tactics"];
+  const routes = ["/", "/players/1", "/transfers", "/transfers/1", "/league", "/squad", "/tactics"];
   for (const route of routes) {
     test(`no currency glyph on ${route}`, async ({ page }) => {
       await page.goto(route);

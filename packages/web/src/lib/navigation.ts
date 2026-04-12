@@ -73,11 +73,11 @@ export const PRIMARY_NAV: readonly NavItem[] = [
     description: "Bucket players into squad roles and read harmony",
   },
   {
-    key: "fixtures",
-    label: "Fixtures",
-    to: "/fixtures",
+    key: "league",
+    label: "League",
+    to: "/league",
     icon: CalendarDays,
-    description: "View the season schedule and advance match weeks",
+    description: "League table, fixtures, and rival clubs",
   },
   {
     key: "club",

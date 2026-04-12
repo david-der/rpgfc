@@ -156,6 +156,13 @@ export async function fetchClubFinances() {
   return res.json();
 }
 
+export async function fetchClubDetail(id: string) {
+  const res = await api.api.clubs[":id"].$get({ param: { id } });
+  if (res.status === 404) throw new Error("Club not found");
+  if (!res.ok) throw new Error(`club detail failed: ${res.status}`);
+  return res.json();
+}
+
 type CurrencyTier = "Minimal" | "Modest" | "Notable" | "Significant" | "Elite";
 type PlayingTimeRole =
   | "Star Player"

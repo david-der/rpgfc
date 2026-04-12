@@ -13,7 +13,8 @@ test.describe("form sparkline — Story 06", () => {
     page,
   }) => {
     // Advance the matchday so player 1 has form data to read.
-    await page.goto("/fixtures");
+    await page.goto("/league");
+    await page.getByRole("tab", { name: "Fixtures" }).click();
     const advance = page.locator('[data-testid="advance-matchday"]');
     if (await advance.isVisible()) {
       await advance.click();

@@ -17,8 +17,8 @@ const CURRENCY_GLYPH_RE = /[£$€¥]/;
 
 test.describe("match report — Story 06", () => {
   test("AC-18: prose narrative is player-facing and contains no digits", async ({ page }) => {
-    // Boot from /fixtures, advance once, click the first played match.
-    await page.goto("/fixtures");
+    await page.goto("/league");
+    await page.getByRole("tab", { name: "Fixtures" }).click();
     const advance = page.locator('[data-testid="advance-matchday"]');
     if (await advance.isVisible()) {
       await advance.click();
@@ -44,7 +44,8 @@ test.describe("match report — Story 06", () => {
   test("AC-18: scoreline + matchday + goals/assists wear their allowlist suffixes", async ({
     page,
   }) => {
-    await page.goto("/fixtures");
+    await page.goto("/league");
+    await page.getByRole("tab", { name: "Fixtures" }).click();
     const advance = page.locator('[data-testid="advance-matchday"]');
     if (await advance.isVisible()) {
       await advance.click();
