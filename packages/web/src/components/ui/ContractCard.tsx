@@ -27,7 +27,9 @@ export function ContractCard({ contract }: ContractCardProps) {
           <span className="font-mono text-4xl font-medium tabular-nums text-parchment-900">
             {contract.seasonsRemaining}
           </span>
-          <span className="text-xs uppercase tracking-wide text-parchment-500">Seasons left</span>
+          <span className="text-xs uppercase tracking-wide text-parchment-500">
+            {contract.seasonsRemaining === 1 ? "Season left" : "Seasons left"}
+          </span>
         </div>
       </header>
 

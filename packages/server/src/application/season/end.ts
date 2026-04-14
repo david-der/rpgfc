@@ -8,7 +8,12 @@ import type { SeasonSummary } from "@rpgfc/shared";
 
 import type { DbClient } from "../../db/client.js";
 import { computeLeagueTable } from "../../rendering/league-table.js";
+import { generatePlayer } from "../generation/generate-player.js";
+import { mulberry32 } from "../generation/rng.js";
 import { generateFullSeason } from "./schedule.js";
+
+const YOUTH_INTAKE_AGE = 17;
+const YOUTH_INTAKE_PER_CLUB = 3;
 
 function hashSeed(matchday: number, homeId: number, awayId: number): number {
   let h = 31;
@@ -77,6 +82,8 @@ export async function endSeason(
 
   const schedule = generateFullSeason(clubIds);
 
+  const RETIREMENT_AGE = 38;
+
   if (client.dialect === "sqlite") {
     const tx = client.sqlite.transaction(() => {
       // Update save_state.
@@ -85,6 +92,23 @@ export async function endSeason(
           `UPDATE save_state SET season = ?, next_match_week = 1, updated_at = ? WHERE id = 1`,
         )
         .run(nextSeason, now);
+
+      // Age everyone up by one year. One season == one year, no calendar.
+      client.sqlite.prepare(`UPDATE players SET age = age + 1`).run();
+
+      // Retire anyone past the retirement cutoff: they vacate their
+      // club, their contract ends, and they leave the squad + market.
+      const retired = client.sqlite
+        .prepare<[number], { id: number }>(
+          `SELECT id FROM players WHERE age >= ? AND club_id IS NOT NULL`,
+        )
+        .all(RETIREMENT_AGE);
+      for (const { id } of retired) {
+        client.sqlite.prepare(`DELETE FROM contracts WHERE player_id = ?`).run(id);
+        client.sqlite.prepare(`DELETE FROM squad_entries WHERE player_id = ?`).run(id);
+        client.sqlite.prepare(`DELETE FROM listing WHERE player_id = ?`).run(id);
+        client.sqlite.prepare(`UPDATE players SET club_id = NULL WHERE id = ?`).run(id);
+      }
 
       // Decrement contract seasons; expire contracts at 0.
       client.sqlite
@@ -107,10 +131,84 @@ export async function endSeason(
         client.sqlite
           .prepare(`DELETE FROM squad_entries WHERE player_id = ?`)
           .run(player_id);
+        // A free agent isn't on anyone's market — drop any stale listing
+        // row so the Transfers tab doesn't expose an unbuyable player.
+        client.sqlite
+          .prepare(`DELETE FROM listing WHERE player_id = ?`)
+          .run(player_id);
       }
       client.sqlite
         .prepare(`DELETE FROM contracts WHERE seasons_remaining <= 0`)
         .run();
+
+      // Youth intake: every club gets a fresh crop of 17-year-olds on
+      // modest starter contracts. Keeps the pipeline full and the
+      // transfer market alive.
+      const runRow = client.sqlite
+        .prepare<[], { run_id: number }>(`SELECT run_id FROM clubs LIMIT 1`)
+        .get();
+      const runId = runRow?.run_id ?? 1;
+      const youthRng = mulberry32((runId * 131 + nextSeason * 7919) >>> 0);
+      const insertYouth = client.sqlite.prepare(
+        `INSERT INTO players (run_id, club_id, name, dob, age, nationality, preferred_foot,
+                              archetype_id, hidden_attrs_json, mental_traits_json,
+                              experience_years, narrative_seed_json, preferred_positions_json, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      );
+      const insertBadge = client.sqlite.prepare(
+        `INSERT INTO player_badges (player_id, badge_key, tier, awarded_at, awarded_reason)
+         VALUES (?, ?, ?, ?, ?)`,
+      );
+      const insertContract = client.sqlite.prepare(
+        `INSERT INTO contracts
+           (player_id, club_id, weekly_wage_cents, signing_bonus_cents,
+            seasons_remaining, role_promise, release_clause_cents, is_loan,
+            loan_details_json, wages_by_season_json, signed_at)
+         VALUES (?, ?, ?, ?, ?, ?, NULL, 0, NULL, ?, ?)`,
+      );
+      const insertSquad = client.sqlite.prepare(
+        `INSERT INTO squad_entries (club_id, player_id, role, updated_at)
+         VALUES (?, ?, ?, ?)`,
+      );
+      const insertPreferences = client.sqlite.prepare(
+        `INSERT INTO player_preferences
+           (player_id, wage_floor_cents, min_playing_time,
+            preferred_regions_json, forbidden_club_ids_json)
+         VALUES (?, ?, ?, ?, ?)`,
+      );
+      const allClubs = client.sqlite
+        .prepare<[], { id: number; nationality: string }>(
+          `SELECT id, nationality FROM clubs ORDER BY id`,
+        )
+        .all();
+      for (const club of allClubs) {
+        for (let i = 0; i < YOUTH_INTAKE_PER_CLUB; i++) {
+          const np = generatePlayer({
+            runId,
+            clubId: club.id,
+            referenceDate: new Date(),
+            rng: youthRng,
+            overrideAge: YOUTH_INTAKE_AGE,
+          });
+          const info = insertYouth.run(
+            runId, club.id, np.name, np.dob, np.age, np.nationality,
+            np.preferredFoot, np.archetypeId,
+            JSON.stringify(np.hiddenAttrs), JSON.stringify(np.mentalTraits),
+            np.experienceYears, JSON.stringify(np.narrativeSeed),
+            JSON.stringify(np.preferredPositions), now,
+          );
+          const pid = Number(info.lastInsertRowid);
+          for (const key of np.badgeKeys) {
+            insertBadge.run(pid, key, null, now, "generation");
+          }
+          // Modest starter: $5K/wk, 3-year deal, Rotation.
+          insertContract.run(pid, club.id, 500_000, 0, 3, "Rotation",
+            JSON.stringify([500_000, 550_000, 600_000]), now);
+          insertSquad.run(club.id, pid, "Rotation", now);
+          insertPreferences.run(pid, 300_000, "Rotation",
+            JSON.stringify([np.nationality]), JSON.stringify([]));
+        }
+      }
 
       // Generate new season's fixtures.
       for (const md of schedule) {
@@ -135,6 +233,17 @@ export async function endSeason(
         `UPDATE save_state SET season = $1, next_match_week = 1, updated_at = $2 WHERE id = 1`,
         [nextSeason, now],
       );
+      await conn.query(`UPDATE players SET age = age + 1`);
+      const retiredRes = await conn.query<{ id: number }>(
+        `SELECT id FROM players WHERE age >= $1 AND club_id IS NOT NULL`,
+        [RETIREMENT_AGE],
+      );
+      for (const { id } of retiredRes.rows) {
+        await conn.query(`DELETE FROM contracts WHERE player_id = $1`, [id]);
+        await conn.query(`DELETE FROM squad_entries WHERE player_id = $1`, [id]);
+        await conn.query(`DELETE FROM listing WHERE player_id = $1`, [id]);
+        await conn.query(`UPDATE players SET club_id = NULL WHERE id = $1`, [id]);
+      }
       await conn.query(
         `UPDATE contracts SET seasons_remaining = seasons_remaining - 1
          WHERE seasons_remaining > 0`,
@@ -145,6 +254,7 @@ export async function endSeason(
       for (const { player_id } of expiredRes.rows) {
         await conn.query(`UPDATE players SET club_id = NULL WHERE id = $1`, [player_id]);
         await conn.query(`DELETE FROM squad_entries WHERE player_id = $1`, [player_id]);
+        await conn.query(`DELETE FROM listing WHERE player_id = $1`, [player_id]);
       }
       await conn.query(`DELETE FROM contracts WHERE seasons_remaining <= 0`);
       for (const md of schedule) {

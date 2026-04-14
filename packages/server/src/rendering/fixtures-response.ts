@@ -28,19 +28,33 @@ function parseState(raw: string): MatchState {
     : "Scheduled";
 }
 
-async function loadAllMatches(client: DbClient): Promise<MatchRow[]> {
+async function loadCurrentSeason(client: DbClient): Promise<number> {
+  if (client.dialect === "sqlite") {
+    const row = client.sqlite
+      .prepare<[], { season: number }>(`SELECT season FROM save_state WHERE id = 1`)
+      .get();
+    return row?.season ?? 0;
+  }
+  const res = await client.pool.query<{ season: number }>(
+    `SELECT season FROM save_state WHERE id = 1`,
+  );
+  return res.rows[0]?.season ?? 0;
+}
+
+async function loadAllMatches(client: DbClient, season: number): Promise<MatchRow[]> {
   if (client.dialect === "sqlite") {
     return client.sqlite
-      .prepare<[], MatchRow>(
+      .prepare<[number], MatchRow>(
         `SELECT m.id, m.matchday, m.state,
                 m.home_club_id, h.name AS home_name, m.home_goals,
                 m.away_club_id, a.name AS away_name, m.away_goals
          FROM matches m
          JOIN clubs h ON h.id = m.home_club_id
          JOIN clubs a ON a.id = m.away_club_id
+         WHERE m.season = ?
          ORDER BY m.matchday, m.id`,
       )
-      .all();
+      .all(season);
   }
   const res = await client.pool.query<MatchRow>(
     `SELECT m.id, m.matchday, m.state,
@@ -49,7 +63,9 @@ async function loadAllMatches(client: DbClient): Promise<MatchRow[]> {
      FROM matches m
      JOIN clubs h ON h.id = m.home_club_id
      JOIN clubs a ON a.id = m.away_club_id
+     WHERE m.season = $1
      ORDER BY m.matchday, m.id`,
+    [season],
   );
   return res.rows;
 }
@@ -74,7 +90,8 @@ export async function renderFixturesForUser(
   client: DbClient,
   userClubId: number,
 ): Promise<RenderedFixturesPage> {
-  const rows = await loadAllMatches(client);
+  const season = await loadCurrentSeason(client);
+  const rows = await loadAllMatches(client, season);
 
   const grouped = new Map<number, RenderedFixture[]>();
   let nextMatchday: number | null = null;

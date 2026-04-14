@@ -1,0 +1,23 @@
+{
+  "name": "The Win-Now",
+  "tagline": "Veteran-leaning shopper. Wants experience, pays for it, ignores age.",
+  "targetPositions": ["forward", "midfielder", "defender"],
+  "targetMinAge": 27,
+  "targetMinBadges": 2,
+  "preferTopBadges": true,
+  "rolePromise": "Star Player",
+  "openingFeePctOfAsking": 1.00,
+  "openingWageMultiplier": 1.20,
+  "ratchetMaxAttempts": 3,
+  "ratchetStepPct": 0.10,
+  "abandonAtPctOfAsking": 1.35,
+  "maxActiveBids": 1,
+  "minCashFloorCents": 80000000,
+  "regionFlexible": true,
+  "pursueUnlistedPremium": 1.6,
+  "extendWhenSeasonsLeftLte": 1,
+  "extendMaxAge": 35,
+  "extendWageMultiplier": 1.10,
+  "extendSeasons": 2,
+  "backfillEnabled": true
+}

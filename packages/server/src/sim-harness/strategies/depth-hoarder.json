@@ -1,0 +1,23 @@
+{
+  "name": "The Hoarder",
+  "tagline": "Squads should be deep. Picks up cheap depth across every position.",
+  "targetPositions": ["gk", "defender", "midfielder", "forward"],
+  "targetMaxAskingCents": 20000000000,
+  "preferCheapest": true,
+  "rolePromise": "Backup",
+  "maxRolePromise": "Important Player",
+  "openingFeePctOfAsking": 1.00,
+  "openingWageMultiplier": 1.00,
+  "ratchetMaxAttempts": 2,
+  "ratchetStepPct": 0.05,
+  "abandonAtPctOfAsking": 1.10,
+  "maxActiveBids": 3,
+  "minCashFloorCents": 20000000,
+  "maxSquadSize": 28,
+  "extendWhenSeasonsLeftLte": 1,
+  "extendMaxAge": 30,
+  "extendWageMultiplier": 1.05,
+  "extendSeasons": 2,
+  "backfillEnabled": true,
+  "pursueUnlistedPremium": 1.5
+}

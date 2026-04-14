@@ -20,16 +20,6 @@ import { generateIdentityProse } from "./prose/identity.js";
 //     ctx, not the global player tier. A badge the manager has never been
 //     told about renders Unknown even if the player overall is Confident.
 
-function ageFromDob(dob: string, now: Date): number {
-  const birth = new Date(dob + "T00:00:00Z");
-  let age = now.getUTCFullYear() - birth.getUTCFullYear();
-  const m = now.getUTCMonth() - birth.getUTCMonth();
-  if (m < 0 || (m === 0 && now.getUTCDate() < birth.getUTCDate())) {
-    age -= 1;
-  }
-  return age;
-}
-
 export interface RenderPlayerDeps {
   /** Fetch a fully-hydrated club ref by id. Returns null when the player
    *  is a free agent or the club id can't be resolved. */
@@ -75,7 +65,7 @@ export function renderPlayer(
   return asRenderedPlayer({
     id: hidden.id,
     name: hidden.name,
-    age: ageFromDob(hidden.dob, ctx.now),
+    age: hidden.age,
     nationality: hidden.nationality,
     preferredFoot: hidden.preferredFoot,
     positionLabel,

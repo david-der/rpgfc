@@ -50,13 +50,19 @@ describe("seller evaluator — Story 04 AC-07/08", () => {
     expect(result.kind).toBe("accept");
   });
 
-  it("rejects on budget strain when the buyer cannot afford the wage", () => {
+  // The seller now only checks cash affordability of the FEE — whether
+  // the buyer can sustain the wage is the buyer's and the player's
+  // problem (see REJECTION_PROSE.PLAYER_WAGE_FLOOR on the player side).
+  // This was a deliberate rework during the sim-harness tuning arc; the
+  // old "seller refuses if buyer's wage budget is tight" logic killed
+  // too many legitimate bids.
+  it("rejects on budget strain when the buyer cannot afford the fee", () => {
     const result = evaluateSellerProposal({
       feeCents: 100_000_000_00,
-      wageCents: 1_000_000_000, // $10M/week
+      wageCents: 1_000_000,
       askingCents: 100_000_000_00,
-      buyerCashReserveCents: 10_000_000_000_00,
-      buyerWageBudgetCentsPerWeek: 5_000_000, // $50k/week budget
+      buyerCashReserveCents: 50_000_000_00, // $50M — less than the $1B fee
+      buyerWageBudgetCentsPerWeek: 5_000_000,
       buyerCurrentWageOutCents: 0,
     });
     expect(result.kind).toBe("reject");

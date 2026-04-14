@@ -1,0 +1,17 @@
+{
+  "name": "The Traditionalist",
+  "tagline": "No incoming transfers. Builds the squad through generous extensions.",
+  "rolePromise": "Important Player",
+  "openingFeePctOfAsking": 0,
+  "openingWageMultiplier": 0,
+  "ratchetMaxAttempts": 0,
+  "ratchetStepPct": 0,
+  "abandonAtPctOfAsking": 0,
+  "maxActiveBids": 0,
+  "minCashFloorCents": 0,
+  "extendWhenSeasonsLeftLte": 2,
+  "extendMaxAge": 33,
+  "extendWageMultiplier": 1.15,
+  "extendSeasons": 3,
+  "backfillEnabled": false
+}

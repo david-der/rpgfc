@@ -1,10 +1,10 @@
-// Season simulation personas — 10 distinct manager archetypes.
+// Sim-harness persona contract.
 //
-// Each persona receives a snapshot of the league state once per match
-// week and returns a list of actions. The harness applies them via
-// the same application-layer functions the HTTP routes call.
+// Persona internals used to be hand-coded in this file; the actual
+// decision logic now lives in strategy-engine.ts and is loaded from
+// strategies/*.json. This module just defines the shared types.
 
-import type { CurrencyTier, PlayingTimeRole } from "@rpgfc/shared";
+import type { PlayingTimeRole } from "@rpgfc/shared";
 
 export interface ClubSnapshot {
   clubId: number;
@@ -14,7 +14,7 @@ export interface ClubSnapshot {
   wageBillCents: number;
   wageBudgetCents: number;
   squadSize: number;
-  leaguePosition: number; // 1..10
+  leaguePosition: number;
   lastResult: "W" | "D" | "L" | null;
 }
 
@@ -23,10 +23,21 @@ export interface ListingSnapshot {
   playerName: string;
   clubId: number;
   positionFamily: "gk" | "defender" | "midfielder" | "forward";
+  /** Asking price for listed players, implied value for unlisted. */
   askingPriceCents: number;
+  /** False = unsolicited inquiry required (see strategy.pursueUnlistedPremium). */
+  isListed: boolean;
+  /** What the player currently earns at their selling club. 0 if unknown. */
+  currentWageCents: number;
+  /** Player's wage floor preference, in cents. 0 if unknown. */
+  wageFloorCents: number;
   age: number;
   badgeCount: number;
   formTier: string | null;
+  /** Player's preferred regions (empty = any). */
+  preferredRegions: string[];
+  /** Player's minimum acceptable role promise. */
+  minPlayingTime: PlayingTimeRole;
 }
 
 export interface OwnedPlayerSnapshot {
@@ -38,6 +49,7 @@ export interface OwnedPlayerSnapshot {
   rolePromise: PlayingTimeRole;
   formTier: string | null;
   squadRole: string | null;
+  positionFamily: "gk" | "defender" | "midfielder" | "forward";
 }
 
 export interface PersonaContext {
@@ -46,20 +58,34 @@ export interface PersonaContext {
   club: ClubSnapshot;
   ownedPlayers: OwnedPlayerSnapshot[];
   marketListings: ListingSnapshot[];
+  /** Players this club already has an active bid on — skip them. */
+  playersWithActiveBid: Set<number>;
+  /** Players this club has fully abandoned (ratchet exceeded). */
+  playersRecentlyRejected: Set<number>;
+  /** Per-player bid attempt counter — used to drive ratchet escalation. */
+  playerBidAttempts: Map<number, number>;
+  /** Per-player extension rejection count. Capped at 2 attempts. */
+  extensionRejections: Map<number, number>;
+  /** Position families with a recent departure — backfill priority. */
+  priorityBackfillPositions: Set<"gk" | "defender" | "midfielder" | "forward">;
+  /** This club's nationality — used for player region preference filtering. */
+  clubNationality: string;
+  /** Successful signings by this club in the current season. */
+  signingsThisSeason: number;
 }
 
 export type Action =
   | {
       kind: "bid";
       playerId: number;
-      feeTier: CurrencyTier;
-      wageTier: CurrencyTier;
+      feeCents: number;
+      wageCents: number;
       rolePromise: PlayingTimeRole;
     }
   | {
       kind: "extend";
       playerId: number;
-      wageTier: CurrencyTier;
+      wageCents: number;
       seasons: number;
       rolePromise: PlayingTimeRole;
     };
@@ -69,295 +95,3 @@ export interface Persona {
   tagline: string;
   decide(ctx: PersonaContext): Action[];
 }
-
-// ── helpers ──────────────────────────────────────────────────────────────
-
-function pickBestTarget(
-  listings: ListingSnapshot[],
-  filter: (l: ListingSnapshot) => boolean,
-): ListingSnapshot | null {
-  const candidates = listings.filter(filter);
-  if (candidates.length === 0) return null;
-  return candidates.reduce((best, l) =>
-    l.badgeCount > best.badgeCount ? l : best,
-  );
-}
-
-function tierForPrice(cents: number): CurrencyTier {
-  if (cents <= 50_000_000_00) return "Minimal";
-  if (cents <= 200_000_000_00) return "Modest";
-  if (cents <= 1_000_000_000_00) return "Notable";
-  if (cents <= 3_000_000_000_00) return "Significant";
-  return "Elite";
-}
-
-// ── personas ─────────────────────────────────────────────────────────────
-
-export const MARQUEE: Persona = {
-  name: "The Marquee",
-  tagline: "Aggressive spender — targets marquee signings at Elite prices",
-  decide(ctx) {
-    const actions: Action[] = [];
-    // Bid on up to one high-badge forward or winger per week if cash allows.
-    const target = pickBestTarget(
-      ctx.marketListings,
-      (l) =>
-        (l.positionFamily === "forward" || l.positionFamily === "midfielder") &&
-        l.badgeCount >= 2 &&
-        l.askingPriceCents <= ctx.club.cashCents,
-    );
-    if (target) {
-      actions.push({
-        kind: "bid",
-        playerId: target.playerId,
-        feeTier: tierForPrice(target.askingPriceCents),
-        wageTier: "Significant",
-        rolePromise: "Star Player",
-      });
-    }
-    // Extend any starter whose contract is in the last season at Elite wage.
-    for (const p of ctx.ownedPlayers) {
-      if (p.seasonsRemaining <= 1 && p.age < 30) {
-        actions.push({
-          kind: "extend",
-          playerId: p.playerId,
-          wageTier: "Significant",
-          seasons: 4,
-          rolePromise: "Star Player",
-        });
-      }
-    }
-    return actions;
-  },
-};
-
-export const ANALYST: Persona = {
-  name: "The Analyst",
-  tagline: "Bargain hunter — signs young players at Minimal/Modest tiers",
-  decide(ctx) {
-    const actions: Action[] = [];
-    const target = pickBestTarget(
-      ctx.marketListings,
-      (l) =>
-        l.age <= 23 &&
-        l.askingPriceCents <= 200_000_000_00 &&
-        l.askingPriceCents <= ctx.club.cashCents,
-    );
-    if (target) {
-      actions.push({
-        kind: "bid",
-        playerId: target.playerId,
-        feeTier: tierForPrice(target.askingPriceCents),
-        wageTier: "Modest",
-        rolePromise: "Rotation",
-      });
-    }
-    return actions;
-  },
-};
-
-export const ARCHITECT: Persona = {
-  name: "The Architect",
-  tagline: "Youth developer — locks in young players with long extensions",
-  decide(ctx) {
-    const actions: Action[] = [];
-    // Young player target.
-    const target = pickBestTarget(
-      ctx.marketListings,
-      (l) => l.age <= 21 && l.askingPriceCents <= ctx.club.cashCents,
-    );
-    if (target) {
-      actions.push({
-        kind: "bid",
-        playerId: target.playerId,
-        feeTier: tierForPrice(target.askingPriceCents),
-        wageTier: "Modest",
-        rolePromise: "Rotation",
-      });
-    }
-    // Extend every young player with 2 or fewer seasons remaining.
-    for (const p of ctx.ownedPlayers) {
-      if (p.age <= 24 && p.seasonsRemaining <= 2) {
-        actions.push({
-          kind: "extend",
-          playerId: p.playerId,
-          wageTier: "Notable",
-          seasons: 5,
-          rolePromise: "Important Player",
-        });
-      }
-    }
-    return actions;
-  },
-};
-
-export const TRADITIONALIST: Persona = {
-  name: "The Traditionalist",
-  tagline: "No new signings — focus on extending the existing squad",
-  decide(ctx) {
-    const actions: Action[] = [];
-    for (const p of ctx.ownedPlayers) {
-      if (p.seasonsRemaining <= 1 && p.age < 32) {
-        actions.push({
-          kind: "extend",
-          playerId: p.playerId,
-          wageTier: "Modest",
-          seasons: 3,
-          rolePromise: "Important Player",
-        });
-      }
-    }
-    return actions;
-  },
-};
-
-export const OPPORTUNIST: Persona = {
-  name: "The Opportunist",
-  tagline: "Reactionary — bids after losses, extends after wins",
-  decide(ctx) {
-    const actions: Action[] = [];
-    if (ctx.club.lastResult === "L") {
-      const target = pickBestTarget(
-        ctx.marketListings,
-        (l) =>
-          l.badgeCount >= 1 && l.askingPriceCents <= ctx.club.cashCents,
-      );
-      if (target) {
-        actions.push({
-          kind: "bid",
-          playerId: target.playerId,
-          feeTier: tierForPrice(target.askingPriceCents),
-          wageTier: "Notable",
-          rolePromise: "Important Player",
-        });
-      }
-    } else if (ctx.club.lastResult === "W") {
-      const star = ctx.ownedPlayers
-        .filter((p) => p.seasonsRemaining <= 2 && p.formTier === "Excellent")
-        .sort((a, b) => b.weeklyWageCents - a.weeklyWageCents)[0];
-      if (star) {
-        actions.push({
-          kind: "extend",
-          playerId: star.playerId,
-          wageTier: "Significant",
-          seasons: 3,
-          rolePromise: "Star Player",
-        });
-      }
-    }
-    return actions;
-  },
-};
-
-export const CALCULATOR: Persona = {
-  name: "The Calculator",
-  tagline: "Financially prudent — never spends more than 1/10 of cash",
-  decide(ctx) {
-    const actions: Action[] = [];
-    const cap = ctx.club.cashCents / 10;
-    const target = pickBestTarget(
-      ctx.marketListings,
-      (l) => l.askingPriceCents <= cap,
-    );
-    if (target) {
-      actions.push({
-        kind: "bid",
-        playerId: target.playerId,
-        feeTier: tierForPrice(target.askingPriceCents),
-        wageTier: "Modest",
-        rolePromise: "Rotation",
-      });
-    }
-    return actions;
-  },
-};
-
-export const HOARDER: Persona = {
-  name: "The Hoarder",
-  tagline: "Collects depth — signs third-string players on long contracts",
-  decide(ctx) {
-    const actions: Action[] = [];
-    if (ctx.club.squadSize < 25) {
-      const target = pickBestTarget(
-        ctx.marketListings,
-        (l) => l.askingPriceCents <= ctx.club.cashCents / 4,
-      );
-      if (target) {
-        actions.push({
-          kind: "bid",
-          playerId: target.playerId,
-          feeTier: tierForPrice(target.askingPriceCents),
-          wageTier: "Modest",
-          rolePromise: "Backup",
-        });
-      }
-    }
-    return actions;
-  },
-};
-
-export const SABOTEUR: Persona = {
-  name: "The Saboteur",
-  tagline: "Poaches from rivals — bids on high-badge players from top clubs",
-  decide(ctx) {
-    const actions: Action[] = [];
-    const target = pickBestTarget(
-      ctx.marketListings,
-      (l) => l.badgeCount >= 2 && l.askingPriceCents <= ctx.club.cashCents,
-    );
-    if (target) {
-      actions.push({
-        kind: "bid",
-        playerId: target.playerId,
-        feeTier: tierForPrice(target.askingPriceCents),
-        wageTier: "Significant",
-        rolePromise: "Star Player",
-      });
-    }
-    return actions;
-  },
-};
-
-export const ROTATOR: Persona = {
-  name: "The Rotator",
-  tagline: "Mid-tier shopping — targets Rotation-quality players",
-  decide(ctx) {
-    const actions: Action[] = [];
-    const target = pickBestTarget(
-      ctx.marketListings,
-      (l) =>
-        l.age >= 24 && l.age <= 28 && l.askingPriceCents <= ctx.club.cashCents / 3,
-    );
-    if (target) {
-      actions.push({
-        kind: "bid",
-        playerId: target.playerId,
-        feeTier: tierForPrice(target.askingPriceCents),
-        wageTier: "Notable",
-        rolePromise: "Rotation",
-      });
-    }
-    return actions;
-  },
-};
-
-export const MINIMALIST: Persona = {
-  name: "The Minimalist",
-  tagline: "Control persona — does nothing, runs on autopilot",
-  decide() {
-    return [];
-  },
-};
-
-export const PERSONA_ROSTER: readonly Persona[] = [
-  MARQUEE,
-  ANALYST,
-  ARCHITECT,
-  TRADITIONALIST,
-  OPPORTUNIST,
-  CALCULATOR,
-  HOARDER,
-  SABOTEUR,
-  ROTATOR,
-  MINIMALIST,
-];

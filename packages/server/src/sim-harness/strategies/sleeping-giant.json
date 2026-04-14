@@ -1,0 +1,17 @@
+{
+  "name": "The Sleeping Giant",
+  "tagline": "Control. Does nothing. The market should still drag them along.",
+  "rolePromise": "Important Player",
+  "openingFeePctOfAsking": 0,
+  "openingWageMultiplier": 0,
+  "ratchetMaxAttempts": 0,
+  "ratchetStepPct": 0,
+  "abandonAtPctOfAsking": 0,
+  "maxActiveBids": 0,
+  "minCashFloorCents": 0,
+  "extendWhenSeasonsLeftLte": 0,
+  "extendMaxAge": 0,
+  "extendWageMultiplier": 0,
+  "extendSeasons": 0,
+  "backfillEnabled": false
+}

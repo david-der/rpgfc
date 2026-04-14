@@ -85,7 +85,7 @@ async function countRemaining(client: DbClient): Promise<number> {
 
 export async function advanceMatchday(
   client: DbClient,
-  options: { now?: Date; engine?: SimEngine } = {},
+  options: { now?: Date; engine?: SimEngine; skipAiBids?: boolean } = {},
 ): Promise<AdvanceMatchdayResult> {
   const engine = options.engine ?? createSimStub();
   const now = (options.now ?? new Date()).toISOString();
@@ -226,7 +226,9 @@ export async function advanceMatchday(
 
   // Story 08: tick the transfer market after match results.
   await tickBids(client, matchday);
-  await generateAiBids(client, matchday);
+  if (!options.skipAiBids) {
+    await generateAiBids(client, matchday);
+  }
 
   const remaining = await countRemaining(client);
   return { matchday, played: results.length, remaining };

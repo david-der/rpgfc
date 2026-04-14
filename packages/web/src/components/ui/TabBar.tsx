@@ -27,15 +27,20 @@ export interface TabDefinition {
 
 interface TabBarProps {
   tabs: TabDefinition[];
+  /** Uncontrolled default — ignored when `activeKey` is provided. */
   initialKey?: string;
+  /** Controlled active key. Pass this + onChange to keep the active
+   *  tab in URL search state. */
+  activeKey?: string;
   onChange?: (key: string) => void;
 }
 
-export function TabBar({ tabs, initialKey, onChange }: TabBarProps) {
-  const [active, setActive] = useState(initialKey ?? tabs[0]?.key ?? "");
+export function TabBar({ tabs, initialKey, activeKey, onChange }: TabBarProps) {
+  const [internal, setInternal] = useState(initialKey ?? tabs[0]?.key ?? "");
+  const active = activeKey ?? internal;
 
   const select = (key: string) => {
-    setActive(key);
+    if (activeKey === undefined) setInternal(key);
     onChange?.(key);
   };
 

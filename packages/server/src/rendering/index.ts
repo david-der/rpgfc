@@ -49,3 +49,8 @@ export { renderMatchById, advanceMatchdayRendered } from "./match-response.js";
 export { renderFixturesForUser } from "./fixtures-response.js";
 export { renderFormSeriesFor, currentFormFor } from "./player-form.js";
 export { computeLeagueTable } from "./league-table.js";
+// Error types + rejection paraphrases — routes reach these through the
+// rendering barrel to honour the `no-hidden-in-routes` lint rule. Both
+// are pure value helpers, not hidden-player readers.
+export { BidPreconditionError } from "../application/transfers/bids.js";
+export { REJECTION_PROSE } from "../application/transfers/evaluators.js";

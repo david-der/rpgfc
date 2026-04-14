@@ -23,6 +23,16 @@ import { stanceFor } from "@rpgfc/shared";
 
 import type { DbClient } from "../../db/client.js";
 import { REJECTION_PROSE } from "./evaluators.js";
+import { estimateValueCents } from "./valuations.js";
+
+/** User-recoverable bid failure — the route layer turns these into 400s
+ *  with the `message` shown to the manager. Anything else bubbles as 500. */
+export class BidPreconditionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BidPreconditionError";
+  }
+}
 
 // ── types ─────────────────────────────────────────────────────────────────
 
@@ -141,6 +151,35 @@ async function loadListing(client: DbClient, playerId: number): Promise<ListingR
     [playerId],
   );
   return res.rows[0] ?? null;
+}
+
+/** Implied market value for a player not currently listed for transfer.
+ *  Used when a club makes an unsolicited inquiry. */
+async function estimateUnlistedValue(client: DbClient, playerId: number): Promise<number> {
+  if (client.dialect !== "sqlite") {
+    // Postgres path deferred — harness runs SQLite.
+    return 1_000_000_00;
+  }
+  const row = client.sqlite
+    .prepare<
+      [number],
+      { name: string; archetype_id: string; experience_years: number }
+    >(
+      `SELECT name, archetype_id, experience_years FROM players WHERE id = ?`,
+    )
+    .get(playerId);
+  if (!row) return 1_000_000_00;
+  const badgeRows = client.sqlite
+    .prepare<[number], { badge_key: string }>(
+      `SELECT badge_key FROM player_badges WHERE player_id = ?`,
+    )
+    .all(playerId);
+  return estimateValueCents({
+    name: row.name,
+    archetypeId: row.archetype_id,
+    experienceYears: row.experience_years,
+    badgeKeys: badgeRows.map((b) => b.badge_key),
+  });
 }
 
 async function loadPlayer(client: DbClient, id: number): Promise<PlayerRow | null> {
@@ -341,17 +380,43 @@ export async function submitBid(client: DbClient, input: SubmitBidInput): Promis
   const now = (input.now ?? new Date()).toISOString();
 
   const listing = await loadListing(client, input.playerId);
-  if (!listing) throw new Error("Player is not listed for transfer");
+  // Listed players have an explicit asking price. For unlisted inquiries
+  // we fall back to the valuation formula — the bid still submits, but
+  // the seller's acceptance threshold is stricter (see evaluators.ts).
+  const askingCents = listing?.asking_price_cents
+    ?? (await estimateUnlistedValue(client, input.playerId));
   const player = await loadPlayer(client, input.playerId);
-  if (!player || player.club_id === null) {
-    throw new Error("Player has no current club");
+  if (!player) {
+    throw new BidPreconditionError("That player could not be found.");
   }
-  // Guard: you can't buy your own players.
+  if (player.club_id === null) {
+    throw new BidPreconditionError(
+      "That player is a free agent — sign them directly rather than through a transfer offer.",
+    );
+  }
   if (player.club_id === input.fromClubId) {
-    throw new Error("Cannot bid on a player already at your club");
+    throw new BidPreconditionError("You can't bid on a player already at your club.");
+  }
+  // Guard: you can't have two active bids on the same player.
+  // Prevents persona spam and mirrors how real transfer markets work —
+  // you make one offer and wait for a response.
+  if (client.dialect === "sqlite") {
+    const existing = client.sqlite
+      .prepare<
+        [number, number],
+        { id: number }
+      >(
+        `SELECT id FROM bids
+         WHERE from_club_id = ? AND player_id = ?
+           AND state NOT IN ('Signed', 'SellerRejected', 'PlayerRejected', 'Expired', 'Cancelled')`,
+      )
+      .get(input.fromClubId, input.playerId);
+    if (existing) {
+      throw new BidPreconditionError("You already have an active bid on this player.");
+    }
   }
 
-  const stance = stanceFor(input.feeCents, listing.asking_price_cents);
+  const stance = stanceFor(input.feeCents, askingCents);
 
   // Story 08: bids are now time-based. Submit enters Submitted state
   // with a 4-week deadline. The bid ticker in advanceMatchday handles

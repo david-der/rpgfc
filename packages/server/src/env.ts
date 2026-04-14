@@ -24,6 +24,10 @@ const envSchema = z.object({
   SIM_ENGINE: z.enum(["stub", "python"]).default("stub"),
   AUTH_MODE: z.enum(["dev", "cognito"]).default("dev"),
   GIT_SHA: z.string().optional(),
+  // Which club the local UI is "managed" by. Hardcoded to 1 historically;
+  // exposed as env so you can boot the server against a sim-harness DB and
+  // browse from any club's perspective.
+  MANAGED_CLUB_ID: z.coerce.number().int().positive().default(1),
 });
 
 export type Env = z.infer<typeof envSchema>;

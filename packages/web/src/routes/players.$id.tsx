@@ -21,8 +21,8 @@
 //   FIX-05 — TierPill defaults to the muted (outlined) variant.
 //   FIX-06 — Overall CertaintyText sits under the subtitle in the hero.
 
-import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { PromiseMood } from "@rpgfc/shared";
 
@@ -33,19 +33,41 @@ import { ExtendContractForm } from "../components/ui/ExtendContractForm";
 import { FormSparkline } from "../components/ui/FormSparkline";
 import { KeyNumber } from "../components/ui/KeyNumber";
 import { NarrativeBlock } from "../components/ui/NarrativeBlock";
+import { PlayerCard } from "../components/ui/PlayerCard";
 import { PromiseMoodChip } from "../components/ui/PromiseMoodChip";
 import { ScoutReportCard } from "../components/ui/ScoutReportCard";
 import { TabBar, type TabDefinition } from "../components/ui/TabBar";
 import { TierPill } from "../components/ui/TierPill";
 import {
+  addToWatchlist,
+  fetchClubFinances,
   fetchPlayer,
   fetchPlayerContract,
   fetchPlayerForm,
+  fetchPlayerHistory,
   fetchPlayerReports,
+  fetchWatchlist,
+  removeFromWatchlist,
 } from "../lib/api";
+
+const PLAYER_TABS = [
+  "overview",
+  "history",
+  "badges",
+  "relationships",
+  "contract",
+  "reports",
+] as const;
+type PlayerTab = (typeof PLAYER_TABS)[number];
 
 export const Route = createFileRoute("/players/$id")({
   component: PlayerProfile,
+  validateSearch: (search: Record<string, unknown>): { tab?: PlayerTab } => {
+    const raw = search["tab"];
+    return typeof raw === "string" && (PLAYER_TABS as readonly string[]).includes(raw)
+      ? { tab: raw as PlayerTab }
+      : {};
+  },
 });
 
 function ComingSoon({ label }: { label: string }) {
@@ -76,6 +98,11 @@ function PlayerProfile() {
     queryKey: ["player-form", id],
     queryFn: () => fetchPlayerForm(id),
   });
+  const meQuery = useQuery({ queryKey: ["club-finances"], queryFn: fetchClubFinances });
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
+  const activeTab: PlayerTab = search.tab ?? "overview";
+  const watchlistQuery = useQuery({ queryKey: ["watchlist"], queryFn: fetchWatchlist });
 
   if (query.isPending) {
     return (
@@ -155,8 +182,8 @@ function PlayerProfile() {
         </div>
       ),
     },
-    { key: "history", label: "History", content: <ComingSoon label="history" /> },
-    { key: "badges", label: "Badges", content: <ComingSoon label="badges detail" /> },
+    { key: "history", label: "History", content: <HistoryTab playerId={id} /> },
+    { key: "badges", label: "Badges", content: <BadgesTab badges={player.badges} /> },
     {
       key: "relationships",
       label: "Relationships",
@@ -174,15 +201,18 @@ function PlayerProfile() {
           {contractQuery.data?.contract ? (
             <>
               <ContractCard contract={contractQuery.data.contract} />
-              {/* Finance v2: extend-contract form only appears for the
-                  user's own players. Club id 1 is hardcoded until auth
-                  lands. */}
-              {player.club?.id === 1 && (
-                <ExtendContractForm
-                  playerId={player.id}
-                  currentRolePromise={contractQuery.data.contract.rolePromise}
-                />
-              )}
+              {/* Extension form only appears for the user's own
+                  players. `meQuery.data.clubId` comes from the finances
+                  endpoint, which is scoped by server-side
+                  MANAGED_CLUB_ID — so changing the env var now reroutes
+                  who this form appears for. */}
+              {meQuery.data?.clubId !== undefined &&
+                player.club?.id === meQuery.data.clubId && (
+                  <ExtendContractForm
+                    playerId={player.id}
+                    currentRolePromise={contractQuery.data.contract.rolePromise}
+                  />
+                )}
             </>
           ) : contractQuery.isSuccess ? (
             <p className="text-sm italic text-parchment-500">
@@ -222,8 +252,20 @@ function PlayerProfile() {
   // primary nav takes over as the way back to the roster.
   return (
     <div className="mx-auto max-w-5xl px-6 py-10">
-      <header className="flex items-end justify-between border-b border-parchment-300 pb-6">
-        <div>
+      <header className="flex items-start gap-8 border-b border-parchment-300 pb-6">
+        {/* Panini-style trading card on the left — per-player illustration
+            over a club-color stripe. Drops to no stripe for free agents. */}
+        <PlayerCard
+          playerId={player.id}
+          playerName={player.name}
+          positionLabel={player.positionLabel}
+          nationality={player.nationality}
+          age={player.age}
+          club={player.club}
+          certaintyLabel={player.certainty}
+        />
+
+        <div className="min-w-0 flex-1">
           <div className="text-xs uppercase tracking-wide text-parchment-500">
             {player.positionLabel} · {player.nationality}
           </div>
@@ -259,7 +301,7 @@ function PlayerProfile() {
             </div>
           )}
         </div>
-        <div className="flex items-start gap-6">
+        <div className="flex flex-none items-start gap-6">
           <KeyNumber value={player.age} label="Age" allowlistReason="age" />
           <div className="flex flex-col items-start gap-2">
             {/* FIX-05: TierPill defaults to the muted outlined variant. */}
@@ -269,9 +311,245 @@ function PlayerProfile() {
         </div>
       </header>
 
+      <RivalActionRow
+        playerId={player.id}
+        playerClubId={player.club?.id ?? null}
+        myClubId={meQuery.data?.clubId}
+        watchedIds={
+          (watchlistQuery.data?.items ?? []).map((i) => i.player_id)
+        }
+      />
+
       <section className="mt-8">
-        <TabBar tabs={tabs} />
+        <TabBar
+          tabs={tabs}
+          activeKey={activeTab}
+          onChange={(key) => {
+            void navigate({
+              search: key === "overview" ? {} : { tab: key as PlayerTab },
+            });
+          }}
+        />
       </section>
+    </div>
+  );
+}
+
+function RivalActionRow({
+  playerId,
+  playerClubId,
+  myClubId,
+  watchedIds,
+}: {
+  playerId: number;
+  playerClubId: number | null;
+  myClubId: number | undefined;
+  watchedIds: number[];
+}) {
+  const queryClient = useQueryClient();
+  const addMutation = useMutation({
+    mutationFn: () => addToWatchlist(playerId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["watchlist"] }),
+  });
+  const removeMutation = useMutation({
+    mutationFn: () => removeFromWatchlist(playerId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["watchlist"] }),
+  });
+
+  // Not at any club → free agent (signing path not in the transfer
+  // composer). Skip the rival action row entirely.
+  if (playerClubId === null) return null;
+  // My own player → Contract tab already has the extend form.
+  if (myClubId !== undefined && playerClubId === myClubId) return null;
+
+  const isWatched = watchedIds.includes(playerId);
+  const err = addMutation.error ?? removeMutation.error;
+
+  return (
+    <section className="mt-6 border border-parchment-300 bg-parchment-100 p-4">
+      <div className="flex items-center gap-3">
+        <Link
+          to="/transfers/$playerId"
+          params={{ playerId: String(playerId) }}
+          className="border border-moss-600 bg-moss-500 px-4 py-2 font-sans text-sm font-semibold uppercase tracking-wide text-parchment-50 hover:bg-moss-600"
+        >
+          Bid on this player
+        </Link>
+        {isWatched ? (
+          <button
+            type="button"
+            onClick={() => removeMutation.mutate()}
+            disabled={removeMutation.isPending}
+            className="border border-parchment-600 px-4 py-2 font-sans text-sm font-semibold uppercase tracking-wide text-parchment-800 hover:bg-parchment-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {removeMutation.isPending ? "Removing…" : "Remove from watchlist"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => addMutation.mutate()}
+            disabled={addMutation.isPending}
+            className="border border-parchment-600 px-4 py-2 font-sans text-sm font-semibold uppercase tracking-wide text-parchment-800 hover:bg-parchment-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {addMutation.isPending ? "Adding…" : "Watch"}
+          </button>
+        )}
+        <span className="text-xs italic text-parchment-500">
+          Currently at a rival club.
+        </span>
+      </div>
+      {err && <p className="mt-2 text-sm text-semantic-error">{err.message}</p>}
+    </section>
+  );
+}
+
+// ── History tab ──────────────────────────────────────────────────────────
+
+function HistoryTab({ playerId }: { playerId: string }) {
+  const query = useQuery({
+    queryKey: ["player-history", playerId],
+    queryFn: () => fetchPlayerHistory(playerId),
+  });
+  if (query.isPending) return <p className="text-parchment-600">Loading…</p>;
+  if (query.isError) {
+    return <p className="text-semantic-error">Could not load the player's history.</p>;
+  }
+  const seasons = query.data?.seasons ?? [];
+  if (seasons.length === 0) {
+    return (
+      <p className="text-sm italic text-parchment-500">
+        No matches played yet. Their story starts this season.
+      </p>
+    );
+  }
+  const totalApps = seasons.reduce((s, r) => s + r.appearances, 0);
+  const totalGoals = seasons.reduce((s, r) => s + r.goals, 0);
+  const totalAssists = seasons.reduce((s, r) => s + r.assists, 0);
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-baseline gap-6 border border-parchment-300 bg-parchment-50 p-4">
+        <HistoryStat label="Apps" value={totalApps} />
+        <HistoryStat label="Goals" value={totalGoals} />
+        <HistoryStat label="Assists" value={totalAssists} />
+        <HistoryStat label="Seasons" value={seasons.length} />
+      </div>
+      <div className="overflow-x-auto border border-parchment-300">
+        <table className="w-full text-left text-sm">
+          <thead>
+            <tr className="border-b border-parchment-300 bg-parchment-100 text-xs uppercase tracking-wide text-parchment-500">
+              <th className="px-3 py-2">Season</th>
+              <th className="px-3 py-2">Club</th>
+              <th className="px-3 py-2 text-right">Apps</th>
+              <th className="px-3 py-2 text-right">Goals</th>
+              <th className="px-3 py-2 text-right">Assists</th>
+              <th className="px-3 py-2 text-right">Mins</th>
+              <th className="px-3 py-2 text-right">Y</th>
+              <th className="px-3 py-2 text-right">R</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-parchment-200">
+            {seasons.map((r) => (
+              <tr key={`${r.season}-${r.clubId}`} className="hover:bg-parchment-100">
+                <td
+                  data-testid="history-season-allowlist-number"
+                  className="px-3 py-1.5 font-mono tabular-nums text-parchment-700"
+                >
+                  {r.season + 1}
+                </td>
+                <td className="px-3 py-1.5">
+                  <span data-testid="player-facing" className="text-parchment-900">
+                    {r.clubName}
+                  </span>
+                </td>
+                <td
+                  data-testid="history-apps-allowlist-number"
+                  className="px-3 py-1.5 text-right font-mono tabular-nums"
+                >
+                  {r.appearances}
+                </td>
+                <td
+                  data-testid="history-goals-allowlist-number"
+                  className="px-3 py-1.5 text-right font-mono font-semibold tabular-nums text-parchment-900"
+                >
+                  {r.goals}
+                </td>
+                <td
+                  data-testid="history-assists-allowlist-number"
+                  className="px-3 py-1.5 text-right font-mono tabular-nums"
+                >
+                  {r.assists}
+                </td>
+                <td
+                  data-testid="history-mins-allowlist-number"
+                  className="px-3 py-1.5 text-right font-mono tabular-nums text-parchment-500"
+                >
+                  {r.minutes}
+                </td>
+                <td
+                  data-testid="history-y-allowlist-number"
+                  className="px-3 py-1.5 text-right font-mono tabular-nums text-parchment-500"
+                >
+                  {r.yellowCards}
+                </td>
+                <td
+                  data-testid="history-r-allowlist-number"
+                  className="px-3 py-1.5 text-right font-mono tabular-nums text-clay-700"
+                >
+                  {r.redCards}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function HistoryStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex flex-col items-start">
+      <span
+        data-testid={`history-total-${label.toLowerCase()}-allowlist-number`}
+        className="font-mono text-3xl font-medium tabular-nums text-parchment-900"
+      >
+        {value}
+      </span>
+      <span className="text-xs uppercase tracking-wide text-parchment-500">{label}</span>
+    </div>
+  );
+}
+
+// ── Badges tab ───────────────────────────────────────────────────────────
+
+import type { BadgeRef, BadgeCategory } from "@rpgfc/shared";
+import { BADGE_CATEGORIES } from "@rpgfc/shared";
+
+function BadgesTab({ badges }: { badges: BadgeRef[] }) {
+  if (badges.length === 0) {
+    return (
+      <p className="text-sm italic text-parchment-500">
+        No badges yet. This player is still earning their identity.
+      </p>
+    );
+  }
+  const byCategory = new Map<BadgeCategory, BadgeRef[]>();
+  for (const cat of BADGE_CATEGORIES) byCategory.set(cat, []);
+  for (const b of badges) byCategory.get(b.category)?.push(b);
+  return (
+    <div className="space-y-6">
+      {BADGE_CATEGORIES.map((cat) => {
+        const items = byCategory.get(cat) ?? [];
+        if (items.length === 0) return null;
+        return (
+          <section key={cat}>
+            <h3 className="mb-3 text-xs font-medium uppercase tracking-wide text-parchment-500">
+              {cat} <span className="ml-1 text-parchment-400">({items.length})</span>
+            </h3>
+            <BadgeStack badges={items} />
+          </section>
+        );
+      })}
     </div>
   );
 }

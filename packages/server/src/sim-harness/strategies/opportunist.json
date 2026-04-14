@@ -1,0 +1,23 @@
+{
+  "name": "The Opportunist",
+  "tagline": "Bids hard after losses, tightens contracts after wins.",
+  "targetPositions": ["forward", "midfielder", "defender"],
+  "targetMinBadges": 1,
+  "preferTopBadges": true,
+  "rolePromise": "Important Player",
+  "openingFeePctOfAsking": 1.05,
+  "openingWageMultiplier": 1.15,
+  "ratchetMaxAttempts": 2,
+  "ratchetStepPct": 0.10,
+  "abandonAtPctOfAsking": 1.30,
+  "maxActiveBids": 1,
+  "bidOnlyAfterLoss": true,
+  "minCashFloorCents": 50000000,
+  "extendWhenSeasonsLeftLte": 2,
+  "extendMaxAge": 32,
+  "extendOnlyAfterWin": true,
+  "extendWageMultiplier": 1.20,
+  "extendSeasons": 3,
+  "backfillEnabled": true,
+  "pursueUnlistedPremium": 1.55
+}

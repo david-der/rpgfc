@@ -82,6 +82,20 @@ async function main() {
   if (!listingSeed.skipped) {
     logger.info({ listings: listingSeed.listingsCreated }, "Seeded listings");
   }
+  // One-shot self-repair: drop listings whose player is now a free
+  // agent. endSeason does this going forward; older saves accumulated
+  // orphans before the fix landed.
+  if (dbClient.dialect === "sqlite") {
+    const removed = dbClient.sqlite
+      .prepare(
+        `DELETE FROM listing
+         WHERE player_id IN (SELECT id FROM players WHERE club_id IS NULL)`,
+      )
+      .run();
+    if (removed.changes > 0) {
+      logger.info({ orphanListings: removed.changes }, "Cleaned orphan listings");
+    }
+  }
   const prefSeed = await seedPreferencesIfEmpty(dbClient);
   if (!prefSeed.skipped) {
     logger.info({ preferences: prefSeed.preferencesCreated }, "Seeded player preferences");
@@ -137,6 +151,7 @@ async function main() {
     db: dbClient,
     devEndpointsEnabled: env.AUTH_MODE === "dev",
     now: () => new Date(),
+    userClubId: env.MANAGED_CLUB_ID,
     ...(staticDir ? { staticDir } : {}),
     ...(savesDir ? { savesDir } : {}),
     ...(currentDbPath ? { currentDbPath } : {}),

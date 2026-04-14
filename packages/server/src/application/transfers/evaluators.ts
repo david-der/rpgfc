@@ -29,6 +29,14 @@ export interface SellerEvalInput {
   buyerCashReserveCents: number;
   buyerWageBudgetCentsPerWeek: number;
   buyerCurrentWageOutCents: number;
+  /** The player isn't listed — seller demands significantly above
+   *  implied market value to consider letting them go. */
+  isUnlisted?: boolean;
+  /** Seller's current roster size. Sellers refuse to sell when this
+   *  would drop the roster below the minimum. */
+  sellerRosterSize?: number;
+  /** Minimum roster size the seller is willing to maintain. */
+  sellerRosterFloor?: number;
 }
 
 export type SellerEvalResult =
@@ -37,17 +45,35 @@ export type SellerEvalResult =
   | { kind: "reject"; reason: RejectionReason };
 
 export function evaluateSellerProposal(input: SellerEvalInput): SellerEvalResult {
-  // Affordability gate — if the buyer can't even pay the new wage,
-  // the seller declines outright.
-  const buyerCanAffordWage =
-    input.buyerCurrentWageOutCents + input.wageCents <= input.buyerWageBudgetCentsPerWeek;
-  const buyerCanAffordFee = input.buyerCashReserveCents >= input.feeCents;
-
-  if (!buyerCanAffordFee || !buyerCanAffordWage) {
-    return { kind: "reject", reason: "SELLER_BUDGET_STRAIN" };
+  // Roster-floor gate: a club below its minimum squad size won't sell
+  // anyone regardless of fee. Blocks cascading depletion.
+  if (
+    input.sellerRosterFloor !== undefined &&
+    input.sellerRosterSize !== undefined &&
+    input.sellerRosterSize <= input.sellerRosterFloor
+  ) {
+    return { kind: "reject", reason: "SELLER_FEE_TOO_LOW" };
   }
 
   const ratio = input.feeCents / input.askingCents;
+  const buyerCanAffordFee = input.buyerCashReserveCents >= input.feeCents;
+
+  // Unlisted inquiries: the seller isn't looking to move the player,
+  // so they only entertain offers significantly above implied market
+  // value. Threshold is 1.5× — the "pay a fat premium" path.
+  if (input.isUnlisted) {
+    if (!buyerCanAffordFee) return { kind: "reject", reason: "SELLER_BUDGET_STRAIN" };
+    if (ratio >= 1.5) return { kind: "accept" };
+    if (ratio >= 1.25) {
+      const counterFeeCents = Math.round(input.askingCents * 1.6);
+      return { kind: "counter", counterFeeCents };
+    }
+    return { kind: "reject", reason: "SELLER_FEE_TOO_LOW" };
+  }
+
+  // Listed path.
+  if (ratio >= 1.10) return { kind: "accept" };
+  if (!buyerCanAffordFee) return { kind: "reject", reason: "SELLER_BUDGET_STRAIN" };
   if (ratio >= 0.9) return { kind: "accept" };
   if (ratio >= 0.75) {
     const counterFeeCents = Math.round((input.feeCents + input.askingCents) / 2);

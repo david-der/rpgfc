@@ -105,9 +105,12 @@ describe("transfer routes — Story 04", () => {
     const app = createApiApp(baseDeps(db));
 
     // Submit a bid then force-accept it via the dev-only endpoint.
+    // Pick a listing our earlier AC-13 test didn't bid on — the
+    // active-bid-per-player guard (added for the sim harness) throws
+    // BidPreconditionError if we try to re-submit on listings[0].
     const listingsRes = await app.request("/api/transfers");
     const listings = (await listingsRes.json()) as { listings: Array<{ playerId: number }> };
-    const target = listings.listings[0]!;
+    const target = listings.listings[1]!;
     const submitRes = await app.request(`/api/transfers/${target.playerId}/bid`, {
       method: "POST",
       headers: { "content-type": "application/json" },

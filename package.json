@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "DATABASE_URL=${DATABASE_URL:-sqlite:$PWD/saves/dev.db} pnpm run --parallel --filter @rpgfc/server --filter @rpgfc/web dev",
+    "dev:post-season": "DATABASE_URL=sqlite:$PWD/saves/post-season.db MANAGED_CLUB_ID=${MANAGED_CLUB_ID:-1} pnpm run --parallel --filter @rpgfc/server --filter @rpgfc/web dev",
     "build": "pnpm -r --filter @rpgfc/shared --filter @rpgfc/web --filter @rpgfc/server build",
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint . --ext .ts,.tsx,.cjs,.mjs,.js --max-warnings 0",
@@ -18,6 +19,7 @@
     "test": "pnpm -r test",
     "doctrine": "pnpm --filter @rpgfc/web build && pnpm --filter @rpgfc/server build && playwright test --config tests/doctrine/playwright.config.ts",
     "season-sim": "pnpm --filter @rpgfc/server exec tsx src/sim-harness/run.ts",
+    "gen-art": "pnpm --filter @rpgfc/server exec tsx src/scripts/generate-player-art.ts",
     "db:generate": "pnpm --filter @rpgfc/server db:generate",
     "db:reset": "rm -rf saves && mkdir -p saves"
   },

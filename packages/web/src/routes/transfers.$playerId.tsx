@@ -18,7 +18,13 @@ import type { RenderedBid } from "@rpgfc/shared";
 
 import { BadgeStack } from "../components/ui/BadgeStack";
 import { BidComposer } from "../components/ui/BidComposer";
-import { fetchPlayer, fetchTransfers, forceAcceptBid, submitBid } from "../lib/api";
+import {
+  fetchClubFinances,
+  fetchPlayer,
+  fetchTransfers,
+  forceAcceptBid,
+  submitBid,
+} from "../lib/api";
 
 export const Route = createFileRoute("/transfers/$playerId")({
   component: TransfersPlayer,
@@ -36,6 +42,10 @@ function TransfersPlayer() {
   const transfersQuery = useQuery({
     queryKey: ["transfers"],
     queryFn: fetchTransfers,
+  });
+  const financesQuery = useQuery({
+    queryKey: ["club-finances"],
+    queryFn: fetchClubFinances,
   });
 
   const submitMutation = useMutation({
@@ -114,6 +124,12 @@ function TransfersPlayer() {
           <BidComposer
             initialAskingTier={listing?.askingTier ?? "Notable"}
             busy={submitMutation.isPending}
+            {...(financesQuery.data?.cashCents !== undefined
+              ? { cashCents: financesQuery.data.cashCents }
+              : {})}
+            {...(financesQuery.data?.wageBillCents !== undefined
+              ? { weeklyWageCents: financesQuery.data.wageBillCents }
+              : {})}
             onSubmit={async (value) => {
               await submitMutation.mutateAsync(value);
             }}

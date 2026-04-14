@@ -1,0 +1,23 @@
+{
+  "name": "The Analyst",
+  "tagline": "Bargain hunter. Bids exactly at asking on undervalued young players, walks away if matched.",
+  "targetPositions": ["midfielder", "forward", "defender"],
+  "targetMaxAge": 32,
+  "targetMaxAskingCents": 50000000000,
+  "preferCheapest": true,
+  "rolePromise": "Rotation",
+  "maxRolePromise": "Important Player",
+  "openingFeePctOfAsking": 1.00,
+  "openingWageMultiplier": 1.05,
+  "ratchetMaxAttempts": 1,
+  "ratchetStepPct": 0.0,
+  "abandonAtPctOfAsking": 1.05,
+  "maxActiveBids": 2,
+  "minCashFloorCents": 30000000,
+  "extendWhenSeasonsLeftLte": 1,
+  "extendMaxAge": 28,
+  "extendWageMultiplier": 1.05,
+  "extendSeasons": 3,
+  "backfillEnabled": true,
+  "pursueUnlistedPremium": 1.5
+}

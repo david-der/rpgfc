@@ -1,14 +1,11 @@
-// Season simulator — drives a full season with each of 10 clubs
-// under the control of a distinct persona, then writes a rich
-// markdown evidence report.
+// Season simulator — drives a full season with each of N clubs under
+// the control of a JSON-defined strategy, then writes a markdown
+// evidence report.
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { PlayingTimeRole } from "@rpgfc/shared";
-import {
-  FEE_TIER_MIDPOINT_CENTS,
-  WAGE_TIER_MIDPOINT_CENTS,
-} from "@rpgfc/shared";
+import { feeTierFor, wageTierFor } from "@rpgfc/shared";
 
 import { createDbClient, type DbClient } from "../db/client.js";
 import { runMigrations } from "../db/migrate.js";
@@ -29,19 +26,22 @@ import {
 import { advanceMatchday } from "../application/season/advance.js";
 import { submitBid } from "../application/transfers/bids.js";
 import { extendContract } from "../application/transfers/extend-contract.js";
+import { estimateValueCents } from "../application/transfers/valuations.js";
 import { computeLeagueTable } from "../rendering/league-table.js";
 
 import {
-  PERSONA_ROSTER,
   type ClubSnapshot,
   type ListingSnapshot,
   type OwnedPlayerSnapshot,
   type Persona,
   type PersonaContext,
 } from "./personas.js";
+import { loadAllStrategies, strategyToPersona } from "./strategy-engine.js";
 
 const REFERENCE_DATE = new Date("2026-06-01T00:00:00Z");
 const TOTAL_MATCH_WEEKS = 18; // 10 clubs → 2 × 9 = 18 full-season weeks.
+
+type PositionFamily = "gk" | "defender" | "midfielder" | "forward";
 
 // ── event log shapes ─────────────────────────────────────────────────────
 
@@ -58,10 +58,13 @@ interface TransferAttempt {
   byClub: string;
   byPersona: string;
   playerName: string;
+  feeCents: number;
+  wageCents: number;
   feeTier: string;
   wageTier: string;
+  pctOfAsking: number;
   rolePromise: string;
-  outcome: string; // final state after season
+  outcome: string;
 }
 
 interface ExtensionAttempt {
@@ -85,10 +88,18 @@ interface WeekSnapshot {
 
 // ── snapshot loaders ─────────────────────────────────────────────────────
 
+function positionFamilyFromArchetype(archetypeId: string): PositionFamily {
+  const id = archetypeId.toLowerCase();
+  if (id.includes("gk") || id.includes("keeper")) return "gk";
+  if (id.includes("striker") || id.includes("forward")) return "forward";
+  if (id.includes("winger") || id.includes("wing")) return "forward";
+  if (id.includes("mid") || id.includes("cm")) return "midfielder";
+  return "defender";
+}
+
 function loadClubSnapshot(
   db: DbClient,
   clubId: number,
-  _season: number,
   lastResult: Map<number, "W" | "D" | "L" | null>,
 ): ClubSnapshot {
   if (db.dialect !== "sqlite") throw new Error("sqlite only");
@@ -123,9 +134,6 @@ function loadClubSnapshot(
     )
     .get(clubId);
 
-  const table = /* cached */ undefined;
-  const _cached = table; // unused, kept for clarity
-  void _cached;
   return {
     clubId: row.id,
     clubName: row.name,
@@ -134,14 +142,17 @@ function loadClubSnapshot(
     wageBillCents: Number(wage?.total ?? 0),
     wageBudgetCents: row.wage_budget_cents_per_week,
     squadSize: squad?.n ?? 0,
-    leaguePosition: 0, // filled in after computing table
+    leaguePosition: 0,
     lastResult: lastResult.get(clubId) ?? null,
   };
 }
 
 function loadListings(db: DbClient, excludeClubId: number): ListingSnapshot[] {
   if (db.dialect !== "sqlite") return [];
-  return db.sqlite
+  // Load ALL other-club players, not just those in the listing table.
+  // Unlisted players are valid targets for unsolicited inquiries —
+  // strategies that pursue them pay a premium over the implied value.
+  const rows = db.sqlite
     .prepare<
       [number],
       {
@@ -149,34 +160,81 @@ function loadListings(db: DbClient, excludeClubId: number): ListingSnapshot[] {
         player_name: string;
         club_id: number;
         archetype_id: string;
-        asking_price_cents: number;
-        dob: string;
+        experience_years: number;
+        listing_asking: number | null;
+        age: number;
         badge_count: number;
         tier: string | null;
+        current_wage: number | null;
+        wage_floor: number | null;
+        regions_json: string | null;
+        min_playing_time: string | null;
       }
     >(
-      `SELECT l.player_id, p.name AS player_name, p.club_id,
-              p.archetype_id, l.asking_price_cents, p.dob,
+      `SELECT p.id AS player_id, p.name AS player_name, p.club_id,
+              p.archetype_id, p.experience_years, p.age,
+              l.asking_price_cents AS listing_asking,
               (SELECT COUNT(*) FROM player_badges b WHERE b.player_id = p.id) AS badge_count,
               (SELECT pmp.tier FROM player_match_performance pmp
                JOIN matches m ON m.id = pmp.match_id
                WHERE pmp.player_id = p.id AND m.state = 'Played'
-               ORDER BY m.matchday DESC LIMIT 1) AS tier
-       FROM listing l
-       JOIN players p ON p.id = l.player_id
-       WHERE p.club_id != ?`,
+               ORDER BY m.matchday DESC LIMIT 1) AS tier,
+              (SELECT c.weekly_wage_cents FROM contracts c WHERE c.player_id = p.id) AS current_wage,
+              (SELECT pp.wage_floor_cents FROM player_preferences pp WHERE pp.player_id = p.id) AS wage_floor,
+              (SELECT pp.preferred_regions_json FROM player_preferences pp WHERE pp.player_id = p.id) AS regions_json,
+              (SELECT pp.min_playing_time FROM player_preferences pp WHERE pp.player_id = p.id) AS min_playing_time
+       FROM players p
+       LEFT JOIN listing l ON l.player_id = p.id
+       WHERE p.club_id IS NOT NULL AND p.club_id != ?`,
     )
-    .all(excludeClubId)
-    .map((r) => ({
+    .all(excludeClubId);
+
+  return rows.map((r) => {
+    let regions: string[] = [];
+    try {
+      regions = r.regions_json ? (JSON.parse(r.regions_json) as string[]) : [];
+    } catch { /* ignore */ }
+    const isListed = r.listing_asking !== null;
+    const badgeKeys = db.sqlite
+      .prepare<[number], { badge_key: string }>(
+        `SELECT badge_key FROM player_badges WHERE player_id = ?`,
+      )
+      .all(r.player_id)
+      .map((b) => b.badge_key);
+    const askingPriceCents = isListed
+      ? (r.listing_asking as number)
+      : estimateValueCents({
+          name: r.player_name,
+          archetypeId: r.archetype_id,
+          experienceYears: r.experience_years,
+          badgeKeys,
+        });
+    return {
       playerId: r.player_id,
       playerName: r.player_name,
       clubId: r.club_id,
       positionFamily: positionFamilyFromArchetype(r.archetype_id),
-      askingPriceCents: r.asking_price_cents,
-      age: ageFromDob(r.dob),
+      askingPriceCents,
+      isListed,
+      currentWageCents: r.current_wage ?? 0,
+      wageFloorCents: r.wage_floor ?? 0,
+      age: r.age,
       badgeCount: Number(r.badge_count),
       formTier: r.tier,
-    }));
+      preferredRegions: regions,
+      minPlayingTime: (r.min_playing_time ?? "Important Player") as PlayingTimeRole,
+    };
+  });
+}
+
+function loadClubNationality(db: DbClient, clubId: number): string {
+  if (db.dialect !== "sqlite") return "";
+  const row = db.sqlite
+    .prepare<[number], { nationality: string }>(
+      `SELECT nationality FROM clubs WHERE id = ?`,
+    )
+    .get(clubId);
+  return row?.nationality ?? "";
 }
 
 function loadOwnedPlayers(db: DbClient, clubId: number): OwnedPlayerSnapshot[] {
@@ -187,7 +245,8 @@ function loadOwnedPlayers(db: DbClient, clubId: number): OwnedPlayerSnapshot[] {
       {
         player_id: number;
         player_name: string;
-        dob: string;
+        age: number;
+        archetype_id: string;
         seasons_remaining: number | null;
         weekly_wage_cents: number | null;
         role_promise: string | null;
@@ -195,7 +254,7 @@ function loadOwnedPlayers(db: DbClient, clubId: number): OwnedPlayerSnapshot[] {
         tier: string | null;
       }
     >(
-      `SELECT p.id AS player_id, p.name AS player_name, p.dob,
+      `SELECT p.id AS player_id, p.name AS player_name, p.age, p.archetype_id,
               c.seasons_remaining, c.weekly_wage_cents, c.role_promise,
               s.role AS squad_role,
               (SELECT pmp.tier FROM player_match_performance pmp
@@ -211,33 +270,34 @@ function loadOwnedPlayers(db: DbClient, clubId: number): OwnedPlayerSnapshot[] {
     .map((r) => ({
       playerId: r.player_id,
       playerName: r.player_name,
-      age: ageFromDob(r.dob),
+      age: r.age,
       seasonsRemaining: r.seasons_remaining ?? 0,
       weeklyWageCents: r.weekly_wage_cents ?? 0,
       rolePromise: (r.role_promise ?? "Important Player") as PlayingTimeRole,
       formTier: r.tier,
       squadRole: r.squad_role,
+      positionFamily: positionFamilyFromArchetype(r.archetype_id),
     }));
 }
 
-function ageFromDob(dob: string): number {
-  const birth = new Date(dob + "T00:00:00Z");
-  const now = REFERENCE_DATE;
-  let age = now.getUTCFullYear() - birth.getUTCFullYear();
-  const m = now.getUTCMonth() - birth.getUTCMonth();
-  if (m < 0 || (m === 0 && now.getUTCDate() < birth.getUTCDate())) age -= 1;
-  return age;
-}
-
-function positionFamilyFromArchetype(
-  archetypeId: string,
-): "gk" | "defender" | "midfielder" | "forward" {
-  const id = archetypeId.toLowerCase();
-  if (id.includes("gk") || id.includes("keeper")) return "gk";
-  if (id.includes("striker") || id.includes("forward")) return "forward";
-  if (id.includes("winger") || id.includes("wing")) return "forward";
-  if (id.includes("mid") || id.includes("cm")) return "midfielder";
-  return "defender";
+function loadSquadByPosition(
+  db: DbClient,
+  clubId: number,
+): Record<PositionFamily, number> {
+  const counts: Record<PositionFamily, number> = {
+    gk: 0,
+    defender: 0,
+    midfielder: 0,
+    forward: 0,
+  };
+  if (db.dialect !== "sqlite") return counts;
+  const rows = db.sqlite
+    .prepare<[number], { archetype_id: string }>(
+      `SELECT archetype_id FROM players WHERE club_id = ?`,
+    )
+    .all(clubId);
+  for (const r of rows) counts[positionFamilyFromArchetype(r.archetype_id)] += 1;
+  return counts;
 }
 
 // ── harness ──────────────────────────────────────────────────────────────
@@ -245,47 +305,79 @@ function positionFamilyFromArchetype(
 export interface HarnessResult {
   reportMarkdown: string;
   reportPath: string;
+  /** Stats available to the iteration runner for cross-iteration comparison. */
+  stats: SeasonStats;
+}
+
+export interface SeasonStats {
+  totalSigned: number;
+  totalRejected: number;
+  clubsWithAtLeastOneSigning: number;
+  totalClubs: number;
+  extensionsAccepted: number;
+  extensionsRejected: number;
+  topPoints: number;
+  bottomPoints: number;
+  pointsSpread: number;
+  champion: string;
+  goldenBoot: string;
+  goldenBootGoals: number;
+  clubsInNegativeCash: number;
+  /** Total transfers attempted by personas (not engine AI bids). */
+  totalAttempts: number;
+  /** Comma-separated count of each rejection reason, e.g. "PLAYER_WAGE_FLOOR=12, ...". */
+  rejectionBreakdown: string;
 }
 
 export async function runSeasonSim(options: {
   dbPath: string;
   reportDir: string;
   seed?: number;
+  reportLabel?: string;
 }): Promise<HarnessResult> {
   const db = createDbClient(`sqlite:${options.dbPath}`);
   try {
+    await runMigrations(db);
+    await seedContentIfMissing(db);
+    await seedWorldIfEmpty(db, {
+      seed: options.seed ?? 42,
+      clubCount: 10,
+      playersPerClub: 20,
+      referenceDate: REFERENCE_DATE,
+    });
+    await seedClubIdentityIfMissing(db);
+    await seedListingsIfEmpty(db);
+    await seedPreferencesIfEmpty(db);
+    await seedTacticsIfEmpty(db);
+    await seedSquadIfEmpty(db);
+    await seedContractsIfEmpty(db);
+    await seedFixturesIfEmpty(db);
+    await ensureSaveState(db);
     return await runOnDb(db, options);
   } finally {
     if (db.dialect === "sqlite") db.close();
   }
 }
 
+/** Run a single season against an already-open, already-seeded DB. */
+export async function runSeasonOn(
+  db: DbClient,
+  options: { reportDir: string; reportLabel?: string },
+): Promise<SeasonStats> {
+  const result = await runOnDb(db, { dbPath: "", ...options });
+  return result.stats;
+}
+
 async function runOnDb(
   db: DbClient,
-  options: { dbPath: string; reportDir: string; seed?: number },
+  options: { dbPath: string; reportDir: string; seed?: number; reportLabel?: string },
 ): Promise<HarnessResult> {
-  await runMigrations(db);
-  await seedContentIfMissing(db);
-  await seedWorldIfEmpty(db, {
-    seed: options.seed ?? 42,
-    clubCount: 10,
-    playersPerClub: 20,
-    referenceDate: REFERENCE_DATE,
-  });
-  await seedClubIdentityIfMissing(db);
-  await seedListingsIfEmpty(db);
-  await seedPreferencesIfEmpty(db);
-  await seedTacticsIfEmpty(db);
-  await seedSquadIfEmpty(db);
-  await seedContractsIfEmpty(db);
-  await seedFixturesIfEmpty(db);
-  await ensureSaveState(db);
-
   if (db.dialect !== "sqlite") {
     throw new Error("Harness requires sqlite for now");
   }
 
-  // Map each club (id asc) to a persona from the roster.
+  // Build a persona for every club from the strategies/ folder.
+  const strategies = loadAllStrategies();
   const clubRows = db.sqlite
     .prepare<[], { id: number; name: string }>(
       `SELECT id, name FROM clubs ORDER BY id`,
@@ -294,9 +386,10 @@ async function runOnDb(
   const personaByClub = new Map<number, Persona>();
   const personaByClubName: Array<{ club: string; persona: Persona }> = [];
   clubRows.forEach((c, i) => {
-    const p = PERSONA_ROSTER[i % PERSONA_ROSTER.length]!;
-    personaByClub.set(c.id, p);
-    personaByClubName.push({ club: c.name, persona: p });
+    const strategy = strategies[i % strategies.length]!;
+    const persona = strategyToPersona(strategy);
+    personaByClub.set(c.id, persona);
+    personaByClubName.push({ club: c.name, persona });
   });
 
   const transferAttempts: TransferAttempt[] = [];
@@ -304,17 +397,44 @@ async function runOnDb(
   const weekSnapshots: WeekSnapshot[] = [];
   const lastResultByClub = new Map<number, "W" | "D" | "L" | null>();
 
-  // Each match week: personas decide → bids/extensions applied →
-  // advanceMatchday runs (which plays fixtures, ticks finance, ticks
-  // bids, generates AI bids).
+  // Per-club memory carried across match weeks.
+  const rejectedBidsByClub = new Map<number, Set<number>>();
+  const bidAttemptsByClub = new Map<number, Map<number, number>>();
+  const extensionRejectionsByClub = new Map<number, Map<number, number>>();
+  const backfillByClub = new Map<number, Set<PositionFamily>>();
+  const lastSquadByPosition = new Map<number, Record<PositionFamily, number>>();
+  // Per-season signing counter — incremented after a bid resolves to
+  // Signed. Reset when a new season starts (this harness run = one season).
+  const signingsThisSeasonByClub = new Map<number, number>();
+  const seenSignedBidIds = new Set<number>(
+    db.sqlite
+      .prepare<[], { id: number }>(`SELECT id FROM bids WHERE state = 'Signed'`)
+      .all()
+      .map((r) => r.id),
+  );
+  for (const clubId of personaByClub.keys()) {
+    lastSquadByPosition.set(clubId, loadSquadByPosition(db, clubId));
+  }
+
   for (let week = 1; week <= TOTAL_MATCH_WEEKS; week++) {
     let bidsPlaced = 0;
     let extensionsAttempted = 0;
 
     for (const [clubId, persona] of personaByClub) {
-      const club = loadClubSnapshot(db, clubId, 0, lastResultByClub);
+      const club = loadClubSnapshot(db, clubId, lastResultByClub);
       const ownedPlayers = loadOwnedPlayers(db, clubId);
       const marketListings = loadListings(db, clubId);
+
+      const activeBidPlayers = new Set<number>(
+        db.sqlite
+          .prepare<[number], { player_id: number }>(
+            `SELECT player_id FROM bids
+             WHERE from_club_id = ?
+               AND state NOT IN ('Signed', 'SellerRejected', 'PlayerRejected', 'Expired', 'Cancelled')`,
+          )
+          .all(clubId)
+          .map((r) => r.player_id),
+      );
 
       const ctx: PersonaContext = {
         matchWeek: week,
@@ -322,6 +442,17 @@ async function runOnDb(
         club,
         ownedPlayers,
         marketListings,
+        playersWithActiveBid: activeBidPlayers,
+        playersRecentlyRejected:
+          rejectedBidsByClub.get(clubId) ?? new Set<number>(),
+        playerBidAttempts:
+          bidAttemptsByClub.get(clubId) ?? new Map<number, number>(),
+        extensionRejections:
+          extensionRejectionsByClub.get(clubId) ?? new Map<number, number>(),
+        priorityBackfillPositions:
+          backfillByClub.get(clubId) ?? new Set<PositionFamily>(),
+        clubNationality: loadClubNationality(db, clubId),
+        signingsThisSeason: signingsThisSeasonByClub.get(clubId) ?? 0,
       };
 
       const actions = persona.decide(ctx);
@@ -332,48 +463,56 @@ async function runOnDb(
             await submitBid(db, {
               playerId: action.playerId,
               fromClubId: clubId,
-              feeCents: FEE_TIER_MIDPOINT_CENTS[action.feeTier],
-              wageCents: WAGE_TIER_MIDPOINT_CENTS[action.wageTier],
+              feeCents: action.feeCents,
+              wageCents: action.wageCents,
               signingBonusCents: 0,
               rolePromise: action.rolePromise,
               matchWeek: week,
             });
             bidsPlaced++;
-            const playerName =
-              marketListings.find((l) => l.playerId === action.playerId)
-                ?.playerName ?? `#${action.playerId}`;
+            const listing = marketListings.find((l) => l.playerId === action.playerId);
+            const playerName = listing?.playerName ?? `#${action.playerId}`;
+            const asking = listing?.askingPriceCents ?? 0;
             transferAttempts.push({
               matchweek: week,
               byClub: club.clubName,
               byPersona: persona.name,
               playerName,
-              feeTier: action.feeTier,
-              wageTier: action.wageTier,
+              feeCents: action.feeCents,
+              wageCents: action.wageCents,
+              feeTier: feeTierFor(action.feeCents),
+              wageTier: wageTierFor(action.wageCents),
+              pctOfAsking: asking > 0 ? action.feeCents / asking : 0,
               rolePromise: action.rolePromise,
               outcome: "Submitted",
             });
+            // Bump the attempts counter so the next week's strategy
+            // either ratchets or abandons.
+            const attempts = ctx.playerBidAttempts;
+            attempts.set(action.playerId, (attempts.get(action.playerId) ?? 0) + 1);
+            bidAttemptsByClub.set(clubId, attempts);
           } catch {
-            // Silent skip — self-bid, already-bid, etc.
+            // Silent skip — server-side dedup or affordability guard.
           }
         } else {
           const result = await extendContract(db, {
             playerId: action.playerId,
             clubId,
-            wageCents: WAGE_TIER_MIDPOINT_CENTS[action.wageTier],
+            wageCents: action.wageCents,
             signingBonusCents: 0,
             seasons: action.seasons,
             rolePromise: action.rolePromise,
           });
           extensionsAttempted++;
           const playerName =
-            ownedPlayers.find((p) => p.playerId === action.playerId)
-              ?.playerName ?? `#${action.playerId}`;
+            ownedPlayers.find((p) => p.playerId === action.playerId)?.playerName ??
+            `#${action.playerId}`;
           extensionAttempts.push({
             matchweek: week,
             byClub: club.clubName,
             byPersona: persona.name,
             playerName,
-            wageTier: action.wageTier,
+            wageTier: wageTierFor(action.wageCents),
             seasons: action.seasons,
             outcome:
               result.kind === "accept"
@@ -387,15 +526,89 @@ async function runOnDb(
                 ? { note: result.message }
                 : {}),
           });
+          if (result.kind === "reject") {
+            const ext = ctx.extensionRejections;
+            ext.set(action.playerId, (ext.get(action.playerId) ?? 0) + 1);
+            extensionRejectionsByClub.set(clubId, ext);
+          }
         }
       }
     }
 
-    // Advance the match week — plays fixtures, ticks bids, finance, AI bids.
-    const advance = await advanceMatchday(db, { now: REFERENCE_DATE });
+    // Skip engine AI bids — strategies drive every club.
+    const advance = await advanceMatchday(db, {
+      now: REFERENCE_DATE,
+      skipAiBids: true,
+    });
     if (advance.matchday === null) break;
 
-    // Load this week's results for the log.
+    // Increment per-club signing counter by looking at what was newly
+    // Signed during this matchday tick.
+    const allSigned = db.sqlite
+      .prepare<[], { id: number; from_club_id: number }>(
+        `SELECT id, from_club_id FROM bids WHERE state = 'Signed'`,
+      )
+      .all();
+    for (const r of allSigned) {
+      if (seenSignedBidIds.has(r.id)) continue;
+      seenSignedBidIds.add(r.id);
+      signingsThisSeasonByClub.set(
+        r.from_club_id,
+        (signingsThisSeasonByClub.get(r.from_club_id) ?? 0) + 1,
+      );
+    }
+
+    // ── post-tick housekeeping ─────────────────────────────────────────
+
+    // Players we should give up on (ratchet exhausted = bid-attempts hit
+    // the per-strategy max but the bid is now in a rejected state).
+    const allRejected = db.sqlite
+      .prepare<[], { from_club_id: number; player_id: number }>(
+        `SELECT from_club_id, player_id FROM bids
+         WHERE state IN ('SellerRejected', 'PlayerRejected', 'Expired', 'Cancelled')`,
+      )
+      .all();
+    for (const r of allRejected) {
+      let rs = rejectedBidsByClub.get(r.from_club_id);
+      if (!rs) {
+        rs = new Set();
+        rejectedBidsByClub.set(r.from_club_id, rs);
+      }
+      // Only mark abandoned once we've hit the strategy's ratchet ceiling
+      // (which the engine encodes by stopping bids once attempts == max).
+      const attempts = bidAttemptsByClub.get(r.from_club_id)?.get(r.player_id) ?? 0;
+      // 3 is the max ratchetMaxAttempts across strategies; the engine
+      // also gates this internally. Safe to mark on first rejection if
+      // the strategy chooses not to re-bid — strategy.decide() will
+      // simply not pick the player again.
+      if (attempts >= 3) rs.add(r.player_id);
+    }
+
+    // Backfill detection: compare squad position counts to the snapshot
+    // taken at the start of the previous tick.
+    for (const clubId of personaByClub.keys()) {
+      const before = lastSquadByPosition.get(clubId)!;
+      const after = loadSquadByPosition(db, clubId);
+      const lost = new Set<PositionFamily>();
+      (Object.keys(after) as PositionFamily[]).forEach((pos) => {
+        if (after[pos] < before[pos]) lost.add(pos);
+      });
+      if (lost.size > 0) {
+        const existing = backfillByClub.get(clubId) ?? new Set<PositionFamily>();
+        for (const p of lost) existing.add(p);
+        backfillByClub.set(clubId, existing);
+      }
+      // Clear backfill flags for positions that have been refilled.
+      const cleared = backfillByClub.get(clubId);
+      if (cleared) {
+        for (const pos of [...cleared]) {
+          if (after[pos] >= before[pos]) cleared.delete(pos);
+        }
+      }
+      lastSquadByPosition.set(clubId, after);
+    }
+
+    // Match log + standings.
     const matchRows = db.sqlite
       .prepare<[number], { home_name: string; away_name: string; home_goals: number; away_goals: number; home_id: number; away_id: number }>(
         `SELECT hc.name AS home_name, ac.name AS away_name,
@@ -416,7 +629,6 @@ async function runOnDb(
       awayGoals: r.away_goals,
     }));
 
-    // Update last result per club.
     for (const m of matchRows) {
       if (m.home_goals > m.away_goals) {
         lastResultByClub.set(m.home_id, "W");
@@ -447,29 +659,44 @@ async function runOnDb(
     });
   }
 
-  // Resolve final transfer outcomes by reading current bid states.
+  // ── final outcome stats ─────────────────────────────────────────────
+
   const bidStates = db.sqlite
     .prepare<
       [],
-      { from_club: string; player: string; state: string; week: number | null }
+      { from_club: string; player: string; state: string; reason: string | null }
     >(
       `SELECT fc.name AS from_club, p.name AS player, b.state,
-              b.submitted_match_week AS week
+              b.rejection_reason AS reason
        FROM bids b
        JOIN players p ON p.id = b.player_id
        JOIN clubs fc ON fc.id = b.from_club_id`,
     )
     .all();
-  const stateBy = new Map<string, string>();
+  const stateBy = new Map<string, { state: string; reason: string | null }>();
   for (const r of bidStates) {
-    stateBy.set(`${r.from_club}:${r.player}`, r.state);
+    stateBy.set(`${r.from_club}:${r.player}`, { state: r.state, reason: r.reason });
   }
   for (const t of transferAttempts) {
     const resolved = stateBy.get(`${t.byClub}:${t.playerName}`);
-    if (resolved) t.outcome = resolved;
+    if (resolved) {
+      t.outcome = resolved.reason
+        ? `${resolved.state} (${resolved.reason})`
+        : resolved.state;
+    }
   }
 
-  // Final stats: goals leaders, most assists, best tier count per player.
+  // Aggregate rejection reasons for the headline.
+  const reasonCounts = new Map<string, number>();
+  for (const t of transferAttempts) {
+    const m = t.outcome.match(/\(([A-Z_]+)\)/);
+    if (m) reasonCounts.set(m[1]!, (reasonCounts.get(m[1]!) ?? 0) + 1);
+  }
+  const reasonLines = [...reasonCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, v]) => `${k}=${v}`)
+    .join(", ");
+
   const goalLeaders = db.sqlite
     .prepare<
       [],
@@ -484,20 +711,6 @@ async function runOnDb(
        GROUP BY p.id
        HAVING SUM(pmp.goals) > 0
        ORDER BY goals DESC, assists DESC
-       LIMIT 10`,
-    )
-    .all();
-
-  const topXg = db.sqlite
-    .prepare<[], { player: string; club: string; xg: number; shots: number }>(
-      `SELECT p.name AS player, c.name AS club,
-              SUM(pmp.xg_x100) / 100.0 AS xg,
-              SUM(pmp.shots) AS shots
-       FROM player_match_performance pmp
-       JOIN players p ON p.id = pmp.player_id
-       JOIN clubs c ON c.id = pmp.club_id
-       GROUP BY p.id
-       ORDER BY xg DESC
        LIMIT 10`,
     )
     .all();
@@ -528,7 +741,6 @@ async function runOnDb(
 
   const finalTable = await computeLeagueTable(db, 0);
 
-  // Finance snapshot per club.
   const finances = db.sqlite
     .prepare<
       [],
@@ -550,25 +762,56 @@ async function runOnDb(
     )
     .all();
 
-  // ── write the report ─────────────────────────────────────────────────────
+  // Cross-iteration stats.
+  const totalSigned = clubTransferSummary.reduce((s, c) => s + c.signed, 0);
+  const totalRejected = clubTransferSummary.reduce((s, c) => s + c.rejected, 0);
+  const clubsWithAtLeastOneSigning = clubTransferSummary.filter((c) => c.signed > 0).length;
+  const extensionsAccepted = extensionAttempts.filter((e) => e.outcome === "accepted").length;
+  const extensionsRejected = extensionAttempts.filter((e) => e.outcome === "rejected").length;
+  const topPoints = finalTable[0]?.points ?? 0;
+  const bottomPoints = finalTable[finalTable.length - 1]?.points ?? 0;
+  const champion = finalTable[0]?.clubName ?? "";
+  const golden = goalLeaders[0];
+  const stats: SeasonStats = {
+    totalSigned,
+    totalRejected,
+    clubsWithAtLeastOneSigning,
+    totalClubs: personaByClub.size,
+    extensionsAccepted,
+    extensionsRejected,
+    topPoints,
+    bottomPoints,
+    pointsSpread: topPoints - bottomPoints,
+    champion,
+    goldenBoot: golden?.player ?? "",
+    goldenBootGoals: golden?.goals ?? 0,
+    clubsInNegativeCash: finances.filter((f) => f.cash < 0).length,
+    totalAttempts: transferAttempts.length,
+    rejectionBreakdown: reasonLines,
+  };
+
   const md = renderReport({
+    ...(options.reportLabel ? { label: options.reportLabel } : {}),
     personaByClubName,
     weekSnapshots,
     transferAttempts,
     extensionAttempts,
     goalLeaders,
-    topXg,
     clubTransferSummary,
     finalTable,
     finances,
+    stats,
   });
 
   mkdirSync(options.reportDir, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  const path = join(options.reportDir, `season-0-${stamp}.md`);
+  const fname = options.reportLabel
+    ? `season-${options.reportLabel}-${stamp}.md`
+    : `season-0-${stamp}.md`;
+  const path = join(options.reportDir, fname);
   writeFileSync(path, md, "utf8");
 
-  return { reportMarkdown: md, reportPath: path };
+  return { reportMarkdown: md, reportPath: path, stats };
 }
 
 // ── report renderer ─────────────────────────────────────────────────────
@@ -583,12 +826,12 @@ function formatCents(cents: number): string {
 }
 
 interface ReportInput {
+  label?: string;
   personaByClubName: Array<{ club: string; persona: Persona }>;
   weekSnapshots: WeekSnapshot[];
   transferAttempts: TransferAttempt[];
   extensionAttempts: ExtensionAttempt[];
   goalLeaders: Array<{ player: string; club: string; goals: number; assists: number }>;
-  topXg: Array<{ player: string; club: string; xg: number; shots: number }>;
   clubTransferSummary: Array<{
     club: string;
     signed: number;
@@ -615,26 +858,38 @@ interface ReportInput {
     revenue: number;
     expense: number;
   }>;
+  stats: SeasonStats;
 }
 
 function renderReport(input: ReportInput): string {
   const lines: string[] = [];
-  lines.push("# Season 0 Simulation Report");
+  lines.push(`# Season Simulation Report${input.label ? ` — ${input.label}` : ""}`);
   lines.push("");
   lines.push(`Generated: ${new Date().toISOString()}`);
   lines.push("");
 
-  // Persona assignments
+  lines.push("## Headline stats");
+  lines.push("");
+  lines.push(`- Signed: **${input.stats.totalSigned}** across ${input.stats.totalClubs} clubs (${input.stats.clubsWithAtLeastOneSigning} clubs signed at least one)`);
+  lines.push(`- Rejected: ${input.stats.totalRejected} of ${input.stats.totalAttempts} attempts`);
+  lines.push(`- Extensions: **${input.stats.extensionsAccepted} accepted**, ${input.stats.extensionsRejected} rejected`);
+  lines.push(`- Champion: **${input.stats.champion}** (${input.stats.topPoints} pts), spread ${input.stats.pointsSpread} pts`);
+  lines.push(`- Golden boot: **${input.stats.goldenBoot}** (${input.stats.goldenBootGoals})`);
+  lines.push(`- Clubs in the red: ${input.stats.clubsInNegativeCash}`);
+  if (input.stats.rejectionBreakdown) {
+    lines.push(`- Rejection reasons: ${input.stats.rejectionBreakdown}`);
+  }
+  lines.push("");
+
   lines.push("## Persona assignments");
   lines.push("");
-  lines.push("| Club | Persona | Strategy |");
+  lines.push("| Club | Strategy | Tagline |");
   lines.push("|---|---|---|");
   for (const p of input.personaByClubName) {
     lines.push(`| ${p.club} | ${p.persona.name} | ${p.persona.tagline} |`);
   }
   lines.push("");
 
-  // Final table
   lines.push("## Final league table");
   lines.push("");
   lines.push("| # | Club | P | W | D | L | GF | GA | GD | Pts |");
@@ -646,7 +901,61 @@ function renderReport(input: ReportInput): string {
   });
   lines.push("");
 
-  // Week-by-week
+  lines.push("## Club transfer summary");
+  lines.push("");
+  lines.push("| Club | Signed | Rejected | Expired | Pending |");
+  lines.push("|---|---|---|---|---|");
+  for (const c of input.clubTransferSummary) {
+    lines.push(`| ${c.club} | ${c.signed} | ${c.rejected} | ${c.expired} | ${c.pending} |`);
+  }
+  lines.push("");
+
+  lines.push("## Transfer attempts (persona-initiated)");
+  lines.push("");
+  lines.push("| Wk | Club | Player | Fee | %Asking | Wage | Role | Outcome |");
+  lines.push("|---|---|---|---|---|---|---|---|");
+  for (const t of input.transferAttempts) {
+    lines.push(
+      `| ${t.matchweek} | ${t.byClub} | ${t.playerName} | ${formatCents(t.feeCents)} (${t.feeTier}) | ${(t.pctOfAsking * 100).toFixed(0)}% | ${formatCents(t.wageCents)} (${t.wageTier}) | ${t.rolePromise} | ${t.outcome} |`,
+    );
+  }
+  lines.push("");
+
+  lines.push("## Contract extension attempts");
+  lines.push("");
+  if (input.extensionAttempts.length === 0) {
+    lines.push("_No extension attempts this season._");
+  } else {
+    lines.push("| Wk | Club | Player | Wage | Seasons | Outcome | Note |");
+    lines.push("|---|---|---|---|---|---|---|");
+    for (const e of input.extensionAttempts) {
+      lines.push(
+        `| ${e.matchweek} | ${e.byClub} | ${e.playerName} | ${e.wageTier} | ${e.seasons} | ${e.outcome} | ${e.note ?? ""} |`,
+      );
+    }
+  }
+  lines.push("");
+
+  lines.push("## Top scorers");
+  lines.push("");
+  lines.push("| # | Player | Club | Goals | Assists |");
+  lines.push("|---|---|---|---|---|");
+  input.goalLeaders.forEach((p, i) => {
+    lines.push(`| ${i + 1} | ${p.player} | ${p.club} | ${p.goals} | ${p.assists} |`);
+  });
+  lines.push("");
+
+  lines.push("## End-of-season finances");
+  lines.push("");
+  lines.push("| Club | Cash | Weekly wages | Revenue | Expense |");
+  lines.push("|---|---|---|---|---|");
+  for (const f of input.finances) {
+    lines.push(
+      `| ${f.club} | ${formatCents(f.cash)} | ${formatCents(f.wages)} | ${formatCents(f.revenue)} | ${formatCents(f.expense)} |`,
+    );
+  }
+  lines.push("");
+
   lines.push("## Match week log");
   lines.push("");
   for (const w of input.weekSnapshots) {
@@ -657,128 +966,9 @@ function renderReport(input: ReportInput): string {
     }
     lines.push("");
     lines.push(
-      `Bids this week: ${w.bidsPlaced} · Extensions attempted: ${w.extensionsAttempted}`,
+      `Bids: ${w.bidsPlaced} · Extensions: ${w.extensionsAttempted}`,
     );
-    if (w.tableTop3.length > 0) {
-      lines.push(
-        `Table: 1. ${w.tableTop3[0]?.club} (${w.tableTop3[0]?.pts}) · 2. ${w.tableTop3[1]?.club} (${w.tableTop3[1]?.pts}) · 3. ${w.tableTop3[2]?.club} (${w.tableTop3[2]?.pts})`,
-      );
-    }
     lines.push("");
   }
-
-  // Transfer log
-  lines.push("## Transfer attempts (persona-initiated)");
-  lines.push("");
-  lines.push("| Week | Club | Persona | Player | Fee | Wage | Role | Final state |");
-  lines.push("|---|---|---|---|---|---|---|---|");
-  for (const t of input.transferAttempts) {
-    lines.push(
-      `| ${t.matchweek} | ${t.byClub} | ${t.byPersona} | ${t.playerName} | ${t.feeTier} | ${t.wageTier} | ${t.rolePromise} | ${t.outcome} |`,
-    );
-  }
-  lines.push("");
-
-  // Extensions
-  lines.push("## Contract extension attempts");
-  lines.push("");
-  if (input.extensionAttempts.length === 0) {
-    lines.push("_No extension attempts this season._");
-  } else {
-    lines.push("| Week | Club | Persona | Player | Wage | Seasons | Outcome | Note |");
-    lines.push("|---|---|---|---|---|---|---|---|");
-    for (const e of input.extensionAttempts) {
-      lines.push(
-        `| ${e.matchweek} | ${e.byClub} | ${e.byPersona} | ${e.playerName} | ${e.wageTier} | ${e.seasons} | ${e.outcome} | ${e.note ?? ""} |`,
-      );
-    }
-  }
-  lines.push("");
-
-  // Club transfer activity summary
-  lines.push("## Club transfer summary");
-  lines.push("");
-  lines.push("| Club | Signed | Rejected | Expired/Cancelled | Pending |");
-  lines.push("|---|---|---|---|---|");
-  for (const c of input.clubTransferSummary) {
-    lines.push(`| ${c.club} | ${c.signed} | ${c.rejected} | ${c.expired} | ${c.pending} |`);
-  }
-  lines.push("");
-
-  // Top scorers
-  lines.push("## Top scorers");
-  lines.push("");
-  lines.push("| # | Player | Club | Goals | Assists |");
-  lines.push("|---|---|---|---|---|");
-  input.goalLeaders.forEach((p, i) => {
-    lines.push(`| ${i + 1} | ${p.player} | ${p.club} | ${p.goals} | ${p.assists} |`);
-  });
-  lines.push("");
-
-  // xG leaders
-  lines.push("## xG leaders");
-  lines.push("");
-  lines.push("| # | Player | Club | xG | Shots |");
-  lines.push("|---|---|---|---|---|");
-  input.topXg.forEach((p, i) => {
-    lines.push(`| ${i + 1} | ${p.player} | ${p.club} | ${p.xg.toFixed(2)} | ${p.shots} |`);
-  });
-  lines.push("");
-
-  // Finances
-  lines.push("## End-of-season finances");
-  lines.push("");
-  lines.push("| Club | Cash | Weekly wages | Season revenue | Season expense |");
-  lines.push("|---|---|---|---|---|");
-  for (const f of input.finances) {
-    lines.push(
-      `| ${f.club} | ${formatCents(f.cash)} | ${formatCents(f.wages)} | ${formatCents(f.revenue)} | ${formatCents(f.expense)} |`,
-    );
-  }
-  lines.push("");
-
-  // Auto-generated lessons
-  lines.push("## Auto-generated observations");
-  lines.push("");
-  const signedTotal = input.clubTransferSummary.reduce((s, c) => s + c.signed, 0);
-  const rejectedTotal = input.clubTransferSummary.reduce((s, c) => s + c.rejected, 0);
-  const expiredTotal = input.clubTransferSummary.reduce((s, c) => s + c.expired, 0);
-  const pendingTotal = input.clubTransferSummary.reduce((s, c) => s + c.pending, 0);
-  lines.push(
-    `- Total transfers: **${signedTotal} signed**, ${rejectedTotal} rejected, ${expiredTotal} expired/cancelled, ${pendingTotal} still pending.`,
-  );
-  const extAccepted = input.extensionAttempts.filter((e) => e.outcome === "accepted").length;
-  const extRejected = input.extensionAttempts.filter((e) => e.outcome === "rejected").length;
-  lines.push(
-    `- Contract extensions: **${extAccepted} accepted**, ${extRejected} rejected out of ${input.extensionAttempts.length} attempts.`,
-  );
-  const topScorerGoals = input.goalLeaders[0]?.goals ?? 0;
-  if (topScorerGoals > 0) {
-    lines.push(
-      `- Golden boot: **${input.goalLeaders[0]!.player}** (${input.goalLeaders[0]!.club}) with ${topScorerGoals} goals in 18 matches.`,
-    );
-  }
-  const top = input.finalTable[0];
-  const bottom = input.finalTable[input.finalTable.length - 1];
-  if (top && bottom) {
-    lines.push(
-      `- Winner: **${top.clubName}** (${top.points} pts) · Wooden spoon: **${bottom.clubName}** (${bottom.points} pts). Spread: ${top.points - bottom.points} points.`,
-    );
-  }
-  const cashRich = input.finances.reduce((a, b) => (b.cash > a.cash ? b : a), input.finances[0]!);
-  const cashPoor = input.finances.reduce((a, b) => (b.cash < a.cash ? b : a), input.finances[0]!);
-  if (cashRich && cashPoor) {
-    lines.push(
-      `- Richest club: **${cashRich.club}** (${formatCents(cashRich.cash)}) · Poorest: **${cashPoor.club}** (${formatCents(cashPoor.cash)}).`,
-    );
-  }
-  // Flag if any club is in negative cash — indicates wage > revenue imbalance.
-  const negCash = input.finances.filter((f) => f.cash < 0);
-  if (negCash.length > 0) {
-    lines.push(
-      `- ⚠️  ${negCash.length} club(s) went into negative cash this season: ${negCash.map((c) => c.club).join(", ")}. Revenue/wage balance needs tuning.`,
-    );
-  }
-  lines.push("");
   return lines.join("\n");
 }

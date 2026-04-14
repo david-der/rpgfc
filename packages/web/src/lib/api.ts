@@ -12,6 +12,26 @@ import { hc } from "hono/client";
 // also correct. Passing "/" lets hc() build full paths like "/api/health".
 export const api = hc<AppType>("/");
 
+/** Read a friendly error message out of a failed Hono response.
+ *  Falls back to a human-sensible sentence if the server didn't send
+ *  our `{ error: { message } }` envelope. Never surfaces the HTTP
+ *  status code — that belongs in the network tab, not in the UI. */
+export async function readErrorMessage(res: Response, fallback: string): Promise<string> {
+  try {
+    const body = (await res.clone().json()) as { error?: { message?: string } } | undefined;
+    const msg = body?.error?.message;
+    if (typeof msg === "string" && msg.length > 0) return msg;
+  } catch {
+    // JSON parse failure — server returned plain text or nothing.
+  }
+  return fallback;
+}
+
+/** Throw a typed error whose `.message` is safe to show to the manager. */
+export async function throwFriendlyError(res: Response, fallback: string): Promise<never> {
+  throw new Error(await readErrorMessage(res, fallback));
+}
+
 // Convenience wrapper that unwraps the health response into a typed object.
 // Story 00 exposes only /api/health; more endpoints arrive in Story 01+.
 export async function fetchHealth() {
@@ -132,7 +152,9 @@ export async function addToWatchlist(playerId: number) {
   const res = await api.api.transfers.watchlist[":playerId"].$post({
     param: { playerId: String(playerId) },
   });
-  if (!res.ok) throw new Error(`watchlist add failed: ${res.status}`);
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res, "Could not add this player to your watchlist."));
+  }
   return res.json();
 }
 
@@ -140,7 +162,9 @@ export async function removeFromWatchlist(playerId: number) {
   const res = await api.api.transfers.watchlist[":playerId"].$delete({
     param: { playerId: String(playerId) },
   });
-  if (!res.ok) throw new Error(`watchlist remove failed: ${res.status}`);
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res, "Could not remove this player from your watchlist."));
+  }
   return res.json();
 }
 
@@ -178,7 +202,7 @@ export async function extendContract(body: {
 }) {
   const res = await api.api.club["extend-contract"].$post({ json: body });
   if (!res.ok) {
-    throw new Error(`extend-contract failed: ${res.status}`);
+    throw new Error(await readErrorMessage(res, "The extension offer could not be submitted."));
   }
   return res.json();
 }
@@ -205,7 +229,9 @@ export async function submitBid(
     param: { playerId },
     json: body,
   });
-  if (!res.ok) throw new Error(`bid submit failed: ${res.status}`);
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res, "Your bid could not be submitted."));
+  }
   return res.json();
 }
 
@@ -213,7 +239,9 @@ export async function forceAcceptBid(bidId: number) {
   const res = await api.api.transfers.bids[":bidId"]["force-accept"].$post({
     param: { bidId: String(bidId) },
   });
-  if (!res.ok) throw new Error(`force-accept failed: ${res.status}`);
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res, "Force-accept failed."));
+  }
   return res.json();
 }
 
@@ -306,7 +334,9 @@ export async function fetchFixtures() {
 
 export async function advanceMatchday() {
   const res = await api.api.season.advance.$post();
-  if (!res.ok) throw new Error(`advance failed: ${res.status}`);
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res, "Could not advance the match week."));
+  }
   return res.json();
 }
 
@@ -314,6 +344,14 @@ export async function fetchMatch(id: string) {
   const res = await api.api.matches[":id"].$get({ param: { id } });
   if (res.status === 404) throw new Error("Match not found");
   if (!res.ok) throw new Error(`match fetch failed: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchPlayerHistory(id: string) {
+  const res = await api.api.players[":id"].history.$get({ param: { id } });
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res, "Could not load the player's history."));
+  }
   return res.json();
 }
 
@@ -337,7 +375,23 @@ export async function fetchLeagueTable() {
 
 export async function endSeason() {
   const res = await api.api.season.end.$post();
-  if (!res.ok) throw new Error(`season end failed: ${res.status}`);
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res, "The season could not be ended — make sure every fixture is played."));
+  }
+  return res.json();
+}
+
+/** Ceremony data for a completed season — powers /season/summary. Pass
+ *  a specific season number to inspect any prior run; omit to get the
+ *  most-recently-completed one. */
+export async function fetchSeasonSummary(season?: number) {
+  const res = await api.api.season.summary.$get({
+    query: season !== undefined ? { season: String(season) } : {},
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res, "Could not load the season summary."));
+  }
   return res.json();
 }
 
@@ -351,6 +405,8 @@ export async function fetchSaves() {
 
 export async function createSave(name: string) {
   const res = await api.api.saves.$post({ json: { name } });
-  if (!res.ok) throw new Error(`save create failed: ${res.status}`);
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res, "Could not create a new save slot."));
+  }
   return res.json();
 }

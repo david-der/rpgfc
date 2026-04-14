@@ -63,20 +63,11 @@ interface ClubDetailResponse {
   recentMatches: RecentMatch[];
 }
 
-function ageFromDob(dob: string, now: Date): number {
-  const birth = new Date(dob + "T00:00:00Z");
-  let age = now.getUTCFullYear() - birth.getUTCFullYear();
-  const m = now.getUTCMonth() - birth.getUTCMonth();
-  if (m < 0 || (m === 0 && now.getUTCDate() < birth.getUTCDate())) age -= 1;
-  return age;
-}
-
 async function loadClubDetail(
   client: DbClient,
   clubId: number,
 ): Promise<ClubDetailResponse | null> {
   if (client.dialect !== "sqlite") return null;
-  const now = new Date();
 
   const club = client.sqlite
     .prepare<
@@ -109,7 +100,7 @@ async function loadClubDetail(
         player_id: number;
         player_name: string;
         archetype_id: string;
-        dob: string;
+        age: number;
         nationality: string;
         squad_role: string | null;
         role_promise: string | null;
@@ -118,7 +109,7 @@ async function loadClubDetail(
       }
     >(
       `SELECT p.id AS player_id, p.name AS player_name, p.archetype_id,
-              p.dob, p.nationality,
+              p.age, p.nationality,
               s.role AS squad_role,
               c.role_promise,
               c.weekly_wage_cents,
@@ -163,7 +154,7 @@ async function loadClubDetail(
       playerId: row.player_id,
       playerName: row.player_name,
       positionLabel,
-      age: ageFromDob(row.dob, now),
+      age: row.age,
       nationality: row.nationality,
       squadRole: row.squad_role,
       rolePromise: row.role_promise,

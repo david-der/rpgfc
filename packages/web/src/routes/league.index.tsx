@@ -2,27 +2,41 @@
 // sub-tab. Clicking any club in the table drills into
 // /league/clubs/$clubId.
 
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { FixtureCard } from "../components/ui/FixtureCard";
+import { ResultPill } from "../components/ui/ResultPill";
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { TabBar, type TabDefinition } from "../components/ui/TabBar";
 import {
   advanceMatchday,
   endSeason,
+  fetchClubFinances,
   fetchFixtures,
   fetchLeagueTable,
   fetchSeasonState,
 } from "../lib/api";
 
+const LEAGUE_TABS = ["table", "fixtures"] as const;
+type LeagueTab = (typeof LEAGUE_TABS)[number];
+
 export const Route = createFileRoute("/league/")({
   component: LeagueDashboard,
+  validateSearch: (search: Record<string, unknown>): { tab?: LeagueTab } => {
+    const raw = search["tab"];
+    return typeof raw === "string" && (LEAGUE_TABS as readonly string[]).includes(raw)
+      ? { tab: raw as LeagueTab }
+      : {};
+  },
 });
 
 function LeagueDashboard() {
   const stateQuery = useQuery({ queryKey: ["season-state"], queryFn: fetchSeasonState });
   const season = stateQuery.data?.season ?? 0;
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
+  const activeTab: LeagueTab = search.tab ?? "table";
 
   const tabs: TabDefinition[] = [
     { key: "table", label: "Table", content: <TableTab /> },
@@ -46,7 +60,15 @@ function LeagueDashboard() {
         title="League"
       />
       <div className="mt-6">
-        <TabBar tabs={tabs} />
+        <TabBar
+          tabs={tabs}
+          activeKey={activeTab}
+          onChange={(key) => {
+            void navigate({
+              search: key === "table" ? {} : { tab: key as LeagueTab },
+            });
+          }}
+        />
       </div>
     </div>
   );
@@ -56,6 +78,8 @@ function LeagueDashboard() {
 
 function TableTab() {
   const query = useQuery({ queryKey: ["league-table"], queryFn: fetchLeagueTable });
+  const meQuery = useQuery({ queryKey: ["club-finances"], queryFn: fetchClubFinances });
+  const myClubId = meQuery.data?.clubId;
 
   if (query.isPending) return <p className="text-parchment-600">Loading…</p>;
   if (query.isError) return <p className="text-semantic-error">Could not load the table.</p>;
@@ -83,14 +107,17 @@ function TableTab() {
             <th className="px-2 py-3">GF</th>
             <th className="px-2 py-3">GA</th>
             <th className="px-2 py-3">GD</th>
+            <th className="px-3 py-3">Form</th>
             <th className="px-2 py-3">Pts</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, idx) => (
+          {rows.map((row, idx) => {
+            const mine = row.clubId === myClubId;
+            return (
             <tr
               key={row.clubId}
-              className="border-b border-parchment-200 last:border-b-0 hover:bg-parchment-100"
+              className={`border-b border-parchment-200 last:border-b-0 hover:bg-parchment-100 ${mine ? "bg-parchment-100 font-medium border-l-2 border-l-moss-500" : ""}`}
             >
               <td
                 data-testid="league-table-allowlist-number"
@@ -106,6 +133,16 @@ function TableTab() {
                 >
                   {row.clubName}
                 </Link>
+                {row.lastSeasonPosition !== null && (
+                  <span
+                    data-testid="league-last-season-allowlist-number"
+                    className="ml-2 font-mono text-xs tabular-nums text-parchment-500"
+                    title="Finish last season"
+                  >
+                    ({row.lastSeasonPosition}
+                    {ordinalSuffix(row.lastSeasonPosition)})
+                  </span>
+                )}
               </td>
               <td data-testid="league-table-allowlist-number" className="px-2 py-2">
                 {row.played}
@@ -128,6 +165,17 @@ function TableTab() {
               <td data-testid="league-table-allowlist-number" className="px-2 py-2">
                 {row.goalDifference > 0 ? `+${row.goalDifference}` : row.goalDifference}
               </td>
+              <td className="px-3 py-2">
+                {row.recentForm.length > 0 ? (
+                  <div className="flex items-center gap-1">
+                    {row.recentForm.map((r, i) => (
+                      <ResultPill key={i} result={r} />
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-xs text-parchment-400">—</span>
+                )}
+              </td>
               <td
                 data-testid="league-table-allowlist-number"
                 className="px-2 py-2 font-semibold text-parchment-900"
@@ -135,7 +183,8 @@ function TableTab() {
                 {row.points}
               </td>
             </tr>
-          ))}
+          );
+          })}
         </tbody>
       </table>
     </div>
@@ -157,12 +206,18 @@ function FixturesTab() {
     },
   });
 
+  const navigate = useNavigate();
   const endSeasonMutation = useMutation({
     mutationFn: endSeason,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["fixtures"] });
       queryClient.invalidateQueries({ queryKey: ["season-state"] });
       queryClient.invalidateQueries({ queryKey: ["league-table"] });
+      queryClient.invalidateQueries({ queryKey: ["season-summary"] });
+      // Route the manager to the ceremony page — without this step,
+      // clicking End Season produces no visible moment. See Session 4–5
+      // playtest critique.
+      void navigate({ to: "/season/summary" });
     },
   });
 
@@ -224,15 +279,17 @@ function FixturesTab() {
           >
             {endSeasonMutation.isPending ? "Ending season…" : "End season and start next"}
           </button>
-          {endSeasonMutation.data && (
-            <div className="border border-parchment-300 bg-parchment-50 p-4">
-              <p data-testid="player-facing" className="font-serif text-base text-parchment-800">
-                {endSeasonMutation.data.narrative}
-              </p>
-            </div>
+          {endSeasonMutation.isError && (
+            <p className="text-semantic-error">{endSeasonMutation.error.message}</p>
           )}
         </div>
       )}
     </div>
   );
+}
+
+function ordinalSuffix(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return s[(v - 20) % 10] ?? s[v] ?? s[0] ?? "th";
 }

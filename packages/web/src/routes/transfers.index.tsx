@@ -6,7 +6,7 @@
 // Watchlist: bookmarked players the user is tracking.
 // Completed: recent signings in and out.
 
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { ListingCard } from "../components/ui/ListingCard";
@@ -21,8 +21,17 @@ import {
   removeFromWatchlist,
 } from "../lib/api";
 
+const TRANSFER_TABS = ["market", "my-bids", "offers", "watchlist", "completed"] as const;
+type TransferTab = (typeof TRANSFER_TABS)[number];
+
 export const Route = createFileRoute("/transfers/")({
   component: TransferDashboard,
+  validateSearch: (search: Record<string, unknown>): { tab?: TransferTab } => {
+    const raw = search["tab"];
+    return typeof raw === "string" && (TRANSFER_TABS as readonly string[]).includes(raw)
+      ? { tab: raw as TransferTab }
+      : {};
+  },
 });
 
 const BID_STATE_LABELS: Record<string, string> = {
@@ -54,6 +63,10 @@ const STATE_COLOR: Record<string, string> = {
 };
 
 function TransferDashboard() {
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
+  const activeTab: TransferTab = search.tab ?? "market";
+
   const tabs: TabDefinition[] = [
     { key: "market", label: "Market", content: <MarketTab /> },
     { key: "my-bids", label: "My Bids", content: <MyBidsTab /> },
@@ -66,7 +79,15 @@ function TransferDashboard() {
     <div className="mx-auto max-w-5xl px-6 py-10">
       <SectionHeader eyebrow="Transfers" title="Transfer market" />
       <div className="mt-6">
-        <TabBar tabs={tabs} />
+        <TabBar
+          tabs={tabs}
+          activeKey={activeTab}
+          onChange={(key) => {
+            void navigate({
+              search: key === "market" ? {} : { tab: key as TransferTab },
+            });
+          }}
+        />
       </div>
     </div>
   );
@@ -151,6 +172,7 @@ interface BidItem {
   id: number;
   player_id: number;
   player_name: string;
+  from_club_name: string;
   to_club_name: string;
   state: string;
   stance: string;
@@ -163,9 +185,11 @@ interface BidItem {
 function BidCard({ bid, currentMatchWeek }: { bid: BidItem; currentMatchWeek: number }) {
   const deadline = bid.deadline_match_week ?? 0;
   const weeksLeft = Math.max(0, deadline - currentMatchWeek);
-  const isActive = !["Signed", "Expired", "Cancelled", "SellerRejected", "PlayerRejected"].includes(
+  const isResolved = ["Signed", "Expired", "Cancelled", "SellerRejected", "PlayerRejected"].includes(
     bid.state,
   );
+  const isRejected = bid.state === "SellerRejected" || bid.state === "PlayerRejected";
+  const prose = bid.rejection_reason ? REJECTION_PROSE[bid.rejection_reason] : null;
 
   return (
     <div className="flex items-start justify-between border border-parchment-300 bg-parchment-100 p-4">
@@ -180,6 +204,14 @@ function BidCard({ bid, currentMatchWeek }: { bid: BidItem; currentMatchWeek: nu
         <div className="mt-1 text-xs text-parchment-500">
           from {bid.to_club_name} · {bid.role_promise}
         </div>
+        {isRejected && prose && (
+          <p
+            data-testid="player-facing"
+            className="mt-2 max-w-prose font-serif text-sm italic text-parchment-700"
+          >
+            &ldquo;{prose}&rdquo;
+          </p>
+        )}
       </div>
       <div className="flex flex-col items-end gap-1">
         <span
@@ -187,15 +219,37 @@ function BidCard({ bid, currentMatchWeek }: { bid: BidItem; currentMatchWeek: nu
         >
           {BID_STATE_LABELS[bid.state] ?? bid.state}
         </span>
-        {isActive && weeksLeft > 0 && (
+        {!isResolved && weeksLeft > 0 && (
           <span className="text-[10px] text-parchment-500">
             {weeksLeft} match week{weeksLeft !== 1 ? "s" : ""} left
           </span>
+        )}
+        {isRejected && (
+          <Link
+            to="/transfers/$playerId"
+            params={{ playerId: String(bid.player_id) }}
+            className="mt-1 border border-moss-600 bg-moss-500 px-2 py-0.5 font-sans text-xs font-semibold uppercase tracking-wide text-parchment-50 hover:bg-moss-600"
+          >
+            Re-offer
+          </Link>
         )}
       </div>
     </div>
   );
 }
+
+/** Paraphrased rejection-reason copy (mirrors server REJECTION_PROSE).
+ *  Kept client-side so the UI can render immediately without a round-trip.
+ *  Must stay in sync with packages/server/src/application/transfers/evaluators.ts. */
+const REJECTION_PROSE: Record<string, string> = {
+  SELLER_FEE_TOO_LOW: "The selling club laughed the offer out of the room.",
+  SELLER_BUDGET_STRAIN:
+    "The selling club will not consider a move they cannot replace financially.",
+  PLAYER_WAGE_FLOOR: "He expects a proper reward for a player at his level.",
+  PLAYER_PLAYING_TIME: "He wants more game time than this club can realistically offer.",
+  PLAYER_FORBIDDEN_CLUB: "He would not play for this club under any terms.",
+  PLAYER_REGION_MISMATCH: "He is not willing to move to that part of the world.",
+};
 
 // ── Offers tab ────────────────────────────────────────────────────────────
 
@@ -216,18 +270,29 @@ function OffersTab() {
 
   return (
     <div className="space-y-2">
-      {offers.map((offer: BidItem) => (
+      {offers.map((offer: BidItem) => {
+        const prose = offer.rejection_reason ? REJECTION_PROSE[offer.rejection_reason] : null;
+        const isRejected = offer.state === "SellerRejected" || offer.state === "PlayerRejected";
+        return (
         <div
           key={offer.id}
           className="flex items-start justify-between border border-parchment-300 bg-parchment-100 p-4"
         >
-          <div>
+          <div className="min-w-0 flex-1">
             <div className="font-serif text-base text-parchment-900">
               <span data-testid="player-facing">{offer.player_name}</span>
             </div>
             <div className="mt-1 text-xs text-parchment-500">
-              Bid from {offer.to_club_name}
+              Bid from {offer.from_club_name}
             </div>
+            {isRejected && prose && (
+              <p
+                data-testid="player-facing"
+                className="mt-2 max-w-prose font-serif text-sm italic text-parchment-700"
+              >
+                &ldquo;{prose}&rdquo;
+              </p>
+            )}
           </div>
           <span
             className={`border px-2 py-0.5 font-sans text-xs uppercase tracking-wide ${STATE_COLOR[offer.state] ?? ""}`}
@@ -235,7 +300,8 @@ function OffersTab() {
             {BID_STATE_LABELS[offer.state] ?? offer.state}
           </span>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

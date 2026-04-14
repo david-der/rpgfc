@@ -1,0 +1,22 @@
+{
+  "name": "The Saboteur",
+  "tagline": "Pries the best from rivals' top-six. Always overpays the wage to seduce.",
+  "targetPositions": ["forward", "midfielder", "defender"],
+  "targetMinBadges": 1,
+  "preferTopBadges": true,
+  "rolePromise": "Star Player",
+  "openingFeePctOfAsking": 1.10,
+  "openingWageMultiplier": 1.40,
+  "ratchetMaxAttempts": 2,
+  "ratchetStepPct": 0.10,
+  "abandonAtPctOfAsking": 1.40,
+  "maxActiveBids": 1,
+  "minCashFloorCents": 100000000,
+  "regionFlexible": true,
+  "pursueUnlistedPremium": 1.7,
+  "extendWhenSeasonsLeftLte": 1,
+  "extendMaxAge": 31,
+  "extendWageMultiplier": 1.10,
+  "extendSeasons": 3,
+  "backfillEnabled": true
+}

@@ -42,6 +42,111 @@ const listQuery = z.object({
 
 const idParam = z.object({ id: z.coerce.number().int().positive() });
 
+interface HistorySeasonRow {
+  season: number;
+  clubId: number;
+  clubName: string;
+  appearances: number;
+  goals: number;
+  assists: number;
+  minutes: number;
+  yellowCards: number;
+  redCards: number;
+}
+
+async function loadPlayerHistory(
+  client: DbClient,
+  playerId: number,
+): Promise<HistorySeasonRow[]> {
+  // Aggregates every played match this player appeared in, grouped by
+  // (season, club_id) so a transferred player's seasons split across
+  // clubs read correctly. No hidden-attr reads — just match facts.
+  if (client.dialect === "sqlite") {
+    return client.sqlite
+      .prepare<
+        [number],
+        {
+          season: number;
+          club_id: number;
+          club_name: string;
+          appearances: number;
+          goals: number;
+          assists: number;
+          minutes: number;
+          yellow_cards: number;
+          red_cards: number;
+        }
+      >(
+        `SELECT m.season,
+                pmp.club_id,
+                c.name AS club_name,
+                COUNT(*) AS appearances,
+                SUM(pmp.goals) AS goals,
+                SUM(pmp.assists) AS assists,
+                SUM(pmp.minutes_played) AS minutes,
+                SUM(pmp.yellow_cards) AS yellow_cards,
+                SUM(pmp.red_cards) AS red_cards
+         FROM player_match_performance pmp
+         JOIN matches m ON m.id = pmp.match_id
+         JOIN clubs c ON c.id = pmp.club_id
+         WHERE pmp.player_id = ? AND m.state = 'Played'
+         GROUP BY m.season, pmp.club_id, c.name
+         ORDER BY m.season DESC, pmp.club_id`,
+      )
+      .all(playerId)
+      .map((r) => ({
+        season: r.season,
+        clubId: r.club_id,
+        clubName: r.club_name,
+        appearances: r.appearances,
+        goals: r.goals,
+        assists: r.assists,
+        minutes: r.minutes,
+        yellowCards: r.yellow_cards,
+        redCards: r.red_cards,
+      }));
+  }
+  const res = await client.pool.query<{
+    season: number;
+    club_id: number;
+    club_name: string;
+    appearances: string;
+    goals: string;
+    assists: string;
+    minutes: string;
+    yellow_cards: string;
+    red_cards: string;
+  }>(
+    `SELECT m.season,
+            pmp.club_id,
+            c.name AS club_name,
+            COUNT(*)::text AS appearances,
+            SUM(pmp.goals)::text AS goals,
+            SUM(pmp.assists)::text AS assists,
+            SUM(pmp.minutes_played)::text AS minutes,
+            SUM(pmp.yellow_cards)::text AS yellow_cards,
+            SUM(pmp.red_cards)::text AS red_cards
+     FROM player_match_performance pmp
+     JOIN matches m ON m.id = pmp.match_id
+     JOIN clubs c ON c.id = pmp.club_id
+     WHERE pmp.player_id = $1 AND m.state = 'Played'
+     GROUP BY m.season, pmp.club_id, c.name
+     ORDER BY m.season DESC, pmp.club_id`,
+    [playerId],
+  );
+  return res.rows.map((r) => ({
+    season: r.season,
+    clubId: r.club_id,
+    clubName: r.club_name,
+    appearances: Number(r.appearances),
+    goals: Number(r.goals),
+    assists: Number(r.assists),
+    minutes: Number(r.minutes),
+    yellowCards: Number(r.yellow_cards),
+    redCards: Number(r.red_cards),
+  }));
+}
+
 const generateBody = z.object({
   seed: z.number().int().default(42),
   clubCount: z.number().int().min(1).max(30).default(10),
@@ -88,6 +193,13 @@ export function createPlayersRoute(deps: PlayersRouteDeps) {
       const { id } = c.req.valid("param");
       const series = await renderFormSeriesFor(deps.db, id);
       return c.json(series);
+    })
+    // Per-season aggregate stats — drives the Profile → History tab.
+    // Pure query against player_match_performance grouped by season.
+    .get("/:id/history", zValidator("param", idParam), async (c) => {
+      const { id } = c.req.valid("param");
+      const seasons = await loadPlayerHistory(deps.db, id);
+      return c.json({ seasons });
     });
 
   if (deps.devEndpointsEnabled) {

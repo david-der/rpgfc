@@ -23,6 +23,7 @@ import {
 } from "@rpgfc/shared";
 
 import {
+  BidPreconditionError,
   forceAcceptBidRendered,
   renderTransfersPage,
   submitBidRendered,
@@ -235,25 +236,37 @@ export function createTransfersRoute(deps: TransfersRouteDeps) {
         const { playerId } = c.req.valid("param");
         const body = c.req.valid("json");
         const state = await loadSeasonState(deps.db);
-        const rendered = await submitBidRendered(deps.db, {
-          playerId,
-          fromClubId: deps.userClubId,
-          feeCents: FEE_TIER_MIDPOINT_CENTS[body.feeTier],
-          wageCents: WAGE_TIER_MIDPOINT_CENTS[body.wageTier],
-          signingBonusCents: FEE_TIER_MIDPOINT_CENTS[body.signingBonusTier],
-          rolePromise: body.rolePromise,
-          matchWeek: state.matchWeek,
-          loanOffer: body.isLoan
-            ? {
-                wageCoveragePct: 0.5,
-                playingTimeGuarantee: 10,
-                obligationToBuy: false,
-                endsAt: new Date(deps.now().getTime() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-              }
-            : null,
-          now: deps.now(),
-        });
-        return c.json(rendered);
+        try {
+          const rendered = await submitBidRendered(deps.db, {
+            playerId,
+            fromClubId: deps.userClubId,
+            feeCents: FEE_TIER_MIDPOINT_CENTS[body.feeTier],
+            wageCents: WAGE_TIER_MIDPOINT_CENTS[body.wageTier],
+            signingBonusCents: FEE_TIER_MIDPOINT_CENTS[body.signingBonusTier],
+            rolePromise: body.rolePromise,
+            matchWeek: state.matchWeek,
+            loanOffer: body.isLoan
+              ? {
+                  wageCoveragePct: 0.5,
+                  playingTimeGuarantee: 10,
+                  obligationToBuy: false,
+                  endsAt: new Date(deps.now().getTime() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+                }
+              : null,
+            now: deps.now(),
+          });
+          return c.json(rendered);
+        } catch (err) {
+          // BidPreconditionError → 400 with the friendly message. Anything
+          // else bubbles as a 500 via Hono's default handler.
+          if (err instanceof BidPreconditionError) {
+            return c.json(
+              { error: { code: "bid_precondition", message: err.message } },
+              400,
+            );
+          }
+          throw err;
+        }
       },
     )
     .post("/bids/:bidId/force-accept", zValidator("param", bidIdParam), async (c) => {

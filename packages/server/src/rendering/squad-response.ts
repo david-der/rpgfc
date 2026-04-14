@@ -15,11 +15,14 @@ import type {
 } from "@rpgfc/shared";
 import {
   ARCHETYPE_BY_ID,
+  FORM_TIERS,
   HARMONY_LABELS,
   SQUAD_ROLE_LABELS,
   SQUAD_ROLES,
   PLAYING_TIME_ROLES,
+  wageTierFor,
 } from "@rpgfc/shared";
+import type { FormTier } from "@rpgfc/shared";
 
 import { harmonyFor, moodFor, moodLabel } from "../application/squad/harmony.js";
 import { setSquadRole as setSquadRoleRepo } from "../application/squad/repository.js";
@@ -29,8 +32,12 @@ interface PlayerJoinRow {
   id: number;
   name: string;
   archetype_id: string;
+  age: number;
   role: string;
   role_promise: string | null;
+  weekly_wage_cents: number | null;
+  seasons_remaining: number | null;
+  form_tier: string | null;
 }
 
 interface ClubRow {
@@ -56,7 +63,12 @@ async function loadSquadJoin(
   if (client.dialect === "sqlite") {
     return client.sqlite
       .prepare<[number], PlayerJoinRow>(
-        `SELECT p.id, p.name, p.archetype_id, s.role, c.role_promise
+        `SELECT p.id, p.name, p.archetype_id, p.age, s.role, c.role_promise,
+                c.weekly_wage_cents, c.seasons_remaining,
+                (SELECT pmp.tier FROM player_match_performance pmp
+                 JOIN matches m ON m.id = pmp.match_id
+                 WHERE pmp.player_id = p.id AND m.state = 'Played'
+                 ORDER BY m.matchday DESC LIMIT 1) AS form_tier
          FROM squad_entries s
          JOIN players p ON p.id = s.player_id
          LEFT JOIN contracts c ON c.player_id = s.player_id
@@ -66,7 +78,12 @@ async function loadSquadJoin(
       .all(clubId);
   }
   const res = await client.pool.query<PlayerJoinRow>(
-    `SELECT p.id, p.name, p.archetype_id, s.role, c.role_promise
+    `SELECT p.id, p.name, p.archetype_id, p.age, s.role, c.role_promise,
+            c.weekly_wage_cents, c.seasons_remaining,
+            (SELECT pmp.tier FROM player_match_performance pmp
+             JOIN matches m ON m.id = pmp.match_id
+             WHERE pmp.player_id = p.id AND m.state = 'Played'
+             ORDER BY m.matchday DESC LIMIT 1) AS form_tier
      FROM squad_entries s
      JOIN players p ON p.id = s.player_id
      LEFT JOIN contracts c ON c.player_id = s.player_id
@@ -101,16 +118,30 @@ function buildEntry(row: PlayerJoinRow): RenderedSquadEntry {
   const mood: PromiseMood = moodFor(rolePromise, squadRole);
   const label = moodLabel(mood);
   const archetype = ARCHETYPE_BY_ID[row.archetype_id];
+  // Age 17 = this season's youth intake. endSeason only mints new
+  // players at that age, so any 17-year-old on the roster is by
+  // definition a fresh arrival.
+  const isNewArrival = row.age === 17;
+  const wageTier = row.weekly_wage_cents !== null ? wageTierFor(row.weekly_wage_cents) : null;
+  const formTier =
+    row.form_tier && (FORM_TIERS as readonly string[]).includes(row.form_tier)
+      ? (row.form_tier as FormTier)
+      : null;
   return {
     playerId: row.id,
     playerName: row.name,
     positionLabel: archetype?.positionLabel ?? "??",
     archetypeLabel: archetype?.displayName ?? null,
+    age: row.age,
+    isNewArrival,
     role: squadRole,
     roleLabel: SQUAD_ROLE_LABELS[squadRole],
     rolePromise,
     promiseMood: mood,
     promiseMoodLabel: label,
+    wageTier,
+    seasonsRemaining: row.seasons_remaining,
+    formTier,
   };
 }
 

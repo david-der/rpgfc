@@ -4,18 +4,31 @@
 // plus season transfer activity. You always know your own club's
 // finances precisely — opposing clubs show tier words only.
 
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { TabBar, type TabDefinition } from "../components/ui/TabBar";
 import { fetchClubFinances, fetchClubLedger } from "../lib/api";
 
+const CLUB_TABS = ["finances", "ledger"] as const;
+type ClubTab = (typeof CLUB_TABS)[number];
+
 export const Route = createFileRoute("/club/")({
   component: ClubDashboard,
+  validateSearch: (search: Record<string, unknown>): { tab?: ClubTab } => {
+    const raw = search["tab"];
+    return typeof raw === "string" && (CLUB_TABS as readonly string[]).includes(raw)
+      ? { tab: raw as ClubTab }
+      : {};
+  },
 });
 
 function ClubDashboard() {
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
+  const activeTab: ClubTab = search.tab ?? "finances";
+
   const tabs: TabDefinition[] = [
     { key: "finances", label: "Finances", content: <FinancesTab /> },
     { key: "ledger", label: "Ledger", content: <LedgerTab /> },
@@ -25,7 +38,15 @@ function ClubDashboard() {
     <div className="mx-auto max-w-5xl px-6 py-10">
       <SectionHeader eyebrow="Club" title="Club" />
       <div className="mt-6">
-        <TabBar tabs={tabs} />
+        <TabBar
+          tabs={tabs}
+          activeKey={activeTab}
+          onChange={(key) => {
+            void navigate({
+              search: key === "finances" ? {} : { tab: key as ClubTab },
+            });
+          }}
+        />
       </div>
     </div>
   );
@@ -229,6 +250,8 @@ function LedgerTab() {
   }
   const events = query.data.events;
 
+  const rollup = query.data.rollup ?? [];
+
   if (events.length === 0) {
     return (
       <p className="text-sm italic text-parchment-500">
@@ -238,17 +261,72 @@ function LedgerTab() {
   }
 
   return (
-    <div className="overflow-x-auto border border-parchment-300 bg-parchment-50">
-      <table className="w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-parchment-300 bg-parchment-100 text-xs uppercase tracking-wide text-parchment-500">
-            <th className="px-3 py-2">Season</th>
-            <th className="px-3 py-2">Week</th>
-            <th className="px-3 py-2">Kind</th>
-            <th className="px-3 py-2">Note</th>
-            <th className="px-3 py-2 text-right">Amount</th>
-          </tr>
-        </thead>
+    <div className="space-y-6">
+      {rollup.length > 0 && (
+        <section>
+          <h3 className="mb-3 text-xs font-medium uppercase tracking-wide text-parchment-500">
+            Per-season rollup
+          </h3>
+          <div className="overflow-x-auto border border-parchment-300 bg-parchment-50">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-parchment-300 bg-parchment-100 text-xs uppercase tracking-wide text-parchment-500">
+                  <th className="px-3 py-2">Season</th>
+                  <th className="px-3 py-2 text-right">Revenue</th>
+                  <th className="px-3 py-2 text-right">Wages</th>
+                  <th className="px-3 py-2 text-right">Transfers</th>
+                  <th className="px-3 py-2 text-right">Net</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-parchment-200">
+                {rollup.map((r) => (
+                  <tr key={r.season} className="hover:bg-parchment-100">
+                    <td
+                      data-testid="ledger-rollup-season-allowlist-number"
+                      className="px-3 py-1.5 font-mono tabular-nums text-parchment-700"
+                    >
+                      {r.season + 1}
+                    </td>
+                    <td className="px-3 py-1.5 text-right font-mono tabular-nums text-moss-700">
+                      +{formatCents(r.revenueCents)}
+                    </td>
+                    <td className="px-3 py-1.5 text-right font-mono tabular-nums text-clay-700">
+                      {formatCents(r.wagesCents)}
+                    </td>
+                    <td className="px-3 py-1.5 text-right font-mono tabular-nums text-parchment-700">
+                      {formatCents(r.transfersCents)}
+                    </td>
+                    <td
+                      className={`px-3 py-1.5 text-right font-mono font-semibold tabular-nums ${
+                        r.netCents >= 0 ? "text-moss-700" : "text-clay-700"
+                      }`}
+                    >
+                      {r.netCents > 0 ? "+" : ""}
+                      {formatCents(r.netCents)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      <section>
+        <h3 className="mb-3 text-xs font-medium uppercase tracking-wide text-parchment-500">
+          Every event
+        </h3>
+        <div className="overflow-x-auto border border-parchment-300 bg-parchment-50">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-parchment-300 bg-parchment-100 text-xs uppercase tracking-wide text-parchment-500">
+                <th className="px-3 py-2">Season</th>
+                <th className="px-3 py-2">Week</th>
+                <th className="px-3 py-2">Kind</th>
+                <th className="px-3 py-2">Note</th>
+                <th className="px-3 py-2 text-right">Amount</th>
+              </tr>
+            </thead>
         <tbody className="divide-y divide-parchment-200">
           {events.map((e) => {
             const positive = e.amount_cents > 0;
@@ -279,6 +357,8 @@ function LedgerTab() {
           })}
         </tbody>
       </table>
+        </div>
+      </section>
     </div>
   );
 }

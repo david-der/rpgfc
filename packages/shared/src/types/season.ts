@@ -22,6 +22,11 @@ export interface LeagueTableRow {
   goalsAgainst: number;
   goalDifference: number;
   points: number;
+  /** Where this club finished the previous season. `null` in Season 0
+   *  or when no prior data is available. */
+  lastSeasonPosition: number | null;
+  /** Last up-to-5 results, oldest → newest. Empty pre-play. */
+  recentForm: Array<"W" | "D" | "L">;
 }
 
 export interface SeasonSummary {

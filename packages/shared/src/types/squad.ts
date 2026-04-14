@@ -7,6 +7,8 @@
 // tier via min-of-mood (see application/squad/harmony.ts).
 
 import type { PlayingTimeRole } from "./contract.js";
+import type { CurrencyTier } from "./currency.js";
+import type { FormTier } from "./form.js";
 
 export const SQUAD_ROLES = ["Starter", "Rotation", "Backup", "Youth"] as const;
 export type SquadRole = (typeof SQUAD_ROLES)[number];
@@ -59,12 +61,25 @@ export interface RenderedSquadEntry {
   playerName: string;
   positionLabel: string;
   archetypeLabel: string | null;
+  /** Age in years. Allowlisted numeric — ages are facts, not ratings. */
+  age: number;
+  /** True if this player's a fresh youth arrival (age 17 at their first
+   *  club). Drives the "New arrival" chip on the squad page and the
+   *  "N youth joined your academy" card on the Home dashboard. */
+  isNewArrival: boolean;
   role: SquadRole;
   roleLabel: string;
   rolePromise: PlayingTimeRole | null;
   promiseMood: PromiseMood | null;
   /** Prose template for the Mood chip on the squad row. */
   promiseMoodLabel: string | null;
+  /** Weekly wage tier (from the contract). null when uncontracted. */
+  wageTier: CurrencyTier | null;
+  /** Seasons remaining on current contract. null when uncontracted. */
+  seasonsRemaining: number | null;
+  /** Most-recent form tier from the last played match. null when no
+   *  match has been played yet this season. */
+  formTier: FormTier | null;
 }
 
 export interface RenderedSquad {

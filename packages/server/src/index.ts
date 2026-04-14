@@ -42,6 +42,8 @@ export interface ApiDeps {
    *  tests that don't need saves can skip them. */
   savesDir?: string;
   currentDbPath?: string;
+  /** The club whose perspective the local UI shows. Defaults to 1. */
+  userClubId?: number;
 }
 
 export interface AppDeps extends ApiDeps {
@@ -57,6 +59,7 @@ export interface AppDeps extends ApiDeps {
 // via .route() and accessed through the typed RPC client at
 // `client.api.players.<method>`, etc.
 export function createApiApp(deps: ApiDeps) {
+  const userClubId = deps.userClubId ?? 1;
   const playersApp = createPlayersRoute({
     db: deps.db,
     devEndpointsEnabled: deps.devEndpointsEnabled,
@@ -76,27 +79,27 @@ export function createApiApp(deps: ApiDeps) {
     db: deps.db,
     now: deps.now,
     devEndpointsEnabled: deps.devEndpointsEnabled,
-    userClubId: 1,
+    userClubId,
   });
   const tacticsApp = createTacticsRoute({
     db: deps.db,
-    userClubId: 1,
+    userClubId,
   });
   const squadApp = createSquadRoute({
     db: deps.db,
-    userClubId: 1,
+    userClubId,
   });
   const seasonApp = createSeasonRoute({
     db: deps.db,
     now: deps.now,
-    userClubId: 1,
+    userClubId,
   });
   const matchesApp = createMatchesRoute({ db: deps.db });
   const savesApp = createSavesRoute({
     savesDir: deps.savesDir ?? "./saves",
     currentDbPath: deps.currentDbPath ?? "./saves/dev.db",
   });
-  const clubApp = createClubRoute({ db: deps.db, userClubId: 1 });
+  const clubApp = createClubRoute({ db: deps.db, userClubId });
   const clubsApp = createClubsRoute({ db: deps.db });
   return new Hono()
     .get("/api/health", (c) => {

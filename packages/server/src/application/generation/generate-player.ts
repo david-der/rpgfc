@@ -28,6 +28,8 @@ export interface GenerationContext {
   clubId: number | null;
   referenceDate: Date; // baseline for age math — "today" in the game world
   rng: Random;
+  /** Force a specific age (used by the youth-intake pipeline). */
+  overrideAge?: number;
 }
 
 function sampleNormalClamped(rng: Random, mean: number, spread: number, lo = 0, hi = 100): number {
@@ -152,7 +154,7 @@ export function generatePlayer(ctx: GenerationContext): NewHiddenPlayer {
   };
 
   // 6. Assign age and experience years.
-  const age = pickAge(rng, archetype);
+  const age = ctx.overrideAge ?? pickAge(rng, archetype);
   const experienceYears = Math.max(0, age - 17);
 
   // 7. Starting badges for age-appropriate experience.
@@ -172,6 +174,7 @@ export function generatePlayer(ctx: GenerationContext): NewHiddenPlayer {
     clubId,
     name: naming.name,
     dob,
+    age,
     nationality: naming.nationality,
     preferredFoot,
     archetypeId: archetype.id,

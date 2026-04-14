@@ -12,10 +12,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 
+import { HeroIllustration } from "../components/ui/HeroIllustration";
 import { MatchPerformanceList } from "../components/ui/MatchPerformanceList";
 import { MatchStatsTable } from "../components/ui/MatchStatsTable";
 import { MatchTeamSummary } from "../components/ui/MatchTeamSummary";
-import { SectionHeader } from "../components/ui/SectionHeader";
 import { TabBar, type TabDefinition } from "../components/ui/TabBar";
 import { fetchMatch } from "../lib/api";
 
@@ -121,39 +121,27 @@ function MatchReport() {
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-10">
-      <SectionHeader
+      <HeroIllustration
+        folder="match-art"
+        artKey={match.id}
         eyebrow={
           <>
             Match Week{" "}
-            <span
-              data-testid="match-week-allowlist-number"
-              className="font-mono tabular-nums text-parchment-700"
-            >
-              {match.matchday}
-            </span>
+            <span data-testid="match-week-allowlist-number">{match.matchday}</span>
           </>
         }
-        title="Match report"
+        title={
+          <span className="flex flex-wrap items-baseline gap-x-3">
+            <span data-testid="player-facing">{match.home.name}</span>
+            <span className="font-mono tabular-nums text-3xl text-parchment-700">
+              <span data-testid="match-score-allowlist-number">{homeGoals}</span>
+              <span className="mx-2 text-parchment-400">–</span>
+              <span data-testid="match-score-allowlist-number">{awayGoals}</span>
+            </span>
+            <span data-testid="player-facing">{match.away.name}</span>
+          </span>
+        }
       />
-
-      {/* Hero: shields + scoreline */}
-      <header className="mt-8 grid grid-cols-[1fr_auto_1fr] items-center gap-6 border-b border-parchment-300 pb-8">
-        <div className="text-right">
-          <div data-testid="player-facing" className="font-serif text-3xl text-parchment-900">
-            {match.home.name}
-          </div>
-        </div>
-        <div className="flex items-baseline gap-3 font-mono tabular-nums text-5xl font-semibold text-parchment-900">
-          <span data-testid="match-score-allowlist-number">{homeGoals}</span>
-          <span className="text-parchment-400">–</span>
-          <span data-testid="match-score-allowlist-number">{awayGoals}</span>
-        </div>
-        <div className="text-left">
-          <div data-testid="player-facing" className="font-serif text-3xl text-parchment-900">
-            {match.away.name}
-          </div>
-        </div>
-      </header>
 
       <div className="mt-8">
         <TabBar tabs={tabs} />

@@ -121,3 +121,6 @@ packages/server/drizzle/meta/_journal.json.bak
 *.tmp
 tmp/
 tsconfig.tsbuildinfo
+
+# Claude CLI local state
+.claude/

@@ -27,6 +27,7 @@ interface PlayerRow {
   club_id: number | null;
   name: string;
   dob: string;
+  age: number;
   nationality: string;
   preferred_foot: string;
   archetype_id: string;
@@ -50,6 +51,7 @@ function rowToHidden(row: PlayerRow): HiddenPlayer {
     clubId: row.club_id,
     name: row.name,
     dob: row.dob,
+    age: row.age,
     nationality: row.nationality,
     preferredFoot: row.preferred_foot as PreferredFoot,
     archetypeId: row.archetype_id,
@@ -68,6 +70,7 @@ function newPlayerToInsert(p: NewHiddenPlayer, clubId: number | null, now: strin
     club_id: clubId,
     name: p.name,
     dob: p.dob,
+    age: p.age,
     nationality: p.nationality,
     preferred_foot: p.preferredFoot,
     archetype_id: p.archetypeId,
@@ -103,7 +106,7 @@ export async function getPlayerById(client: DbClient, id: number): Promise<Hidde
   if (client.dialect === "sqlite") {
     const row = client.sqlite
       .prepare<[number], PlayerRow>(
-        `SELECT id, run_id, club_id, name, dob, nationality, preferred_foot,
+        `SELECT id, run_id, club_id, name, dob, age, nationality, preferred_foot,
                 archetype_id, hidden_attrs_json, mental_traits_json,
                 experience_years, narrative_seed_json, preferred_positions_json
          FROM players WHERE id = ?`,
@@ -116,7 +119,7 @@ export async function getPlayerById(client: DbClient, id: number): Promise<Hidde
   }
 
   const res = await client.pool.query<PlayerRow>(
-    `SELECT id, run_id, club_id, name, dob, nationality, preferred_foot,
+    `SELECT id, run_id, club_id, name, dob, age, nationality, preferred_foot,
             archetype_id, hidden_attrs_json, mental_traits_json,
             experience_years, narrative_seed_json
      FROM players WHERE id = $1`,
@@ -167,7 +170,7 @@ export async function listPlayers(client: DbClient, query: ListQuery): Promise<L
   if (client.dialect === "sqlite") {
     const rows = client.sqlite
       .prepare<[number, number], PlayerRow>(
-        `SELECT id, run_id, club_id, name, dob, nationality, preferred_foot,
+        `SELECT id, run_id, club_id, name, dob, age, nationality, preferred_foot,
                 archetype_id, hidden_attrs_json, mental_traits_json,
                 experience_years, narrative_seed_json, preferred_positions_json
          FROM players
@@ -203,7 +206,7 @@ export async function listPlayers(client: DbClient, query: ListQuery): Promise<L
 
   const params: unknown[] = [query.cursor ?? 0, limit];
   let sql = `
-    SELECT id, run_id, club_id, name, dob, nationality, preferred_foot,
+    SELECT id, run_id, club_id, name, dob, age, nationality, preferred_foot,
            archetype_id, hidden_attrs_json, mental_traits_json,
            experience_years, narrative_seed_json, preferred_positions_json
     FROM players
@@ -270,10 +273,10 @@ export async function seedWorldIfEmpty(client: DbClient, config: SeedConfig): Pr
       `INSERT INTO clubs (run_id, name, nationality, founded_year, created_at) VALUES (?, ?, ?, ?, ?)`,
     );
     const insertPlayer = sqlite.prepare(
-      `INSERT INTO players (run_id, club_id, name, dob, nationality, preferred_foot,
+      `INSERT INTO players (run_id, club_id, name, dob, age, nationality, preferred_foot,
                             archetype_id, hidden_attrs_json, mental_traits_json,
                             experience_years, narrative_seed_json, preferred_positions_json, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     const insertBadge = sqlite.prepare(
       `INSERT INTO player_badges (player_id, badge_key, tier, awarded_at, awarded_reason)
@@ -299,6 +302,7 @@ export async function seedWorldIfEmpty(client: DbClient, config: SeedConfig): Pr
             clubId,
             insert.name,
             insert.dob,
+            insert.age,
             insert.nationality,
             insert.preferred_foot,
             insert.archetype_id,
@@ -348,16 +352,17 @@ export async function seedWorldIfEmpty(client: DbClient, config: SeedConfig): Pr
       for (const p of club.players) {
         const insert = newPlayerToInsert(p, clubId, now);
         const pRes = await pg.query<{ id: number }>(
-          `INSERT INTO players (run_id, club_id, name, dob, nationality, preferred_foot,
+          `INSERT INTO players (run_id, club_id, name, dob, age, nationality, preferred_foot,
                                 archetype_id, hidden_attrs_json, mental_traits_json,
                                 experience_years, narrative_seed_json, preferred_positions_json, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
            RETURNING id`,
           [
             runId,
             clubId,
             insert.name,
             insert.dob,
+            insert.age,
             insert.nationality,
             insert.preferred_foot,
             insert.archetype_id,

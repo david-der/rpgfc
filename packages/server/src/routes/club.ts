@@ -17,8 +17,10 @@ import {
 } from "@rpgfc/shared";
 import type { CurrencyTier } from "@rpgfc/shared";
 
+import { REJECTION_PROSE } from "../rendering/index.js";
 import { extendContract } from "../application/transfers/extend-contract.js";
 import type { DbClient } from "../db/client.js";
+import type { RejectionReason } from "@rpgfc/shared";
 
 export interface ClubRouteDeps {
   db: DbClient;
@@ -163,6 +165,55 @@ async function loadLedger(
     .all(clubId, limit);
 }
 
+interface LedgerSeasonRollup {
+  season: number;
+  revenueCents: number;
+  wagesCents: number;
+  transfersCents: number;
+  netCents: number;
+}
+
+async function loadLedgerRollup(
+  client: DbClient,
+  clubId: number,
+): Promise<LedgerSeasonRollup[]> {
+  if (client.dialect !== "sqlite") return [];
+  // Three classes of activity:
+  //   revenue = any positive-amount event (matchday, sponsor, tv)
+  //   wages   = wage expense events (negative)
+  //   transfers = signing bonuses + fees (negative when outgoing)
+  // Net is the sum. Grouped by season, newest first.
+  const rows = client.sqlite
+    .prepare<
+      [number],
+      {
+        season: number;
+        revenue: number;
+        wages: number;
+        transfers: number;
+        net: number;
+      }
+    >(
+      `SELECT season,
+              SUM(CASE WHEN amount_cents > 0 THEN amount_cents ELSE 0 END) AS revenue,
+              SUM(CASE WHEN kind = 'expense_wages' THEN amount_cents ELSE 0 END) AS wages,
+              SUM(CASE WHEN kind IN ('signing_bonus', 'transfer_fee') THEN amount_cents ELSE 0 END) AS transfers,
+              SUM(amount_cents) AS net
+       FROM finance_events
+       WHERE club_id = ?
+       GROUP BY season
+       ORDER BY season DESC`,
+    )
+    .all(clubId);
+  return rows.map((r) => ({
+    season: r.season,
+    revenueCents: r.revenue,
+    wagesCents: r.wages,
+    transfersCents: r.transfers,
+    netCents: r.net,
+  }));
+}
+
 export function createClubRoute(deps: ClubRouteDeps) {
   const app = new Hono()
     .get("/finances", async (c) => {
@@ -174,7 +225,8 @@ export function createClubRoute(deps: ClubRouteDeps) {
     })
     .get("/ledger", async (c) => {
       const events = await loadLedger(deps.db, deps.userClubId);
-      return c.json({ events });
+      const rollup = await loadLedgerRollup(deps.db, deps.userClubId);
+      return c.json({ events, rollup });
     })
     .post("/extend-contract", zValidator("json", extendBody), async (c) => {
       const body = c.req.valid("json");
@@ -190,7 +242,15 @@ export function createClubRoute(deps: ClubRouteDeps) {
         return c.json({ error: { code: "extend_error", message: result.message } }, 400);
       }
       if (result.kind === "reject") {
-        return c.json({ error: { code: "player_rejected", reason: result.reason } }, 409);
+        const prose = REJECTION_PROSE[result.reason as RejectionReason];
+        const message = prose
+          ?? (result.reason === "CLUB_CANNOT_AFFORD_BONUS"
+            ? "The club can't afford the signing bonus you proposed."
+            : "The offer was rejected.");
+        return c.json(
+          { error: { code: "player_rejected", reason: result.reason, message } },
+          409,
+        );
       }
       return c.json({ ok: true });
     });

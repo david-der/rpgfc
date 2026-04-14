@@ -38,6 +38,7 @@ describe("rendering boundary brands", () => {
       clubId: null,
       name: "Juan Moreno",
       dob: "2002-03-14",
+      age: 24,
       nationality: "ES",
       preferredFoot: "Left",
       archetypeId: "inverted_winger",

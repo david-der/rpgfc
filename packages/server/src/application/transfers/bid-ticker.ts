@@ -16,8 +16,30 @@ import {
   evaluatePlayerProposal,
   evaluateSellerProposal,
 } from "./evaluators.js";
+import { estimateValueCents } from "./valuations.js";
 
 const BID_DEADLINE_WEEKS = 4;
+
+async function loadImpliedValue(client: DbClient, playerId: number): Promise<number> {
+  if (client.dialect !== "sqlite") return 1_000_000_00;
+  const row = client.sqlite
+    .prepare<[number], { name: string; archetype_id: string; experience_years: number }>(
+      `SELECT name, archetype_id, experience_years FROM players WHERE id = ?`,
+    )
+    .get(playerId);
+  if (!row) return 1_000_000_00;
+  const badges = client.sqlite
+    .prepare<[number], { badge_key: string }>(
+      `SELECT badge_key FROM player_badges WHERE player_id = ?`,
+    )
+    .all(playerId);
+  return estimateValueCents({
+    name: row.name,
+    archetypeId: row.archetype_id,
+    experienceYears: row.experience_years,
+    badgeKeys: badges.map((b) => b.badge_key),
+  });
+}
 
 export interface BidTickResult {
   evaluated: number;
@@ -160,7 +182,21 @@ export async function tickBids(
       (bid.state === "Submitted" || bid.state === "SellerReviewing") &&
       currentMatchWeek >= submittedWeek + 1
     ) {
-      const askingCents = bid.asking_price_cents ?? bid.fee_cents;
+      // Unlisted path: no explicit listing → fall back to the
+      // valuation formula and apply the stricter seller threshold.
+      const isUnlisted = bid.asking_price_cents === null;
+      const askingCents = bid.asking_price_cents
+        ?? (await loadImpliedValue(client, bid.player_id));
+
+      // Seller roster size — used to honor the roster floor.
+      let sellerRosterSize = 0;
+      if (client.dialect === "sqlite") {
+        sellerRosterSize = client.sqlite
+          .prepare<[number], { n: number }>(
+            `SELECT COUNT(*) AS n FROM players WHERE club_id = ?`,
+          )
+          .get(bid.to_club_id)?.n ?? 0;
+      }
 
       // Load buyer budget for affordability check.
       let buyerCash = 0;
@@ -190,6 +226,9 @@ export async function tickBids(
         buyerCashReserveCents: buyerCash,
         buyerWageBudgetCentsPerWeek: buyerWageBudget,
         buyerCurrentWageOutCents: buyerCurrentWage,
+        isUnlisted,
+        sellerRosterSize,
+        sellerRosterFloor: 18,
       });
 
       const stance = stanceFor(bid.fee_cents, askingCents);

@@ -36,7 +36,8 @@ export interface HiddenPlayer {
   runId: number;
   clubId: number | null;
   name: string;
-  dob: string; // ISO-8601 date string (portable across SQLite + Postgres)
+  dob: string; // ISO-8601 date string — legacy; prefer `age`.
+  age: number; // Years. Ticks up by 1 on each season rollover.
   nationality: string;
   preferredFoot: PreferredFoot;
   archetypeId: string;

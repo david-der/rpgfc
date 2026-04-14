@@ -54,6 +54,18 @@ dev-server:
 dev-web:
     pnpm --filter @rpgfc/web dev
 
+# Run a full season simulation. Writes saves/post-season.db + a markdown report.
+sim:
+    pnpm season-sim
+
+# Boot the UI against the post-season save. `just dev-post-season club=7`
+dev-post-season club="1":
+    MANAGED_CLUB_ID={{club}} pnpm dev:post-season
+
+# Sim, then immediately browse the result. `just play club=7`
+play club="1": sim
+    MANAGED_CLUB_ID={{club}} pnpm dev:post-season
+
 # Hit the live /api/health endpoint on :8787.
 ping:
     @curl -sS http://localhost:8787/api/health | jq . 2>/dev/null || curl -sS http://localhost:8787/api/health

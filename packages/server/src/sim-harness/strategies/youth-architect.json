@@ -1,0 +1,22 @@
+{
+  "name": "The Youth Architect",
+  "tagline": "Signs U23s at fair market, locks them on long extensions before others notice.",
+  "targetPositions": ["gk", "midfielder", "forward", "defender"],
+  "targetMaxAge": 25,
+  "preferTopBadges": true,
+  "rolePromise": "Important Player",
+  "maxRolePromise": "Star Player",
+  "openingFeePctOfAsking": 1.00,
+  "openingWageMultiplier": 1.10,
+  "ratchetMaxAttempts": 2,
+  "ratchetStepPct": 0.08,
+  "abandonAtPctOfAsking": 1.20,
+  "maxActiveBids": 2,
+  "minCashFloorCents": 50000000,
+  "extendWhenSeasonsLeftLte": 2,
+  "extendMaxAge": 27,
+  "extendWageMultiplier": 1.10,
+  "extendSeasons": 5,
+  "backfillEnabled": true,
+  "pursueUnlistedPremium": 1.55
+}
