@@ -7,6 +7,8 @@
 
 import type { FormTier, RenderedMatchPerformance } from "@rpgfc/shared";
 
+import { usePlayerModal } from "../PlayerModalProvider";
+
 interface MatchPerformanceListProps {
   homeName: string;
   awayName: string;
@@ -24,6 +26,7 @@ const TIER_CLASS: Record<FormTier, string> = {
 };
 
 function PerformanceRow({ perf }: { perf: RenderedMatchPerformance }) {
+  const modal = usePlayerModal();
   return (
     <li className="flex items-start gap-3 border-b border-parchment-200 py-3 last:border-b-0">
       <span
@@ -33,9 +36,14 @@ function PerformanceRow({ perf }: { perf: RenderedMatchPerformance }) {
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-3">
-          <span data-testid="player-facing" className="font-serif text-base text-parchment-900">
+          <button
+            type="button"
+            data-testid="player-facing"
+            onClick={() => modal.open(perf.playerId)}
+            className="text-left font-serif text-base text-parchment-900 hover:text-moss-700"
+          >
             {perf.playerName}
-          </span>
+          </button>
           <span className="text-xs uppercase tracking-wide text-parchment-500">
             {perf.positionLabel}
           </span>

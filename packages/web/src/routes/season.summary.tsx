@@ -6,6 +6,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 
+import { usePlayerModal } from "../components/PlayerModalProvider";
 import { Card } from "../components/ui/Card";
 import { HeroIllustration } from "../components/ui/HeroIllustration";
 import { fetchClubFinances, fetchSeasonSummary } from "../lib/api";
@@ -19,6 +20,7 @@ type Summary = Awaited<ReturnType<typeof fetchSeasonSummary>>;
 function SeasonSummary() {
   const summaryQ = useQuery({ queryKey: ["season-summary"], queryFn: () => fetchSeasonSummary() });
   const financesQ = useQuery({ queryKey: ["club-finances"], queryFn: fetchClubFinances });
+  const modal = usePlayerModal();
 
   if (summaryQ.isPending) {
     return (
@@ -115,13 +117,13 @@ function SeasonSummary() {
         <section className="mt-4">
           <Card eyebrow="Golden boot">
             <div className="flex items-baseline justify-between">
-              <Link
-                to="/players/$id"
-                params={{ id: String(s.topScorer.player_id) }}
-                className="font-serif text-2xl text-parchment-900 hover:underline"
+              <button
+                type="button"
+                onClick={() => modal.open(s.topScorer!.player_id)}
+                className="text-left font-serif text-2xl text-parchment-900 hover:text-moss-700"
               >
                 <span data-testid="player-facing">{s.topScorer.player_name}</span>
-              </Link>
+              </button>
               <div className="flex items-baseline gap-4 text-parchment-600">
                 <span className="text-xs uppercase tracking-wide">
                   <span data-testid="player-facing">{s.topScorer.club_name}</span>

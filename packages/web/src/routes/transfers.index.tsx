@@ -9,6 +9,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { usePlayerModal } from "../components/PlayerModalProvider";
 import { ListingCard } from "../components/ui/ListingCard";
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { TabBar, type TabDefinition } from "../components/ui/TabBar";
@@ -183,6 +184,7 @@ interface BidItem {
 }
 
 function BidCard({ bid, currentMatchWeek }: { bid: BidItem; currentMatchWeek: number }) {
+  const modal = usePlayerModal();
   const deadline = bid.deadline_match_week ?? 0;
   const weeksLeft = Math.max(0, deadline - currentMatchWeek);
   const isResolved = ["Signed", "Expired", "Cancelled", "SellerRejected", "PlayerRejected"].includes(
@@ -194,13 +196,13 @@ function BidCard({ bid, currentMatchWeek }: { bid: BidItem; currentMatchWeek: nu
   return (
     <div className="flex items-start justify-between border border-parchment-300 bg-parchment-100 p-4">
       <div className="min-w-0 flex-1">
-        <Link
-          to="/players/$id"
-          params={{ id: String(bid.player_id) }}
-          className="font-serif text-lg text-parchment-900 hover:text-moss-700"
+        <button
+          type="button"
+          onClick={() => modal.open(bid.player_id)}
+          className="text-left font-serif text-lg text-parchment-900 hover:text-moss-700"
         >
           <span data-testid="player-facing">{bid.player_name}</span>
-        </Link>
+        </button>
         <div className="mt-1 text-xs text-parchment-500">
           from {bid.to_club_name} · {bid.role_promise}
         </div>
@@ -254,6 +256,7 @@ const REJECTION_PROSE: Record<string, string> = {
 // ── Offers tab ────────────────────────────────────────────────────────────
 
 function OffersTab() {
+  const modal = usePlayerModal();
   const query = useQuery({ queryKey: ["offers"], queryFn: fetchOffers });
 
   if (query.isPending) return <p className="text-parchment-600">Loading…</p>;
@@ -279,9 +282,13 @@ function OffersTab() {
           className="flex items-start justify-between border border-parchment-300 bg-parchment-100 p-4"
         >
           <div className="min-w-0 flex-1">
-            <div className="font-serif text-base text-parchment-900">
+            <button
+              type="button"
+              onClick={() => modal.open(offer.player_id)}
+              className="block text-left font-serif text-base text-parchment-900 hover:text-moss-700"
+            >
               <span data-testid="player-facing">{offer.player_name}</span>
-            </div>
+            </button>
             <div className="mt-1 text-xs text-parchment-500">
               Bid from {offer.from_club_name}
             </div>
@@ -316,6 +323,7 @@ function WatchlistTab() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["watchlist"] }),
   });
 
+  const modal = usePlayerModal();
   if (query.isPending) return <p className="text-parchment-600">Loading…</p>;
   if (query.isError) return <p className="text-semantic-error">Could not load watchlist.</p>;
 
@@ -333,13 +341,13 @@ function WatchlistTab() {
       {items.map((item: WatchlistItem) => (
         <div key={item.player_id} className="flex items-center justify-between p-4">
           <div>
-            <Link
-              to="/players/$id"
-              params={{ id: String(item.player_id) }}
-              className="font-serif text-base text-parchment-900 hover:text-moss-700"
+            <button
+              type="button"
+              onClick={() => modal.open(item.player_id)}
+              className="text-left font-serif text-base text-parchment-900 hover:text-moss-700"
             >
               <span data-testid="player-facing">{item.player_name}</span>
-            </Link>
+            </button>
             <div className="mt-1 text-xs text-parchment-500">
               {item.nationality}
               {item.club_name && <> · {item.club_name}</>}
@@ -379,6 +387,7 @@ interface WatchlistItem {
 // ── Completed tab ─────────────────────────────────────────────────────────
 
 function CompletedTab() {
+  const modal = usePlayerModal();
   const query = useQuery({ queryKey: ["completed-deals"], queryFn: fetchCompletedDeals });
 
   if (query.isPending) return <p className="text-parchment-600">Loading…</p>;
@@ -398,13 +407,13 @@ function CompletedTab() {
       {deals.map((deal: CompletedDeal) => (
         <div key={deal.bid_id} className="flex items-center justify-between p-4">
           <div>
-            <Link
-              to="/players/$id"
-              params={{ id: String(deal.player_id) }}
-              className="font-serif text-base text-parchment-900 hover:text-moss-700"
+            <button
+              type="button"
+              onClick={() => modal.open(deal.player_id)}
+              className="text-left font-serif text-base text-parchment-900 hover:text-moss-700"
             >
               <span data-testid="player-facing">{deal.player_name}</span>
-            </Link>
+            </button>
             <div className="mt-1 text-xs text-parchment-500">
               {deal.from_club_name} → {deal.to_club_name} · {deal.role_promise}
             </div>

@@ -7,6 +7,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 
+import { usePlayerModal } from "../components/PlayerModalProvider";
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { fetchClubDetail } from "../lib/api";
 
@@ -15,6 +16,7 @@ export const Route = createFileRoute("/league/clubs/$clubId")({
 });
 
 function ClubDetail() {
+  const modal = usePlayerModal();
   const { clubId } = Route.useParams();
   const query = useQuery({
     queryKey: ["club-detail", clubId],
@@ -81,13 +83,13 @@ function ClubDetail() {
               {club.roster.map((p) => (
                 <tr key={p.playerId} className="hover:bg-parchment-100">
                   <td className="px-4 py-2">
-                    <Link
-                      to="/players/$id"
-                      params={{ id: String(p.playerId) }}
-                      className="font-serif text-base text-parchment-900 hover:text-moss-700"
+                    <button
+                      type="button"
+                      onClick={() => modal.open(p.playerId)}
+                      className="text-left font-serif text-base text-parchment-900 hover:text-moss-700"
                     >
                       <span data-testid="player-facing">{p.playerName}</span>
-                    </Link>
+                    </button>
                   </td>
                   <td className="px-2 py-2 font-mono text-xs text-parchment-700">
                     {p.positionLabel}

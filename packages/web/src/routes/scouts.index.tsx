@@ -16,6 +16,7 @@ import {
   FORM_TIERS,
 } from "@rpgfc/shared";
 
+import { usePlayerModal } from "../components/PlayerModalProvider";
 import { BadgeChip } from "../components/ui/BadgeChip";
 import { CertaintyText } from "../components/ui/CertaintyText";
 import { SectionHeader } from "../components/ui/SectionHeader";
@@ -30,6 +31,7 @@ const POSITIONS = ["GK", "CB", "LB", "RB", "DM", "CM", "AM", "LW", "RW", "ST"];
 type PlayerItem = Awaited<ReturnType<typeof fetchPlayers>>["items"][number];
 
 function ScoutingSearch() {
+  const modal = usePlayerModal();
   const queryClient = useQueryClient();
   const watchMutation = useMutation({
     mutationFn: addToWatchlist,
@@ -235,13 +237,13 @@ function ScoutingSearch() {
                 {filtered.map((player) => (
                   <tr key={player.id} className="hover:bg-parchment-100">
                     <td className="px-4 py-3">
-                      <Link
-                        to="/players/$id"
-                        params={{ id: String(player.id) }}
-                        className="font-serif text-base text-parchment-900 hover:text-moss-700"
+                      <button
+                        type="button"
+                        onClick={() => modal.open(player.id)}
+                        className="text-left font-serif text-base text-parchment-900 hover:text-moss-700"
                       >
                         <span data-testid="player-facing">{player.name}</span>
-                      </Link>
+                      </button>
                     </td>
                     <td className="px-3 py-3 font-mono text-xs text-parchment-700">
                       {player.positionLabel}

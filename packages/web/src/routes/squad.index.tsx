@@ -10,6 +10,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { PromiseMood, SquadRole } from "@rpgfc/shared";
 import { SQUAD_ROLES } from "@rpgfc/shared";
 
+import { usePlayerModal } from "../components/PlayerModalProvider";
 import { HarmonyChip } from "../components/ui/HarmonyChip";
 import { PlayerAvatar } from "../components/ui/PlayerAvatar";
 import { PromiseMoodChip } from "../components/ui/PromiseMoodChip";
@@ -45,6 +46,7 @@ const FORM_TONE: Record<string, string> = {
 
 function SquadList() {
   const queryClient = useQueryClient();
+  const modal = usePlayerModal();
   const query = useQuery({
     queryKey: ["squad"],
     queryFn: fetchSquad,
@@ -157,12 +159,14 @@ function SquadList() {
                             </span>
                           )}
                         </div>
-                        <div
+                        <button
+                          type="button"
                           data-testid="player-facing"
-                          className="mt-1 font-serif text-lg text-parchment-900"
+                          onClick={() => modal.open(entry.playerId)}
+                          className="mt-1 text-left font-serif text-lg text-parchment-900 hover:text-moss-700"
                         >
                           {entry.playerName}
-                        </div>
+                        </button>
                         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                           {entry.wageTier && (
                             <span className="border border-parchment-300 bg-parchment-50 px-2 py-0.5 uppercase tracking-wide text-parchment-700">

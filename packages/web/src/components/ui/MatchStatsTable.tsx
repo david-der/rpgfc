@@ -6,6 +6,8 @@
 
 import type { FormTier, RenderedMatchPerformance } from "@rpgfc/shared";
 
+import { usePlayerModal } from "../PlayerModalProvider";
+
 interface Props {
   homeName: string;
   awayName: string;
@@ -40,6 +42,7 @@ export function MatchStatsTable({
 }
 
 function StatsBlock({ title, rows }: { title: string; rows: RenderedMatchPerformance[] }) {
+  const modal = usePlayerModal();
   return (
     <section>
       <h3 className="mb-3 font-serif text-xl text-parchment-900">{title}</h3>
@@ -70,12 +73,14 @@ function StatsBlock({ title, rows }: { title: string; rows: RenderedMatchPerform
             {rows.map((p) => (
               <tr key={p.playerId} className="hover:bg-parchment-100">
                 <td className="px-3 py-2">
-                  <div
+                  <button
+                    type="button"
                     data-testid="player-facing"
-                    className="font-serif text-sm text-parchment-900"
+                    onClick={() => modal.open(p.playerId)}
+                    className="text-left font-serif text-sm text-parchment-900 hover:text-moss-700"
                   >
                     {p.playerName}
-                  </div>
+                  </button>
                   <div className="text-[10px] uppercase tracking-wide text-parchment-500">
                     {p.positionLabel}
                   </div>
