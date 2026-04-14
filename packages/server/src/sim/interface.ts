@@ -24,6 +24,9 @@ export interface SimPlayer {
   /** Coarse position family. Drives stat distributions (forwards get
    *  more shots, defenders more tackles, etc). */
   positionFamily: PositionFamily;
+  /** Archetype's primaryRole (e.g. "Goalkeeper", "Center-Back",
+   *  "Striker"). Drives the position-aware match rating formula. */
+  primaryRole: string;
 }
 
 export interface SimSide {
@@ -76,6 +79,9 @@ export interface SimPerformance {
   saves: number;
   yellowCards: number;
   redCards: number;
+  /** Position-aware "media consensus" rating, INTEGER × 10
+   *  (60 = 6.0, 100 = 10.0). Clamped to [40, 100]. */
+  ratingX10: number;
 }
 
 export interface SimMatchResult {

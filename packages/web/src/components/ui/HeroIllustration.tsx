@@ -62,34 +62,35 @@ export function HeroIllustration({
             mixBlendMode: "multiply",
           }}
         />
-        {/* Gradient veil so overlaid text stays legible. No box-shadow; a
-            parchment-tinted fade is enough on a grayscale sketch. */}
+        {/* Just the eyebrow + title overlay the art — the subtitle moves
+            below to stay legible regardless of the sketch composition. */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-24"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-32"
           style={{
             background:
-              "linear-gradient(to top, rgba(250,247,240,0.92), rgba(250,247,240,0))",
+              "linear-gradient(to top, rgba(250,247,240,0.98) 40%, rgba(250,247,240,0.75) 75%, rgba(250,247,240,0))",
           }}
         />
-        {/* Overlay text — sits inside the art frame so the scene feels like
-            a storybook plate with the caption burned in. */}
         <div className="absolute inset-x-0 bottom-0 px-6 pb-5">
           {eyebrow && (
-            <div className="font-mono text-xs uppercase tracking-wide text-parchment-600">
+            <div className="font-mono text-xs uppercase tracking-wide text-parchment-700">
               {eyebrow}
             </div>
           )}
           <h1 className="mt-1 font-serif text-4xl leading-tight text-parchment-900">
             {title}
           </h1>
-          {subtitle && (
-            <p className="mt-2 max-w-prose font-serif text-base text-parchment-700">
-              {subtitle}
-            </p>
-          )}
         </div>
       </div>
+
+      {subtitle && (
+        <div className="border-t border-parchment-300 bg-parchment-50 px-6 py-4">
+          <p className="max-w-prose font-serif text-base leading-relaxed text-parchment-700">
+            {subtitle}
+          </p>
+        </div>
+      )}
 
       {children && (
         <div className="border-t border-parchment-300 px-6 py-4">{children}</div>

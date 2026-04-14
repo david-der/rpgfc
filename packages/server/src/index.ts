@@ -27,6 +27,7 @@ import { createPlayersRoute } from "./routes/players.js";
 import { createSavesRoute } from "./routes/saves.js";
 import { createScoutsRoute } from "./routes/scouts.js";
 import { createSeasonRoute } from "./routes/season.js";
+import { createSeasonsRoute } from "./routes/seasons.js";
 import { createSquadRoute } from "./routes/squad.js";
 import { createTacticsRoute } from "./routes/tactics.js";
 import { createTransfersRoute } from "./routes/transfers.js";
@@ -94,6 +95,10 @@ export function createApiApp(deps: ApiDeps) {
     now: deps.now,
     userClubId,
   });
+  const seasonsApp = createSeasonsRoute({
+    db: deps.db,
+    userClubId,
+  });
   const matchesApp = createMatchesRoute({ db: deps.db });
   const savesApp = createSavesRoute({
     savesDir: deps.savesDir ?? "./saves",
@@ -117,6 +122,7 @@ export function createApiApp(deps: ApiDeps) {
     .route("/api/tactics", tacticsApp)
     .route("/api/squad", squadApp)
     .route("/api/season", seasonApp)
+    .route("/api/seasons", seasonsApp)
     .route("/api/matches", matchesApp)
     .route("/api/saves", savesApp)
     .route("/api/club", clubApp)

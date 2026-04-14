@@ -11,9 +11,11 @@ import { Hono } from "hono";
 
 import {
   advanceMatchdayRendered,
+  computeBestXI,
   computeLeagueTable,
   renderFixturesForUser,
 } from "../rendering/index.js";
+import type { BestXI } from "../rendering/index.js";
 import { loadSeasonState } from "../application/season/state.js";
 import { endSeason } from "../application/season/end.js";
 import type { DbClient } from "../db/client.js";
@@ -72,6 +74,19 @@ export function createSeasonRoute(deps: SeasonRouteDeps) {
           404,
         );
       }
+      // Current season isn't done — don't synthesise a champion from an
+      // empty table. The archive list already excludes it.
+      if (requested >= state.season) {
+        return c.json(
+          {
+            error: {
+              code: "season_incomplete",
+              message: "That season hasn't finished yet.",
+            },
+          },
+          404,
+        );
+      }
       const summary = await renderSeasonSummary(deps.db, requested, deps.userClubId);
       if (!summary) {
         return c.json(
@@ -105,7 +120,9 @@ async function renderSeasonSummary(
   woodenSpoon: { clubId: number; clubName: string; points: number };
   userFinish: { position: number; points: number; clubName: string } | null;
   topScorer: TopScorerRow | null;
+  topAssister: TopScorerRow | null;
   table: Awaited<ReturnType<typeof computeLeagueTable>>;
+  bestXI: BestXI;
   narrative: string;
 }> {
   const table = await computeLeagueTable(db, season);
@@ -115,6 +132,8 @@ async function renderSeasonSummary(
   const userRow = table.find((r) => r.clubId === userClubId) ?? null;
   const userIndex = table.findIndex((r) => r.clubId === userClubId);
   const topScorer = await loadTopScorer(db, season);
+  const topAssister = await loadTopAssister(db, season);
+  const bestXI = await computeBestXI(db, season);
 
   const narrative = buildNarrative({
     season,
@@ -136,9 +155,49 @@ async function renderSeasonSummary(
       ? { position: userIndex + 1, points: userRow.points, clubName: userRow.clubName }
       : null,
     topScorer,
+    topAssister,
     table,
+    bestXI,
     narrative,
   };
+}
+
+async function loadTopAssister(db: DbClient, season: number): Promise<TopScorerRow | null> {
+  if (db.dialect === "sqlite") {
+    const row = db.sqlite
+      .prepare<[number], TopScorerRow>(
+        `SELECT pmp.player_id, p.name AS player_name, pmp.club_id, c.name AS club_name,
+                SUM(pmp.goals) AS goals,
+                SUM(pmp.assists) AS assists
+         FROM player_match_performance pmp
+         JOIN matches m ON m.id = pmp.match_id
+         JOIN players p ON p.id = pmp.player_id
+         JOIN clubs c ON c.id = pmp.club_id
+         WHERE m.season = ? AND m.state = 'Played'
+         GROUP BY pmp.player_id
+         HAVING SUM(pmp.assists) > 0
+         ORDER BY assists DESC, goals DESC
+         LIMIT 1`,
+      )
+      .get(season);
+    return row ?? null;
+  }
+  const res = await db.pool.query<TopScorerRow>(
+    `SELECT pmp.player_id, p.name AS player_name, pmp.club_id, c.name AS club_name,
+            SUM(pmp.goals)::int AS goals,
+            SUM(pmp.assists)::int AS assists
+     FROM player_match_performance pmp
+     JOIN matches m ON m.id = pmp.match_id
+     JOIN players p ON p.id = pmp.player_id
+     JOIN clubs c ON c.id = pmp.club_id
+     WHERE m.season = $1 AND m.state = 'Played'
+     GROUP BY pmp.player_id, p.name, pmp.club_id, c.name
+     HAVING SUM(pmp.assists) > 0
+     ORDER BY assists DESC, goals DESC
+     LIMIT 1`,
+    [season],
+  );
+  return res.rows[0] ?? null;
 }
 
 async function loadTopScorer(db: DbClient, season: number): Promise<TopScorerRow | null> {

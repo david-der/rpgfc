@@ -136,8 +136,8 @@ export async function advanceMatchday(
             passes_attempted, passes_completed, tackles_attempted, tackles_won,
             interceptions, clearances, aerials_won, aerials_contested,
             dribbles_completed, fouls_committed, fouls_drawn, saves,
-            yellow_cards, red_cards)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            yellow_cards, red_cards, rating_x10)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       );
       for (const { row, result } of entries) {
         updateMatch.run(result.homeGoals, result.awayGoals, now, row.id);
@@ -151,7 +151,7 @@ export async function advanceMatchday(
             perf.tacklesAttempted, perf.tacklesWon, perf.interceptions,
             perf.clearances, perf.aerialsWon, perf.aerialsContested,
             perf.dribblesCompleted, perf.foulsCommitted, perf.foulsDrawn,
-            perf.saves, perf.yellowCards, perf.redCards,
+            perf.saves, perf.yellowCards, perf.redCards, perf.ratingX10,
           );
         }
       }
@@ -183,9 +183,9 @@ export async function advanceMatchday(
                 passes_attempted, passes_completed, tackles_attempted, tackles_won,
                 interceptions, clearances, aerials_won, aerials_contested,
                 dribbles_completed, fouls_committed, fouls_drawn, saves,
-                yellow_cards, red_cards)
+                yellow_cards, red_cards, rating_x10)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-                     $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)`,
+                     $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)`,
             [
               row.id, perf.playerId, perf.clubId,
               perf.goals, perf.assists, perf.tier, perf.eventDescription,
@@ -194,7 +194,7 @@ export async function advanceMatchday(
               perf.tacklesAttempted, perf.tacklesWon, perf.interceptions,
               perf.clearances, perf.aerialsWon, perf.aerialsContested,
               perf.dribblesCompleted, perf.foulsCommitted, perf.foulsDrawn,
-              perf.saves, perf.yellowCards, perf.redCards,
+              perf.saves, perf.yellowCards, perf.redCards, perf.ratingX10,
             ],
           );
         }

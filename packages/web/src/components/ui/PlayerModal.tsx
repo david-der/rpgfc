@@ -24,6 +24,7 @@ import {
   fetchPlayer,
   fetchPlayerContract,
   fetchPlayerHistory,
+  fetchPlayerRecentMatches,
 } from "../../lib/api";
 
 type Face = "front" | "back";
@@ -46,6 +47,10 @@ export function PlayerModal({
   const historyQ = useQuery({
     queryKey: ["player-history", id],
     queryFn: () => fetchPlayerHistory(id),
+  });
+  const recentQ = useQuery({
+    queryKey: ["player-recent-matches", id],
+    queryFn: () => fetchPlayerRecentMatches(id),
   });
 
   // Escape to close — classic modal ergonomics.
@@ -122,6 +127,7 @@ export function PlayerModal({
           <FrontFace
             player={player}
             contract={contract}
+            recentMatches={recentQ.data?.last5 ?? []}
             onOpenFullProfile={onClose}
           />
         ) : (
@@ -134,13 +140,52 @@ export function PlayerModal({
 
 // ── FRONT ────────────────────────────────────────────────────────────────
 
+type RecentMatch = Awaited<ReturnType<typeof fetchPlayerRecentMatches>>["last5"][number];
+
+function signatureBeat(recent: RecentMatch[]): string {
+  if (recent.length === 0) return "No recent matches.";
+  const goals = recent.reduce((s, m) => s + m.goals, 0);
+  const assists = recent.reduce((s, m) => s + m.assists, 0);
+  const totalRating = recent.reduce((s, m) => s + m.ratingX10, 0);
+  const avgRating = totalRating / recent.length;
+  // Unbeaten streak: scan newest-first until a loss.
+  let unbeaten = 0;
+  for (const m of recent) {
+    if (m.result === "L") break;
+    unbeaten += 1;
+  }
+  if (goals >= 2) {
+    return `${goals} goals in his last ${recent.length}.`;
+  }
+  if (assists >= 2) {
+    return `${assists} assists in his last ${recent.length}.`;
+  }
+  if (unbeaten >= 3) {
+    return `Unbeaten in his last ${unbeaten} starts.`;
+  }
+  if (avgRating >= 72) {
+    return `Averaging ${(avgRating / 10).toFixed(1)} across his last ${recent.length}.`;
+  }
+  return "A quiet run of form.";
+}
+
+function resultToneBg(result: "W" | "D" | "L"): string {
+  return result === "W"
+    ? "border-result-win bg-result-win text-parchment-50"
+    : result === "L"
+      ? "border-result-loss bg-result-loss text-parchment-50"
+      : "border-parchment-500 bg-parchment-50 text-parchment-800";
+}
+
 function FrontFace({
   player,
   contract,
+  recentMatches,
   onOpenFullProfile,
 }: {
   player: NonNullable<Awaited<ReturnType<typeof fetchPlayer>>>;
   contract: { wageTier: string; rolePromise: string; seasonsRemaining: number } | null;
+  recentMatches: RecentMatch[];
   onOpenFullProfile: () => void;
 }) {
   const seasonsLeft = contract?.seasonsRemaining ?? null;
@@ -231,6 +276,47 @@ function FrontFace({
           </div>
         )}
 
+        {/* Signature beat — one interesting sentence. The allowlisted
+            digits here are always concrete counts, never a rating. */}
+        <div className="border-t border-parchment-300 pt-4">
+          <p
+            data-testid="modal-signature-beat"
+            className="font-serif text-sm italic text-parchment-700"
+          >
+            {signatureBeat(recentMatches)}
+          </p>
+        </div>
+
+        {/* Last 5 matches strip */}
+        {recentMatches.length > 0 && (
+          <div>
+            <div className="mb-2 text-xs font-medium uppercase tracking-wide text-parchment-500">
+              Last {recentMatches.length} matches
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {recentMatches.map((m, i) => (
+                <div key={`${m.matchId}-${i}`} className="flex flex-col items-center">
+                  <span
+                    data-testid="player-facing"
+                    className="text-[9px] uppercase tracking-wide text-parchment-500"
+                  >
+                    {m.homeAway === "home" ? "vs" : "@"} {abbreviate(m.opponentClubName)}
+                  </span>
+                  <span
+                    data-testid={`modal-last5-rating-${i}-allowlist-number`}
+                    className={`mt-0.5 inline-flex h-7 min-w-[2.25rem] items-center justify-center border px-1.5 font-mono text-xs font-semibold tabular-nums ${resultToneBg(m.result)}`}
+                  >
+                    {(m.ratingX10 / 10).toFixed(1)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Role fit indicator — qualitative only */}
+        <RoleFit player={player} />
+
         <div className="flex items-center gap-3 border-t border-parchment-300 pt-4">
           <Link
             to="/players/$id"
@@ -244,6 +330,52 @@ function FrontFace({
       </div>
     </div>
   );
+}
+
+function abbreviate(name: string): string {
+  // Take up to 3 uppercase initials, falling back to the first 3 chars.
+  const words = name.split(/\s+/).filter(Boolean);
+  const initials = words
+    .map((w) => w[0])
+    .filter((c): c is string => !!c)
+    .join("")
+    .toUpperCase();
+  if (initials.length >= 2) return initials.slice(0, 3);
+  return name.slice(0, 3).toUpperCase();
+}
+
+function RoleFit({
+  player,
+}: {
+  player: NonNullable<Awaited<ReturnType<typeof fetchPlayer>>>;
+}) {
+  // Map rolePromise (a playing-time tier) to the SquadRole we'd expect.
+  // A mismatch surfaces as "Playing out of role".
+  const promise = player.rolePromise;
+  const role = player.squadRole;
+  if (!promise || !role) {
+    return (
+      <p className="text-xs italic text-parchment-500">Role not yet set.</p>
+    );
+  }
+  const expected: Record<string, string> = {
+    "Star Player": "Starter",
+    "Important Player": "Starter",
+    Rotation: "Rotation",
+    Backup: "Backup",
+    "Youth/Development": "Youth",
+  };
+  const want = expected[promise];
+  if (want && want !== role) {
+    return (
+      <p className="text-xs italic text-clay-700">
+        Playing out of role:{" "}
+        <span className="font-semibold not-italic">{promise}</span> →{" "}
+        <span className="font-semibold not-italic">{role}</span>
+      </p>
+    );
+  }
+  return <p className="text-xs italic text-parchment-500">Playing in role.</p>;
 }
 
 function Stat({

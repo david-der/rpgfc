@@ -8,6 +8,9 @@
 
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
+
+import type { RenderedListing } from "@rpgfc/shared";
 
 import { usePlayerModal } from "../components/PlayerModalProvider";
 import { ListingCard } from "../components/ui/ListingCard";
@@ -25,13 +28,90 @@ import {
 const TRANSFER_TABS = ["market", "my-bids", "offers", "watchlist", "completed"] as const;
 type TransferTab = (typeof TRANSFER_TABS)[number];
 
+const POSITION_BUCKETS = ["All", "GK", "DEF", "MID", "FWD"] as const;
+type PositionBucket = (typeof POSITION_BUCKETS)[number];
+
+const MARKET_SORTS = [
+  "recent",
+  "name-asc",
+  "age-young",
+  "age-old",
+  "club",
+  "price-low",
+  "price-high",
+] as const;
+type MarketSort = (typeof MARKET_SORTS)[number];
+
+const SORT_LABEL: Record<MarketSort, string> = {
+  recent: "Most recently listed",
+  "name-asc": "Name A–Z",
+  "age-young": "Age (youngest)",
+  "age-old": "Age (oldest)",
+  club: "Club name",
+  "price-low": "Asking price (low)",
+  "price-high": "Asking price (high)",
+};
+
+const POSITION_TO_BUCKET: Record<string, Exclude<PositionBucket, "All">> = {
+  GK: "GK",
+  CB: "DEF",
+  FB: "DEF",
+  LB: "DEF",
+  RB: "DEF",
+  DM: "MID",
+  CM: "MID",
+  AM: "MID",
+  LW: "FWD",
+  RW: "FWD",
+  ST: "FWD",
+};
+
+const ASKING_TIER_RANK: Record<string, number> = {
+  Minimal: 0,
+  Modest: 1,
+  Notable: 2,
+  Significant: 3,
+  Elite: 4,
+};
+
+const AGE_MIN_DEFAULT = 16;
+const AGE_MAX_DEFAULT = 40;
+
+interface MarketSearch {
+  tab?: TransferTab;
+  pos?: PositionBucket;
+  ageMin?: number;
+  ageMax?: number;
+  club?: string;
+  q?: string;
+  sort?: MarketSort;
+}
+
 export const Route = createFileRoute("/transfers/")({
   component: TransferDashboard,
-  validateSearch: (search: Record<string, unknown>): { tab?: TransferTab } => {
-    const raw = search["tab"];
-    return typeof raw === "string" && (TRANSFER_TABS as readonly string[]).includes(raw)
-      ? { tab: raw as TransferTab }
-      : {};
+  validateSearch: (search: Record<string, unknown>): MarketSearch => {
+    const out: MarketSearch = {};
+    const tab = search["tab"];
+    if (typeof tab === "string" && (TRANSFER_TABS as readonly string[]).includes(tab)) {
+      out.tab = tab as TransferTab;
+    }
+    const pos = search["pos"];
+    if (typeof pos === "string" && (POSITION_BUCKETS as readonly string[]).includes(pos)) {
+      out.pos = pos as PositionBucket;
+    }
+    const ageMin = Number(search["ageMin"]);
+    if (Number.isFinite(ageMin) && ageMin >= 0 && ageMin <= 99) out.ageMin = ageMin;
+    const ageMax = Number(search["ageMax"]);
+    if (Number.isFinite(ageMax) && ageMax >= 0 && ageMax <= 99) out.ageMax = ageMax;
+    const club = search["club"];
+    if (typeof club === "string" && club.length > 0) out.club = club;
+    const q = search["q"];
+    if (typeof q === "string" && q.length > 0) out.q = q;
+    const sort = search["sort"];
+    if (typeof sort === "string" && (MARKET_SORTS as readonly string[]).includes(sort)) {
+      out.sort = sort as MarketSort;
+    }
+    return out;
   },
 });
 
@@ -69,7 +149,11 @@ function TransferDashboard() {
   const activeTab: TransferTab = search.tab ?? "market";
 
   const tabs: TabDefinition[] = [
-    { key: "market", label: "Market", content: <MarketTab /> },
+    {
+      key: "market",
+      label: "Market",
+      content: <MarketTab search={search} />,
+    },
     { key: "my-bids", label: "My Bids", content: <MyBidsTab /> },
     { key: "offers", label: "Offers", content: <OffersTab /> },
     { key: "watchlist", label: "Watchlist", content: <WatchlistTab /> },
@@ -85,7 +169,12 @@ function TransferDashboard() {
           activeKey={activeTab}
           onChange={(key) => {
             void navigate({
-              search: key === "market" ? {} : { tab: key as TransferTab },
+              search: (prev: MarketSearch) => {
+                const { tab: _tab, ...rest } = prev;
+                return key === "market"
+                  ? rest
+                  : { ...rest, tab: key as TransferTab };
+              },
             });
           }}
         />
@@ -96,22 +185,255 @@ function TransferDashboard() {
 
 // ── Market tab ────────────────────────────────────────────────────────────
 
-function MarketTab() {
+function MarketTab({ search }: { search: MarketSearch }) {
+  const navigate = useNavigate({ from: Route.fullPath });
   const query = useQuery({ queryKey: ["transfers"], queryFn: fetchTransfers });
+
+  const pos: PositionBucket = search.pos ?? "All";
+  const ageMin = search.ageMin ?? AGE_MIN_DEFAULT;
+  const ageMax = search.ageMax ?? AGE_MAX_DEFAULT;
+  const club = search.club ?? "All";
+  const q = search.q ?? "";
+  const sort: MarketSort = search.sort ?? "recent";
+
+  const listings = query.data?.listings ?? [];
+
+  const clubNames = useMemo(() => {
+    const set = new Set<string>();
+    for (const l of listings) set.add(l.club.name);
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [listings]);
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    const result = listings.filter((l) => {
+      if (pos !== "All") {
+        const bucket = POSITION_TO_BUCKET[l.positionLabel];
+        if (bucket !== pos) return false;
+      }
+      if (l.age < ageMin || l.age > ageMax) return false;
+      if (club !== "All" && l.club.name !== club) return false;
+      if (needle && !l.playerName.toLowerCase().includes(needle)) return false;
+      return true;
+    });
+    const sorted = [...result];
+    switch (sort) {
+      case "name-asc":
+        sorted.sort((a, b) => a.playerName.localeCompare(b.playerName));
+        break;
+      case "age-young":
+        sorted.sort((a, b) => a.age - b.age);
+        break;
+      case "age-old":
+        sorted.sort((a, b) => b.age - a.age);
+        break;
+      case "club":
+        sorted.sort((a, b) => a.club.name.localeCompare(b.club.name));
+        break;
+      case "price-low":
+        sorted.sort(
+          (a, b) =>
+            (ASKING_TIER_RANK[a.askingTier] ?? 0) - (ASKING_TIER_RANK[b.askingTier] ?? 0),
+        );
+        break;
+      case "price-high":
+        sorted.sort(
+          (a, b) =>
+            (ASKING_TIER_RANK[b.askingTier] ?? 0) - (ASKING_TIER_RANK[a.askingTier] ?? 0),
+        );
+        break;
+      case "recent":
+      default:
+        break;
+    }
+    return sorted;
+  }, [listings, pos, ageMin, ageMax, club, q, sort]);
+
+  function update(partial: Partial<MarketSearch>) {
+    void navigate({
+      search: (prev: MarketSearch) => {
+        const next: MarketSearch = { ...prev, ...partial };
+        // Drop defaults so the URL stays clean.
+        if (next.pos === "All") delete next.pos;
+        if (next.ageMin === AGE_MIN_DEFAULT) delete next.ageMin;
+        if (next.ageMax === AGE_MAX_DEFAULT) delete next.ageMax;
+        if (next.club === "All" || next.club === "") delete next.club;
+        if (!next.q) delete next.q;
+        if (next.sort === "recent") delete next.sort;
+        return next;
+      },
+    });
+  }
+
+  const hasActiveFilter =
+    pos !== "All" ||
+    ageMin !== AGE_MIN_DEFAULT ||
+    ageMax !== AGE_MAX_DEFAULT ||
+    club !== "All" ||
+    q !== "" ||
+    sort !== "recent";
+
+  function clearFilters() {
+    void navigate({
+      search: (prev: MarketSearch): MarketSearch =>
+        prev.tab ? { tab: prev.tab } : {},
+    });
+  }
 
   if (query.isPending) return <p className="text-parchment-600">Loading…</p>;
   if (query.isError) return <p className="text-semantic-error">Could not load listings.</p>;
 
+  const summaryParts: string[] = [];
+  summaryParts.push(`${filtered.length} listing${filtered.length === 1 ? "" : "s"}`);
+  if (pos !== "All") summaryParts.push(pos);
+  if (ageMin !== AGE_MIN_DEFAULT || ageMax !== AGE_MAX_DEFAULT) {
+    summaryParts.push(`${ageMin}–${ageMax} yrs`);
+  }
+  if (club !== "All") summaryParts.push(club);
+  if (q) summaryParts.push(`"${q}"`);
+  summaryParts.push(`sorted by ${SORT_LABEL[sort].toLowerCase()}`);
+
   return (
     <div className="space-y-4">
-      <h2 className="text-xs font-medium uppercase tracking-wide text-parchment-500">
-        Listings ({query.data.listings.length})
-      </h2>
-      <div className="space-y-3">
-        {query.data.listings.map((listing) => (
-          <ListingCard key={listing.playerId} listing={listing} />
-        ))}
+      <div className="border border-parchment-300 bg-parchment-100 p-4">
+        <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+          <div>
+            <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-parchment-500">
+              Position
+            </div>
+            <div className="flex">
+              {POSITION_BUCKETS.map((b) => {
+                const active = b === pos;
+                return (
+                  <button
+                    key={b}
+                    type="button"
+                    onClick={() => update({ pos: b })}
+                    className={`border px-3 py-1 font-sans text-xs uppercase tracking-wide -ml-px first:ml-0 ${
+                      active
+                        ? "border-moss-600 bg-moss-500 text-parchment-50"
+                        : "border-parchment-300 bg-parchment-50 text-parchment-700 hover:border-parchment-500"
+                    }`}
+                  >
+                    {b}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-parchment-500">
+              Age
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={AGE_MIN_DEFAULT}
+                max={AGE_MAX_DEFAULT}
+                value={ageMin}
+                onChange={(e) => update({ ageMin: Number(e.target.value) })}
+                className="w-16 border border-parchment-300 bg-parchment-50 px-2 py-1 font-mono text-xs tabular-nums text-parchment-900"
+              />
+              <span className="text-xs text-parchment-500">–</span>
+              <input
+                type="number"
+                min={AGE_MIN_DEFAULT}
+                max={AGE_MAX_DEFAULT}
+                value={ageMax}
+                onChange={(e) => update({ ageMax: Number(e.target.value) })}
+                className="w-16 border border-parchment-300 bg-parchment-50 px-2 py-1 font-mono text-xs tabular-nums text-parchment-900"
+              />
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-parchment-500">
+              Club
+            </div>
+            <select
+              value={club}
+              onChange={(e) => update({ club: e.target.value })}
+              className="min-w-[10rem] border border-parchment-300 bg-parchment-50 px-2 py-1 font-sans text-xs text-parchment-900"
+            >
+              <option value="All">All clubs</option>
+              {clubNames.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="min-w-[10rem] flex-1">
+            <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-parchment-500">
+              Search
+            </div>
+            <input
+              type="search"
+              value={q}
+              onChange={(e) => update({ q: e.target.value })}
+              placeholder="Player name…"
+              className="w-full border border-parchment-300 bg-parchment-50 px-2 py-1 font-sans text-xs text-parchment-900 placeholder:text-parchment-400"
+            />
+          </div>
+
+          <div>
+            <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-parchment-500">
+              Sort
+            </div>
+            <select
+              value={sort}
+              onChange={(e) => update({ sort: e.target.value as MarketSort })}
+              className="border border-parchment-300 bg-parchment-50 px-2 py-1 font-sans text-xs text-parchment-900"
+            >
+              {MARKET_SORTS.map((s) => (
+                <option key={s} value={s}>
+                  {SORT_LABEL[s]}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
       </div>
+
+      <div className="flex items-center justify-between">
+        <h2 className="text-xs font-medium uppercase tracking-wide text-parchment-500">
+          {summaryParts.join(" · ")}
+        </h2>
+        {hasActiveFilter && (
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="font-sans text-xs uppercase tracking-wide text-moss-700 hover:text-moss-900"
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="border border-parchment-300 bg-parchment-100 p-8 text-center">
+          <p className="font-serif text-base text-parchment-700">
+            No listings match your filters.
+          </p>
+          {hasActiveFilter && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="mt-3 font-sans text-xs uppercase tracking-wide text-moss-700 hover:text-moss-900"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((listing: RenderedListing) => (
+            <ListingCard key={listing.playerId} listing={listing} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

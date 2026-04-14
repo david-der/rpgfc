@@ -80,6 +80,14 @@ export interface RenderedSquadEntry {
   /** Most-recent form tier from the last played match. null when no
    *  match has been played yet this season. */
   formTier: FormTier | null;
+  /** Per-match rating (rating_x10) for the player's last 5 matches,
+   *  newest first. Fewer entries if the player hasn't played 5 matches.
+   *  Used by the squad-row form sparkline. */
+  last5Ratings: number[];
+  /** Number of played match weeks since this player's last start. null
+   *  if they have never started a match this season. 0 means they
+   *  started the most-recent played match. */
+  matchesSinceLastStart: number | null;
 }
 
 export interface RenderedSquad {

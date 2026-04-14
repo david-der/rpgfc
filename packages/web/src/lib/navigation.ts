@@ -16,6 +16,7 @@ import {
   CalendarDays,
   ClipboardList,
   Handshake,
+  History,
   Home,
   Search,
   UsersRound,
@@ -85,6 +86,13 @@ export const PRIMARY_NAV: readonly NavItem[] = [
     to: "/club",
     icon: Building2,
     description: "Club finances and identity",
+  },
+  {
+    key: "seasons",
+    label: "History",
+    to: "/seasons",
+    icon: History,
+    description: "Past seasons",
   },
 ] as const;
 

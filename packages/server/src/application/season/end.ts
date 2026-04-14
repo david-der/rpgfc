@@ -10,6 +10,10 @@ import type { DbClient } from "../../db/client.js";
 import { computeLeagueTable } from "../../rendering/league-table.js";
 import { generatePlayer } from "../generation/generate-player.js";
 import { mulberry32 } from "../generation/rng.js";
+import {
+  enforceMinimumRosterPostgres,
+  enforceMinimumRosterSqlite,
+} from "./enforce-roster.js";
 import { generateFullSeason } from "./schedule.js";
 
 const YOUTH_INTAKE_AGE = 17;
@@ -210,6 +214,13 @@ export async function endSeason(
         }
       }
 
+      // Final pass: every club must have at least 18 contracted players.
+      // Retirements + contract expiries can drain a roster below the floor;
+      // this signs free agents (generating new ones if the pool is dry)
+      // on minimum-wage 2-year contracts. Cash checks are bypassed —
+      // this is a survival mechanism to keep the fixture list playable.
+      enforceMinimumRosterSqlite(client, now);
+
       // Generate new season's fixtures.
       for (const md of schedule) {
         for (const fx of md.fixtures) {
@@ -257,6 +268,10 @@ export async function endSeason(
         await conn.query(`DELETE FROM listing WHERE player_id = $1`, [player_id]);
       }
       await conn.query(`DELETE FROM contracts WHERE seasons_remaining <= 0`);
+
+      // Final pass: enforce the 18-player roster floor — see sqlite branch.
+      await enforceMinimumRosterPostgres(conn, now);
+
       for (const md of schedule) {
         for (const fx of md.fixtures) {
           const seed = hashSeed(md.matchday, fx.homeClubId, fx.awayClubId);

@@ -1,19 +1,19 @@
 // /squad — Story 05 List archetype.
 //
-// Main column: players grouped by SquadRole with name + position +
-// promise-mood chip per row. Right inspector: HarmonyChip + the
-// three worst-affected players by mood (Fractured / Uneasy call-outs).
+// Main column: players grouped by position bucket (GK/DEF/MID/FWD).
+// Within each bucket sorted by squad-role tier. Right inspector:
+// Harmony + watch list.
 
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Clock } from "lucide-react";
 
 import type { PromiseMood, SquadRole } from "@rpgfc/shared";
-import { SQUAD_ROLES } from "@rpgfc/shared";
 
 import { usePlayerModal } from "../components/PlayerModalProvider";
 import { HarmonyChip } from "../components/ui/HarmonyChip";
 import { PlayerAvatar } from "../components/ui/PlayerAvatar";
-import { PromiseMoodChip } from "../components/ui/PromiseMoodChip";
+import { RatingSparkline } from "../components/ui/RatingSparkline";
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { SquadRoleSelect } from "../components/ui/SquadRoleSelect";
 import { fetchSquad, setSquadRole } from "../lib/api";
@@ -25,23 +25,38 @@ export const Route = createFileRoute("/squad/")({
 type SquadResponse = Awaited<ReturnType<typeof fetchSquad>>;
 type SquadEntry = SquadResponse["entries"][number];
 
+type PositionBucket = "GK" | "DEF" | "MID" | "FWD";
+
+const BUCKET_LABELS: Record<PositionBucket, string> = {
+  GK: "Goalkeepers",
+  DEF: "Defenders",
+  MID: "Midfielders",
+  FWD: "Forwards",
+};
+
+const BUCKET_ORDER: PositionBucket[] = ["GK", "DEF", "MID", "FWD"];
+
+function bucketFor(positionLabel: string): PositionBucket {
+  const p = positionLabel.toUpperCase();
+  if (p === "GK") return "GK";
+  if (p === "CB" || p === "FB" || p === "LB" || p === "RB" || p === "WB") return "DEF";
+  if (p === "DM" || p === "CM" || p === "AM" || p === "MC") return "MID";
+  return "FWD";
+}
+
+const ROLE_SORT: Record<SquadRole, number> = {
+  Starter: 0,
+  Rotation: 1,
+  Backup: 2,
+  Youth: 3,
+};
+
 const MOOD_ORDER: Record<PromiseMood, number> = {
   Furious: 0,
   Disappointed: 1,
   Concerned: 2,
   Content: 3,
   Eager: 4,
-};
-
-// Form tone for the per-row chip. Paired with the tier word so the
-// signal reads in grayscale too (Style Guide §2 — color is never
-// load-bearing alone).
-const FORM_TONE: Record<string, string> = {
-  Excellent: "border-form-excellent bg-parchment-50 text-form-excellent",
-  Good: "border-form-good bg-parchment-50 text-form-good",
-  Average: "border-parchment-500 bg-parchment-50 text-parchment-700",
-  Poor: "border-form-poor bg-parchment-50 text-form-poor",
-  Dreadful: "border-form-dreadful bg-parchment-50 text-form-dreadful",
 };
 
 function SquadList() {
@@ -78,10 +93,20 @@ function SquadList() {
 
   const squad: SquadResponse = query.data;
 
-  const grouped = new Map<SquadRole, SquadEntry[]>();
-  for (const role of SQUAD_ROLES) grouped.set(role, []);
+  const grouped = new Map<PositionBucket, SquadEntry[]>();
+  for (const bucket of BUCKET_ORDER) grouped.set(bucket, []);
   for (const entry of squad.entries) {
-    grouped.get(entry.role as SquadRole)?.push(entry);
+    grouped.get(bucketFor(entry.positionLabel))?.push(entry);
+  }
+  // Sort each bucket: primary position, then squad-role tier.
+  for (const bucket of BUCKET_ORDER) {
+    const rows = grouped.get(bucket) ?? [];
+    rows.sort((a, b) => {
+      if (a.positionLabel !== b.positionLabel) {
+        return a.positionLabel.localeCompare(b.positionLabel);
+      }
+      return ROLE_SORT[a.role as SquadRole] - ROLE_SORT[b.role as SquadRole];
+    });
   }
 
   const worstMoods = [...squad.entries]
@@ -107,7 +132,10 @@ function SquadList() {
             New arrivals this season
           </div>
           <p className="mt-1 font-serif text-base text-parchment-900">
-            <span data-testid="squad-new-arrivals-count-allowlist-number" className="font-mono tabular-nums">
+            <span
+              data-testid="squad-new-arrivals-count-allowlist-number"
+              className="font-mono tabular-nums"
+            >
               {newArrivals.length}
             </span>{" "}
             youth player{newArrivals.length === 1 ? "" : "s"} joined your academy:
@@ -124,105 +152,37 @@ function SquadList() {
       )}
 
       <div className="mt-8 grid gap-8 md:grid-cols-[2fr_1fr]">
-        {/* Main column */}
         <section className="space-y-6">
-          {SQUAD_ROLES.map((role) => {
-            const rows = grouped.get(role) ?? [];
+          {BUCKET_ORDER.map((bucket) => {
+            const rows = grouped.get(bucket) ?? [];
             if (rows.length === 0) return null;
             return (
-              <div key={role}>
-                <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-parchment-500">
-                  {role} ({rows.length})
-                </h2>
+              <section key={bucket} data-testid={`squad-bucket-${bucket.toLowerCase()}`}>
+                <header className="mb-2 flex items-baseline justify-between border-b border-parchment-300 pb-1">
+                  <h2 className="font-serif text-lg text-parchment-900">
+                    {BUCKET_LABELS[bucket]}
+                  </h2>
+                  <span
+                    data-testid={`squad-bucket-${bucket.toLowerCase()}-count-allowlist-number`}
+                    className="font-mono text-xs uppercase tracking-wide tabular-nums text-parchment-500"
+                  >
+                    {rows.length}
+                  </span>
+                </header>
                 <div className="divide-y divide-parchment-200 border border-parchment-300 bg-parchment-100">
                   {rows.map((entry) => (
-                    <div
+                    <SquadRow
                       key={entry.playerId}
-                      data-testid="squad-row"
-                      className="flex items-start justify-between gap-4 p-4"
-                    >
-                      <PlayerAvatar playerId={entry.playerId} size={56} />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-xs uppercase tracking-wide text-parchment-500">
-                          {entry.positionLabel}
-                          {entry.archetypeLabel && <> · {entry.archetypeLabel}</>}
-                          <span className="mx-2 text-parchment-300">·</span>
-                          <span
-                            data-testid="squad-age-allowlist-number"
-                            className="font-mono tabular-nums text-parchment-700"
-                          >
-                            age {entry.age}
-                          </span>
-                          {entry.isNewArrival && (
-                            <span className="ml-2 border border-moss-600 bg-parchment-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-moss-700">
-                              New arrival
-                            </span>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          data-testid="player-facing"
-                          onClick={() => modal.open(entry.playerId)}
-                          className="mt-1 text-left font-serif text-lg text-parchment-900 hover:text-moss-700"
-                        >
-                          {entry.playerName}
-                        </button>
-                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                          {entry.wageTier && (
-                            <span className="border border-parchment-300 bg-parchment-50 px-2 py-0.5 uppercase tracking-wide text-parchment-700">
-                              Wage:{" "}
-                              <span className="font-semibold text-parchment-900">
-                                {entry.wageTier}
-                              </span>
-                            </span>
-                          )}
-                          {entry.seasonsRemaining !== null && (
-                            <span className="border border-parchment-300 bg-parchment-50 px-2 py-0.5 uppercase tracking-wide text-parchment-700">
-                              <span
-                                data-testid="squad-contract-years-allowlist-number"
-                                className="font-mono tabular-nums font-semibold text-parchment-900"
-                              >
-                                {entry.seasonsRemaining}
-                              </span>
-                              {" "}
-                              {entry.seasonsRemaining === 1 ? "season" : "seasons"} left
-                            </span>
-                          )}
-                          {entry.formTier && (
-                            <span
-                              className={`border px-2 py-0.5 uppercase tracking-wide ${FORM_TONE[entry.formTier] ?? ""}`}
-                            >
-                              Form:{" "}
-                              <span className="font-semibold">{entry.formTier}</span>
-                            </span>
-                          )}
-                        </div>
-                        {entry.promiseMood && entry.promiseMoodLabel && (
-                          <div className="mt-3">
-                            <PromiseMoodChip
-                              mood={entry.promiseMood as PromiseMood}
-                              label={entry.promiseMoodLabel}
-                            />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-none">
-                        <SquadRoleSelect
-                          value={entry.role as SquadRole}
-                          disabled={roleMutation.isPending}
-                          testId={`squad-role-select-${entry.playerId}`}
-                          onChange={(nextRole) =>
-                            roleMutation.mutate({
-                              playerId: entry.playerId,
-                              role: nextRole,
-                            })
-                          }
-                        />
-                      </div>
-                    </div>
+                      entry={entry}
+                      onOpen={() => modal.open(entry.playerId)}
+                      onRoleChange={(nextRole) =>
+                        roleMutation.mutate({ playerId: entry.playerId, role: nextRole })
+                      }
+                      disabled={roleMutation.isPending}
+                    />
                   ))}
                 </div>
-              </div>
+              </section>
             );
           })}
         </section>
@@ -265,6 +225,100 @@ function SquadList() {
             </div>
           )}
         </aside>
+      </div>
+    </div>
+  );
+}
+
+function SquadRow({
+  entry,
+  onOpen,
+  onRoleChange,
+  disabled,
+}: {
+  entry: SquadEntry;
+  onOpen: () => void;
+  onRoleChange: (role: SquadRole) => void;
+  disabled: boolean;
+}) {
+  const isFreeAgent = entry.seasonsRemaining === null;
+  const showNudge =
+    entry.role !== "Youth" &&
+    entry.matchesSinceLastStart !== null &&
+    entry.matchesSinceLastStart >= 3;
+
+  return (
+    <div
+      data-testid="squad-row"
+      className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-4 p-4"
+    >
+      <PlayerAvatar playerId={entry.playerId} size={48} />
+
+      <div className="min-w-0">
+        <div className="text-[11px] uppercase tracking-wide text-parchment-500">
+          {entry.positionLabel}
+          {entry.archetypeLabel && <> · {entry.archetypeLabel}</>}
+          {entry.isNewArrival && (
+            <span className="ml-2 border border-moss-600 bg-parchment-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-moss-700">
+              New arrival
+            </span>
+          )}
+        </div>
+        <div className="mt-0.5 flex items-baseline gap-2">
+          <button
+            type="button"
+            data-testid="player-facing"
+            onClick={onOpen}
+            className="text-left font-serif text-lg text-parchment-900 hover:text-moss-700"
+          >
+            {entry.playerName}
+          </button>
+          <span
+            data-testid="squad-age-allowlist-number"
+            className="font-mono text-xs tabular-nums text-parchment-600"
+          >
+            {entry.age}
+          </span>
+          <RatingSparkline ratings={entry.last5Ratings} size={10} />
+        </div>
+        {showNudge && (
+          <div className="mt-1 text-xs italic text-parchment-600">
+            Hasn&rsquo;t started in a while
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-col items-end gap-1 text-xs">
+        {isFreeAgent ? (
+          <span className="italic text-parchment-500">Free agent</span>
+        ) : (
+          <span className="inline-flex items-center gap-1 text-parchment-700">
+            <Clock size={12} strokeWidth={1.5} className="text-parchment-500" />
+            <span
+              data-testid="squad-contract-years-allowlist-number"
+              className="font-mono tabular-nums font-semibold text-parchment-900"
+            >
+              {entry.seasonsRemaining}
+            </span>
+            <span className="text-parchment-500">
+              {entry.seasonsRemaining === 1 ? "season" : "seasons"}
+            </span>
+          </span>
+        )}
+        {entry.wageTier && (
+          <span className="border border-parchment-300 bg-parchment-50 px-2 py-0.5 uppercase tracking-wide text-parchment-700">
+            {entry.wageTier}
+          </span>
+        )}
+      </div>
+
+      <div className="flex-none">
+        <SquadRoleSelect
+          value={entry.role as SquadRole}
+          disabled={disabled}
+          testId={`squad-role-select-${entry.playerId}`}
+          onChange={onRoleChange}
+        />
       </div>
     </div>
   );

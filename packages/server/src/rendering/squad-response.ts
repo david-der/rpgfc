@@ -40,6 +40,11 @@ interface PlayerJoinRow {
   form_tier: string | null;
 }
 
+interface RatingRow {
+  rating_x10: number;
+  matchday: number;
+}
+
 interface ClubRow {
   id: number;
   name: string;
@@ -112,6 +117,93 @@ async function loadClubRow(client: DbClient, clubId: number): Promise<ClubRow | 
   return res.rows[0] ?? null;
 }
 
+async function loadRecentRatings(
+  client: DbClient,
+  playerId: number,
+): Promise<RatingRow[]> {
+  if (client.dialect === "sqlite") {
+    return client.sqlite
+      .prepare<[number], RatingRow>(
+        `SELECT pmp.rating_x10 AS rating_x10, m.matchday AS matchday
+         FROM player_match_performance pmp
+         JOIN matches m ON m.id = pmp.match_id
+         WHERE pmp.player_id = ? AND m.state = 'Played'
+         ORDER BY m.matchday DESC, m.id DESC
+         LIMIT 5`,
+      )
+      .all(playerId);
+  }
+  const res = await client.pool.query<RatingRow>(
+    `SELECT pmp.rating_x10 AS rating_x10, m.matchday AS matchday
+     FROM player_match_performance pmp
+     JOIN matches m ON m.id = pmp.match_id
+     WHERE pmp.player_id = $1 AND m.state = 'Played'
+     ORDER BY m.matchday DESC, m.id DESC
+     LIMIT 5`,
+    [playerId],
+  );
+  return res.rows;
+}
+
+async function loadMatchesSinceLastStart(
+  client: DbClient,
+  playerId: number,
+  currentSeason: number,
+): Promise<number | null> {
+  // Count played matchweeks since the player's most recent appearance
+  // (any row in player_match_performance) this season. Story ships
+  // without a "started" flag, so "started" ≈ "appeared in pmp" — every
+  // pmp row is a starter per the schema comment on 0005_matches.sql.
+  let lastMatchday: number | null = null;
+  if (client.dialect === "sqlite") {
+    const row = client.sqlite
+      .prepare<[number, number], { matchday: number }>(
+        `SELECT m.matchday AS matchday
+         FROM player_match_performance pmp
+         JOIN matches m ON m.id = pmp.match_id
+         WHERE pmp.player_id = ? AND m.state = 'Played' AND m.season = ?
+         ORDER BY m.matchday DESC, m.id DESC
+         LIMIT 1`,
+      )
+      .get(playerId, currentSeason);
+    if (row) lastMatchday = row.matchday;
+  } else {
+    const res = await client.pool.query<{ matchday: number }>(
+      `SELECT m.matchday AS matchday
+       FROM player_match_performance pmp
+       JOIN matches m ON m.id = pmp.match_id
+       WHERE pmp.player_id = $1 AND m.state = 'Played' AND m.season = $2
+       ORDER BY m.matchday DESC, m.id DESC
+       LIMIT 1`,
+      [playerId, currentSeason],
+    );
+    if (res.rows[0]) lastMatchday = res.rows[0].matchday;
+  }
+  if (lastMatchday === null) return null;
+
+  let mostRecentPlayed: number | null = null;
+  if (client.dialect === "sqlite") {
+    const row = client.sqlite
+      .prepare<[number], { matchday: number }>(
+        `SELECT matchday FROM matches
+         WHERE state = 'Played' AND season = ?
+         ORDER BY matchday DESC, id DESC LIMIT 1`,
+      )
+      .get(currentSeason);
+    if (row) mostRecentPlayed = row.matchday;
+  } else {
+    const res = await client.pool.query<{ matchday: number }>(
+      `SELECT matchday FROM matches
+       WHERE state = 'Played' AND season = $1
+       ORDER BY matchday DESC, id DESC LIMIT 1`,
+      [currentSeason],
+    );
+    if (res.rows[0]) mostRecentPlayed = res.rows[0].matchday;
+  }
+  if (mostRecentPlayed === null) return null;
+  return Math.max(0, mostRecentPlayed - lastMatchday);
+}
+
 function buildEntry(row: PlayerJoinRow): RenderedSquadEntry {
   const squadRole = parseSquadRole(row.role);
   const rolePromise = parseRolePromise(row.role_promise);
@@ -142,6 +234,8 @@ function buildEntry(row: PlayerJoinRow): RenderedSquadEntry {
     wageTier,
     seasonsRemaining: row.seasons_remaining,
     formTier,
+    last5Ratings: [],
+    matchesSinceLastStart: null,
   };
 }
 
@@ -153,6 +247,38 @@ export async function renderSquadForClub(
   if (!club) return null;
   const rows = await loadSquadJoin(client, clubId);
   const entries = rows.map(buildEntry);
+
+  // Current season for the matches-since-last-start lookup. Falls back
+  // to 0 if the save_state row isn't there yet (tests use fresh DBs).
+  let currentSeason = 0;
+  if (client.dialect === "sqlite") {
+    const row = client.sqlite
+      .prepare<[], { season: number }>(
+        `SELECT season FROM save_state WHERE id = 1`,
+      )
+      .get();
+    if (row) currentSeason = row.season;
+  } else {
+    const res = await client.pool.query<{ season: number }>(
+      `SELECT season FROM save_state WHERE id = 1`,
+    );
+    if (res.rows[0]) currentSeason = res.rows[0].season;
+  }
+
+  // Enrich each entry with last-5 ratings + matches-since-last-start.
+  // Separate per-player queries are simple + dual-dialect portable;
+  // the squad is capped at ~25 players so this is well under budget.
+  await Promise.all(
+    entries.map(async (entry) => {
+      const [ratings, since] = await Promise.all([
+        loadRecentRatings(client, entry.playerId),
+        loadMatchesSinceLastStart(client, entry.playerId, currentSeason),
+      ]);
+      entry.last5Ratings = ratings.map((r) => r.rating_x10);
+      entry.matchesSinceLastStart = since;
+    }),
+  );
+
   const moods: PromiseMood[] = entries
     .map((e) => e.promiseMood)
     .filter((m): m is PromiseMood => m !== null);

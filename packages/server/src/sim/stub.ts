@@ -256,7 +256,7 @@ function generateStats(
   goals: number,
   assists: number,
   rng: Random,
-): Omit<SimPerformance, "playerId" | "clubId" | "goals" | "assists" | "tier" | "eventDescription"> {
+): Omit<SimPerformance, "playerId" | "clubId" | "goals" | "assists" | "tier" | "eventDescription" | "ratingX10"> {
   const ranges = RANGES[player.positionFamily];
   const factor = TIER_FACTOR[tier];
 
@@ -336,6 +336,8 @@ function attachPerformances(
   assistCounts: Map<number, number>,
   wonMatch: boolean,
   isDraw: boolean,
+  goalsConceded: number,
+  matchId: number,
   rng: Random,
 ): SimPerformance[] {
   const result: SimPerformance[] = [];
@@ -344,6 +346,20 @@ function attachPerformances(
     const assists = assistCounts.get(player.playerId) ?? 0;
     const tier = tierBucketFor(goals, assists, wonMatch, isDraw, rng);
     const stats = generateStats(player, tier, goals, assists, rng);
+    const ratingX10 = computeMatchRating({
+      primaryRole: player.primaryRole,
+      minutes: stats.minutesPlayed,
+      goals,
+      assists,
+      shots: stats.shots,
+      tacklesWon: stats.tacklesWon,
+      dribblesCompleted: stats.dribblesCompleted,
+      saves: stats.saves,
+      xgX100: stats.xgX100,
+      goalsConceded,
+      matchId,
+      playerId: player.playerId,
+    });
     result.push({
       playerId: player.playerId,
       clubId: side.clubId,
@@ -352,10 +368,77 @@ function attachPerformances(
       tier,
       eventDescription: null,
       ...stats,
+      ratingX10,
     });
   }
   attachEvents(result, rng);
   return result;
+}
+
+// Position-aware "media consensus" rating. The formula body lives in
+// one place so the migration backfill (which only sees counting stats)
+// and the sim (which also has the role) stay in rough sync.
+export function computeMatchRating(input: {
+  primaryRole: string;
+  minutes: number;
+  goals: number;
+  assists: number;
+  shots: number;
+  tacklesWon: number;
+  dribblesCompleted: number;
+  saves: number;
+  xgX100: number;
+  goalsConceded: number;
+  matchId: number;
+  playerId: number;
+}): number {
+  if (input.minutes < 15) return 60;
+  const base = 65;
+  const role = input.primaryRole;
+  let delta = 0;
+  const clean = input.goalsConceded === 0;
+
+  if (role === "Goalkeeper") {
+    if (clean) delta += 12;
+    delta += input.saves * 3;
+    delta += Math.max(-15, -2 * input.goalsConceded);
+  } else if (role === "Center-Back" || role === "Fullback") {
+    if (clean) delta += 8;
+    delta += input.tacklesWon * 2;
+    delta += input.dribblesCompleted;
+    delta += input.goals * 10;
+    delta += input.assists * 6;
+    delta += Math.max(-10, -2 * input.goalsConceded);
+  } else if (role === "Defensive Midfielder" || role === "Central Midfielder") {
+    delta += input.tacklesWon * 2;
+    delta += input.dribblesCompleted;
+    delta += input.goals * 10;
+    delta += input.assists * 8;
+    delta += input.shots;
+  } else if (role === "Attacking Midfielder" || role === "Winger") {
+    delta += input.tacklesWon;
+    delta += input.dribblesCompleted * 2;
+    delta += input.goals * 12;
+    delta += input.assists * 8;
+    delta += input.shots;
+    delta += Math.floor(input.xgX100 / 50);
+  } else {
+    // Striker and fallback.
+    delta += input.goals * 15;
+    delta += input.assists * 7;
+    delta += input.shots;
+    delta += input.dribblesCompleted;
+    delta += Math.floor(input.xgX100 / 40);
+  }
+
+  if (input.minutes < 60) delta = Math.round(delta * (input.minutes / 60));
+
+  // Deterministic ±3 "media noise" seeded by (match_id, player_id).
+  const h = Math.abs((input.matchId * 2654435761 + input.playerId * 40503) | 0);
+  const noise = (h % 7) - 3;
+
+  const raw = base + delta + noise;
+  return Math.max(40, Math.min(100, raw));
 }
 
 const TIER_RANK: Record<FormTier, number> = {
@@ -459,6 +542,8 @@ export function createSimStub(): SimEngine {
         homeDist.assistsByPlayer,
         homeWon,
         isDraw,
+        awayGoals,
+        input.matchId,
         rng,
       );
       const awayPerformances = attachPerformances(
@@ -467,6 +552,8 @@ export function createSimStub(): SimEngine {
         awayDist.assistsByPlayer,
         awayWon,
         isDraw,
+        homeGoals,
+        input.matchId,
         rng,
       );
 

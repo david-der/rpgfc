@@ -13,11 +13,20 @@ function makeSide(clubId: number, badgePerStarter: number): SimSide {
       // 1 GK, 4 defenders, 3 mids, 3 forwards.
       const family: "gk" | "defender" | "midfielder" | "forward" =
         i === 0 ? "gk" : i <= 4 ? "defender" : i <= 7 ? "midfielder" : "forward";
+      const role =
+        family === "gk"
+          ? "Goalkeeper"
+          : family === "defender"
+            ? "Center-Back"
+            : family === "midfielder"
+              ? "Central Midfielder"
+              : "Striker";
       return {
         playerId: clubId * 100 + i + 1,
         badgeCount: badgePerStarter,
         positionFit: true,
         positionFamily: family,
+        primaryRole: role,
       };
     }),
   };

@@ -156,6 +156,8 @@ export async function pickStarters(client: DbClient, clubId: number): Promise<Si
         PITCH_SLOT_POSITION_FAMILIES[slot],
       ),
       positionFamily: familyFromSlot(slot),
+      primaryRole:
+        ARCHETYPE_BY_ID[candidate.archetypeId]?.primaryRole ?? "Central Midfielder",
     })),
   };
 }

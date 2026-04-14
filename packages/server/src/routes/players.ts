@@ -147,6 +147,125 @@ async function loadPlayerHistory(
   }));
 }
 
+interface RecentMatchRow {
+  matchId: number;
+  opponentClubName: string;
+  homeAway: "home" | "away";
+  result: "W" | "D" | "L";
+  ratingX10: number;
+  goals: number;
+  assists: number;
+}
+
+async function loadRecentMatches(
+  client: DbClient,
+  playerId: number,
+): Promise<RecentMatchRow[]> {
+  if (client.dialect === "sqlite") {
+    const rows = client.sqlite
+      .prepare<
+        [number],
+        {
+          match_id: number;
+          player_club_id: number;
+          home_club_id: number;
+          away_club_id: number;
+          home_goals: number;
+          away_goals: number;
+          home_name: string;
+          away_name: string;
+          rating_x10: number;
+          goals: number;
+          assists: number;
+        }
+      >(
+        `SELECT pmp.match_id AS match_id,
+                pmp.club_id AS player_club_id,
+                m.home_club_id AS home_club_id,
+                m.away_club_id AS away_club_id,
+                m.home_goals AS home_goals,
+                m.away_goals AS away_goals,
+                hc.name AS home_name,
+                ac.name AS away_name,
+                pmp.rating_x10 AS rating_x10,
+                pmp.goals AS goals,
+                pmp.assists AS assists
+         FROM player_match_performance pmp
+         JOIN matches m ON m.id = pmp.match_id
+         JOIN clubs hc ON hc.id = m.home_club_id
+         JOIN clubs ac ON ac.id = m.away_club_id
+         WHERE pmp.player_id = ? AND m.state = 'Played'
+         ORDER BY m.season DESC, m.matchday DESC, m.id DESC
+         LIMIT 5`,
+      )
+      .all(playerId);
+    return rows.map((r) => toRecentRow(r));
+  }
+  const res = await client.pool.query<{
+    match_id: number;
+    player_club_id: number;
+    home_club_id: number;
+    away_club_id: number;
+    home_goals: number;
+    away_goals: number;
+    home_name: string;
+    away_name: string;
+    rating_x10: number;
+    goals: number;
+    assists: number;
+  }>(
+    `SELECT pmp.match_id AS match_id,
+            pmp.club_id AS player_club_id,
+            m.home_club_id AS home_club_id,
+            m.away_club_id AS away_club_id,
+            m.home_goals AS home_goals,
+            m.away_goals AS away_goals,
+            hc.name AS home_name,
+            ac.name AS away_name,
+            pmp.rating_x10 AS rating_x10,
+            pmp.goals AS goals,
+            pmp.assists AS assists
+     FROM player_match_performance pmp
+     JOIN matches m ON m.id = pmp.match_id
+     JOIN clubs hc ON hc.id = m.home_club_id
+     JOIN clubs ac ON ac.id = m.away_club_id
+     WHERE pmp.player_id = $1 AND m.state = 'Played'
+     ORDER BY m.season DESC, m.matchday DESC, m.id DESC
+     LIMIT 5`,
+    [playerId],
+  );
+  return res.rows.map((r) => toRecentRow(r));
+}
+
+function toRecentRow(r: {
+  match_id: number;
+  player_club_id: number;
+  home_club_id: number;
+  away_club_id: number;
+  home_goals: number;
+  away_goals: number;
+  home_name: string;
+  away_name: string;
+  rating_x10: number;
+  goals: number;
+  assists: number;
+}): RecentMatchRow {
+  const isHome = r.player_club_id === r.home_club_id;
+  const opponentClubName = isHome ? r.away_name : r.home_name;
+  const my = isHome ? r.home_goals : r.away_goals;
+  const theirs = isHome ? r.away_goals : r.home_goals;
+  const result: "W" | "D" | "L" = my > theirs ? "W" : my < theirs ? "L" : "D";
+  return {
+    matchId: r.match_id,
+    opponentClubName,
+    homeAway: isHome ? "home" : "away",
+    result,
+    ratingX10: r.rating_x10,
+    goals: r.goals,
+    assists: r.assists,
+  };
+}
+
 const generateBody = z.object({
   seed: z.number().int().default(42),
   clubCount: z.number().int().min(1).max(30).default(10),
@@ -193,6 +312,13 @@ export function createPlayersRoute(deps: PlayersRouteDeps) {
       const { id } = c.req.valid("param");
       const series = await renderFormSeriesFor(deps.db, id);
       return c.json(series);
+    })
+    // Recent matches — newest first, capped at 5. Drives the modal's
+    // "last 5 matches" strip + signature-beat line.
+    .get("/:id/recent-matches", zValidator("param", idParam), async (c) => {
+      const { id } = c.req.valid("param");
+      const last5 = await loadRecentMatches(deps.db, id);
+      return c.json({ last5 });
     })
     // Per-season aggregate stats — drives the Profile → History tab.
     // Pure query against player_match_performance grouped by season.

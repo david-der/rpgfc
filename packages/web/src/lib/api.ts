@@ -355,6 +355,14 @@ export async function fetchPlayerHistory(id: string) {
   return res.json();
 }
 
+export async function fetchPlayerRecentMatches(id: string) {
+  const res = await api.api.players[":id"]["recent-matches"].$get({ param: { id } });
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res, "Could not load recent matches."));
+  }
+  return res.json();
+}
+
 export async function fetchPlayerForm(id: string) {
   const res = await api.api.players[":id"].form.$get({ param: { id } });
   if (!res.ok) throw new Error(`player form fetch failed: ${res.status}`);
@@ -391,6 +399,15 @@ export async function fetchSeasonSummary(season?: number) {
   if (res.status === 404) return null;
   if (!res.ok) {
     throw new Error(await readErrorMessage(res, "Could not load the season summary."));
+  }
+  return res.json();
+}
+
+/** Archive list of completed seasons. */
+export async function fetchSeasonsArchive() {
+  const res = await api.api.seasons.$get();
+  if (!res.ok) {
+    throw new Error(await readErrorMessage(res, "Could not load the seasons archive."));
   }
   return res.json();
 }

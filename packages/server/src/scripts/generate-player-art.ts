@@ -27,17 +27,85 @@ import Database from "better-sqlite3";
 
 // ── style anchor ─────────────────────────────────────────────────────────
 //
-// The immutable rules. Edit these and every future generation shifts
-// with you. We DO NOT lock down framing/pose/medium here — those are
-// the axes of variation below.
+// Load-bearing. The problem: the default phrasing ("sports editorial
+// illustration") was letting the model drift into polished digital
+// comic-book looks — uniform line weights, symmetrically rendered
+// faces, smooth gradient shading. We want the opposite: raw, rough,
+// imperfect, visibly hand-done.
+//
+// Two levers:
+//   1. POSITIVE language ("live sketch done in the stands", "visible
+//      pencil strokes", "uneven line weight", "negative space used")
+//   2. NEGATIVE examples — explicitly forbid the stuff the model
+//      keeps producing (clean digital, comic, anime, airbrush, glossy
+//      vector). Naming specific anti-references is much more effective
+//      than positive adjectives alone.
 
-const STYLE_ANCHOR = `Hand-drawn sports editorial illustration on aged
-parchment paper. Square 1:1 frame. Restrained, near-monochrome palette
-— ink/charcoal/pencil tones only, no modern color. ABSOLUTELY NO text,
-letters, numbers, logos, jersey numbers, sponsor boards, scoreboards,
-or scoreboard banners anywhere in the image. Anonymous, generic kit.
-Expressive, gritty, emotional. Composition must be varied — not a
-stock yearbook headshot.`;
+const STYLE_ANCHOR = `A raw, gritty charcoal portrait drawing of a
+fully-clothed footballer in match kit. High-contrast chiaroscuro
+lighting. Rough-edged, observational draftsmanship with visible
+charcoal dust and paper grain. Square 1:1 frame.
+
+KIT — NON-NEGOTIABLE:
+- The player is wearing an OPAQUE, solid, fully-rendered football
+  shirt and shorts. Fabric is cloth — it has folds, wrinkles, and
+  drape. It hides the torso.
+- ABSOLUTELY NO transparent, see-through, translucent, wet, or
+  clinging-to-skin fabric. No visible abs, pecs, nipples, or navel
+  through the shirt. No anatomical muscle definition rendered beneath
+  the kit.
+- This is NOT an anatomical écorché study, NOT a bodybuilding
+  reference, NOT an underwear shoot, NOT a shirtless figure drawing.
+- The shirt is made of OPAQUE fabric. Render the shirt's surface
+  (folds, shadows, wrinkles) — not what is under it.
+
+IMPORTANT — ARTISTIC TECHNIQUE:
+- Shape the figure with VOLUME AND LIGHT, not with closed outlines.
+  Forms emerge from shadow, not from line.
+- Heavy cross-hatching and smudged charcoal gradients build the mass.
+  Hatch density varies aggressively across the figure.
+- Uneven line pressure. Some strokes confident and heavy, others faint
+  and tentative. Visible pencil or charcoal strokes throughout.
+- Lines do not always meet. Contours break. Some areas are fully
+  rendered, others barely suggested.
+- Occasional scratched-out correction marks, fingerprint smudges,
+  eraser ghosts, or pencil guide-lines still visible beneath ink.
+- Negative space is part of the composition — large zones deliberately
+  left unrendered.
+
+FACE & PROPORTIONS:
+- Realistic adult athletic proportions. No "big-head" caricature. No
+  stylised childlike proportions.
+- Rugged masculine bone structure. Weathered facial features.
+  Shadowed, deep-set eye sockets. Heavy brow ridge. Adult nose and jaw.
+- Eyes sit in the LOWER half of the skull, NOT large and high on the
+  face. Eye size is realistic, not expressive-cartoon-large.
+- The face is shaped by SHADOWS rather than by outlines. Asymmetric.
+  Pores, stubble, a slightly crooked nose. Not a model portrait.
+
+EXPLICITLY NOT THIS:
+- No cel-shading, no clean vector lines, no expressive caricature.
+- No oversized eyes. No smooth digital gradients.
+- Not Disney/Pixar/DreamWorks/Illumination proportions.
+- Not anime, manga, or Saturday-morning-cartoon style.
+- Not comic-book line art with uniform stroke weights.
+- Not a FIFA-cover illustration or marketing sports art.
+- Not a polished magazine cover portrait.
+
+REFERENCES (emulate these):
+- Ralph Steadman's gestural ink work.
+- Paul Hogarth's sports-page sketches.
+- Mid-century editorial newspaper charcoal studies.
+- Old Master portrait drawings (Sargent, Menzel) — clothed figures.
+- Quick observational sketches done in 20 minutes or less.
+
+Palette: strictly monochrome. Charcoal, conté, graphite, or ink wash on
+toothed paper. No colour anywhere — not even muted accent colour.
+
+ABSOLUTELY NO text, letters, numbers, logos, jersey numbers, sponsor
+boards, scoreboards, or scoreboard banners anywhere in the image.
+Anonymous, generic kit. Composition must be varied — not a yearbook
+headshot.`;
 
 // ── Axis 1: FRAMING ──────────────────────────────────────────────────────
 // How far away the camera is. Most visible source of variety.
@@ -117,11 +185,31 @@ const SCENES: Weighted<string>[] = [
 // the individual pieces feel hand-crafted rather than filter-stamped.
 
 const MEDIA: Weighted<string>[] = [
-  { weight: 4, value: "pen-and-ink drawing, fine cross-hatch shading, sharp clean lines" },
-  { weight: 3, value: "charcoal pencil sketch, smudged shading, heavier line weight, rough texture" },
-  { weight: 2, value: "graphite pencil sketch, soft restrained hatching, light line work" },
-  { weight: 1, value: "ink-and-wash drawing, loose line work with soft gray wash tones" },
-  { weight: 1, value: "sepia ink drawing with a single muted wash, aged-newspaper feel" },
+  {
+    weight: 5,
+    value:
+      "rough charcoal and conté crayon on heavy-toothed gray paper, heavy smudged shading, paper grain visible through the strokes, fingerprint marks and scuffs",
+  },
+  {
+    weight: 5,
+    value:
+      "technical graphite rendering with visible pencil lead texture, eraser smudges, uneven pressure, incomplete linework, rough gestural quality",
+  },
+  {
+    weight: 3,
+    value:
+      "scratchy pen-and-ink drawing, uneven line weight, irregular cross-hatching, some lines bold and confident others faint, aggressive negative space",
+  },
+  {
+    weight: 2,
+    value:
+      "mixed media — graphite under-drawing with scratchy ink outlines on top, pencil guide-lines still visible beneath the ink",
+  },
+  {
+    weight: 2,
+    value:
+      "Old Master ink wash study with gritty textures, washes bleeding into the paper, dry-brush edges, visible paper tooth",
+  },
 ];
 
 // ── Axis 7: MOOD ─────────────────────────────────────────────────────────
@@ -238,14 +326,14 @@ function buildDescriptor(p: PlayerRow): string {
   // anywhere near rating/skill language.
   const ageBand =
     p.age <= 19
-      ? "fresh-faced and lean, eyes still wide"
+      ? "lean and sinewy, jaw still angular, deep-set eyes under a pronounced brow"
       : p.age <= 25
-        ? "in his early twenties, athletic and quick"
+        ? "in his early twenties, athletic and rugged, shadowed eye sockets, masculine bone structure"
         : p.age <= 30
-          ? "in his prime, body honed by years of football"
+          ? "in his prime, body honed by years of football, heavy brow ridge, weathered facial features"
           : p.age <= 34
-            ? "weathered by years of competition, a few scars on the face"
-            : "veteran, lined face, gray streaks at the temples, eyes that have seen everything";
+            ? "weathered by years of competition, a few scars on the face, deep lines across the forehead, sunken eyes"
+            : "veteran, deeply lined face, gray streaks at the temples, hollow cheeks, eyes that have seen everything";
 
   // Position-shape hint (wide tall vs lean wiry vs solid stocky).
   const role = archetype?.primaryRole ?? "Central Midfielder";
@@ -350,6 +438,19 @@ function hashStr(s: string): number {
 
 function buildPrompt(p: PlayerRow): string {
   const mix = pickMix(p);
+
+  const joyful = /joyful|playful/.test(mix.mood);
+  const moodGuard = joyful
+    ? " Keep the expression raw, unpolished, and gestural — do NOT clean up the face into a cartoon smile; keep the rugged anatomy intact."
+    : "";
+
+  const sprinting = /sprint|mid-sprint|striking|heading|sliding|diving|chest-bump|celebrating-run/.test(
+    mix.moment.key + " " + mix.moment.prompt,
+  );
+  const motionGuard = sprinting
+    ? " Convey motion through smudged charcoal edges and ghosted contour lines, NOT through cartoon speed-lines."
+    : "";
+
   return [
     STYLE_ANCHOR,
     "",
@@ -358,8 +459,8 @@ function buildPrompt(p: PlayerRow): string {
     `COMPOSITION: ${mix.composition}.`,
     `ANGLE: ${mix.angle}.`,
     `SCENE: ${mix.scene}.`,
-    `MOMENT: ${mix.moment.prompt}.`,
-    `MOOD: ${mix.mood}.`,
+    `MOMENT: ${mix.moment.prompt}.${motionGuard}`,
+    `MOOD: ${mix.mood}.${moodGuard}`,
     "",
     `SUBJECT: ${buildDescriptor(p)}`,
     "",

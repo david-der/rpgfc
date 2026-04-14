@@ -13,12 +13,14 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as TransfersIndexRouteImport } from './routes/transfers.index'
 import { Route as TacticsIndexRouteImport } from './routes/tactics.index'
 import { Route as SquadIndexRouteImport } from './routes/squad.index'
+import { Route as SeasonsIndexRouteImport } from './routes/seasons.index'
 import { Route as ScoutsIndexRouteImport } from './routes/scouts.index'
 import { Route as SavesIndexRouteImport } from './routes/saves.index'
 import { Route as PlayersIndexRouteImport } from './routes/players.index'
 import { Route as LeagueIndexRouteImport } from './routes/league.index'
 import { Route as ClubIndexRouteImport } from './routes/club.index'
 import { Route as TransfersPlayerIdRouteImport } from './routes/transfers.$playerId'
+import { Route as SeasonsSeasonRouteImport } from './routes/seasons.$season'
 import { Route as SeasonSummaryRouteImport } from './routes/season.summary'
 import { Route as PlayersIdRouteImport } from './routes/players.$id'
 import { Route as MatchesIdRouteImport } from './routes/matches.$id'
@@ -42,6 +44,11 @@ const TacticsIndexRoute = TacticsIndexRouteImport.update({
 const SquadIndexRoute = SquadIndexRouteImport.update({
   id: '/squad/',
   path: '/squad/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SeasonsIndexRoute = SeasonsIndexRouteImport.update({
+  id: '/seasons/',
+  path: '/seasons/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ScoutsIndexRoute = ScoutsIndexRouteImport.update({
@@ -74,6 +81,11 @@ const TransfersPlayerIdRoute = TransfersPlayerIdRouteImport.update({
   path: '/transfers/$playerId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SeasonsSeasonRoute = SeasonsSeasonRouteImport.update({
+  id: '/seasons/$season',
+  path: '/seasons/$season',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SeasonSummaryRoute = SeasonSummaryRouteImport.update({
   id: '/season/summary',
   path: '/season/summary',
@@ -100,12 +112,14 @@ export interface FileRoutesByFullPath {
   '/matches/$id': typeof MatchesIdRoute
   '/players/$id': typeof PlayersIdRoute
   '/season/summary': typeof SeasonSummaryRoute
+  '/seasons/$season': typeof SeasonsSeasonRoute
   '/transfers/$playerId': typeof TransfersPlayerIdRoute
   '/club/': typeof ClubIndexRoute
   '/league/': typeof LeagueIndexRoute
   '/players/': typeof PlayersIndexRoute
   '/saves/': typeof SavesIndexRoute
   '/scouts/': typeof ScoutsIndexRoute
+  '/seasons/': typeof SeasonsIndexRoute
   '/squad/': typeof SquadIndexRoute
   '/tactics/': typeof TacticsIndexRoute
   '/transfers/': typeof TransfersIndexRoute
@@ -116,12 +130,14 @@ export interface FileRoutesByTo {
   '/matches/$id': typeof MatchesIdRoute
   '/players/$id': typeof PlayersIdRoute
   '/season/summary': typeof SeasonSummaryRoute
+  '/seasons/$season': typeof SeasonsSeasonRoute
   '/transfers/$playerId': typeof TransfersPlayerIdRoute
   '/club': typeof ClubIndexRoute
   '/league': typeof LeagueIndexRoute
   '/players': typeof PlayersIndexRoute
   '/saves': typeof SavesIndexRoute
   '/scouts': typeof ScoutsIndexRoute
+  '/seasons': typeof SeasonsIndexRoute
   '/squad': typeof SquadIndexRoute
   '/tactics': typeof TacticsIndexRoute
   '/transfers': typeof TransfersIndexRoute
@@ -133,12 +149,14 @@ export interface FileRoutesById {
   '/matches/$id': typeof MatchesIdRoute
   '/players/$id': typeof PlayersIdRoute
   '/season/summary': typeof SeasonSummaryRoute
+  '/seasons/$season': typeof SeasonsSeasonRoute
   '/transfers/$playerId': typeof TransfersPlayerIdRoute
   '/club/': typeof ClubIndexRoute
   '/league/': typeof LeagueIndexRoute
   '/players/': typeof PlayersIndexRoute
   '/saves/': typeof SavesIndexRoute
   '/scouts/': typeof ScoutsIndexRoute
+  '/seasons/': typeof SeasonsIndexRoute
   '/squad/': typeof SquadIndexRoute
   '/tactics/': typeof TacticsIndexRoute
   '/transfers/': typeof TransfersIndexRoute
@@ -151,12 +169,14 @@ export interface FileRouteTypes {
     | '/matches/$id'
     | '/players/$id'
     | '/season/summary'
+    | '/seasons/$season'
     | '/transfers/$playerId'
     | '/club/'
     | '/league/'
     | '/players/'
     | '/saves/'
     | '/scouts/'
+    | '/seasons/'
     | '/squad/'
     | '/tactics/'
     | '/transfers/'
@@ -167,12 +187,14 @@ export interface FileRouteTypes {
     | '/matches/$id'
     | '/players/$id'
     | '/season/summary'
+    | '/seasons/$season'
     | '/transfers/$playerId'
     | '/club'
     | '/league'
     | '/players'
     | '/saves'
     | '/scouts'
+    | '/seasons'
     | '/squad'
     | '/tactics'
     | '/transfers'
@@ -183,12 +205,14 @@ export interface FileRouteTypes {
     | '/matches/$id'
     | '/players/$id'
     | '/season/summary'
+    | '/seasons/$season'
     | '/transfers/$playerId'
     | '/club/'
     | '/league/'
     | '/players/'
     | '/saves/'
     | '/scouts/'
+    | '/seasons/'
     | '/squad/'
     | '/tactics/'
     | '/transfers/'
@@ -200,12 +224,14 @@ export interface RootRouteChildren {
   MatchesIdRoute: typeof MatchesIdRoute
   PlayersIdRoute: typeof PlayersIdRoute
   SeasonSummaryRoute: typeof SeasonSummaryRoute
+  SeasonsSeasonRoute: typeof SeasonsSeasonRoute
   TransfersPlayerIdRoute: typeof TransfersPlayerIdRoute
   ClubIndexRoute: typeof ClubIndexRoute
   LeagueIndexRoute: typeof LeagueIndexRoute
   PlayersIndexRoute: typeof PlayersIndexRoute
   SavesIndexRoute: typeof SavesIndexRoute
   ScoutsIndexRoute: typeof ScoutsIndexRoute
+  SeasonsIndexRoute: typeof SeasonsIndexRoute
   SquadIndexRoute: typeof SquadIndexRoute
   TacticsIndexRoute: typeof TacticsIndexRoute
   TransfersIndexRoute: typeof TransfersIndexRoute
@@ -240,6 +266,13 @@ declare module '@tanstack/react-router' {
       path: '/squad'
       fullPath: '/squad/'
       preLoaderRoute: typeof SquadIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/seasons/': {
+      id: '/seasons/'
+      path: '/seasons'
+      fullPath: '/seasons/'
+      preLoaderRoute: typeof SeasonsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/scouts/': {
@@ -284,6 +317,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TransfersPlayerIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/seasons/$season': {
+      id: '/seasons/$season'
+      path: '/seasons/$season'
+      fullPath: '/seasons/$season'
+      preLoaderRoute: typeof SeasonsSeasonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/season/summary': {
       id: '/season/summary'
       path: '/season/summary'
@@ -320,12 +360,14 @@ const rootRouteChildren: RootRouteChildren = {
   MatchesIdRoute: MatchesIdRoute,
   PlayersIdRoute: PlayersIdRoute,
   SeasonSummaryRoute: SeasonSummaryRoute,
+  SeasonsSeasonRoute: SeasonsSeasonRoute,
   TransfersPlayerIdRoute: TransfersPlayerIdRoute,
   ClubIndexRoute: ClubIndexRoute,
   LeagueIndexRoute: LeagueIndexRoute,
   PlayersIndexRoute: PlayersIndexRoute,
   SavesIndexRoute: SavesIndexRoute,
   ScoutsIndexRoute: ScoutsIndexRoute,
+  SeasonsIndexRoute: SeasonsIndexRoute,
   SquadIndexRoute: SquadIndexRoute,
   TacticsIndexRoute: TacticsIndexRoute,
   TransfersIndexRoute: TransfersIndexRoute,
