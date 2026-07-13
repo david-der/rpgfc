@@ -5,6 +5,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { ClubCrest } from "../components/ui/ClubCrest";
 import { FixtureCard } from "../components/ui/FixtureCard";
 import { ResultPill } from "../components/ui/ResultPill";
 import { SectionHeader } from "../components/ui/SectionHeader";
@@ -129,8 +130,14 @@ function TableTab() {
                   <Link
                     to="/league/clubs/$clubId"
                     params={{ clubId: String(row.clubId) }}
-                    className="text-parchment-900 hover:text-moss-700"
+                    className="inline-flex items-center gap-2 text-parchment-900 hover:text-moss-700"
                   >
+                    <ClubCrest
+                      clubName={row.clubName}
+                      primaryColor={row.colors.primary}
+                      secondaryColor={row.colors.secondary}
+                      size={20}
+                    />
                     {row.clubName}
                   </Link>
                   {row.lastSeasonPosition !== null && (

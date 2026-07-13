@@ -8,17 +8,23 @@
 // Style Guide (the other is the default 0 everywhere else). Avatars
 // qualify — circles + dots are the cited example. See packages/web/CLAUDE.md.
 
-import { useSketchArt } from "../../hooks/useSketchArt";
+import { artFamilyFor, useSketchArt } from "../../hooks/useSketchArt";
 
 interface PlayerAvatarProps {
   playerId: number;
   size?: number; // px
   /** Optional accent ring (club color). Falls back to parchment-700. */
   ringColor?: string;
+  /** Position label; selects the anonymous silhouette fallback family. */
+  positionLabel?: string;
 }
 
-export function PlayerAvatar({ playerId, size = 48, ringColor }: PlayerAvatarProps) {
-  const { src, onError } = useSketchArt("player-art", playerId);
+export function PlayerAvatar({ playerId, size = 48, ringColor, positionLabel }: PlayerAvatarProps) {
+  const { src, onError } = useSketchArt(
+    "player-art",
+    playerId,
+    positionLabel ? artFamilyFor(positionLabel) : undefined,
+  );
   return (
     <span
       className="inline-block flex-none overflow-hidden rounded-full border-2 bg-parchment-100"

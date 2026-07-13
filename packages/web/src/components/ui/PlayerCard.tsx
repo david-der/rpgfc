@@ -12,7 +12,7 @@
 // When per-player art lands later, drop files in and the UI picks
 // them up — no code change.
 
-import { useSketchArt } from "../../hooks/useSketchArt";
+import { artFamilyFor, useSketchArt } from "../../hooks/useSketchArt";
 
 import type { RenderedClubRef } from "@rpgfc/shared";
 
@@ -37,7 +37,7 @@ export function PlayerCard({
   club,
   certaintyLabel,
 }: PlayerCardProps) {
-  const { src, onError } = useSketchArt("player-art", playerId);
+  const { src, onError } = useSketchArt("player-art", playerId, artFamilyFor(positionLabel));
 
   // Club-primary drives the top stripe — the same var the AppShell uses
   // for the global 4px chrome. Falls back to moss-500 for free agents.

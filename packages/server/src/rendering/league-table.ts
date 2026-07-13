@@ -17,7 +17,12 @@ interface MatchResultRow {
 interface ClubRow {
   id: number;
   name: string;
+  primary_color: string | null;
+  secondary_color: string | null;
 }
+
+const CLUB_SELECT = `SELECT c.id, c.name, ie.primary_color, ie.secondary_color
+       FROM clubs c LEFT JOIN club_identity_ext ie ON ie.club_id = c.id`;
 
 async function loadResults(client: DbClient, season: number): Promise<MatchResultRow[]> {
   // ORDER BY matchday, id so the "recent form" scan below processes the
@@ -76,13 +81,19 @@ async function computeTableInner(
   let clubs: ClubRow[];
 
   if (client.dialect === "sqlite") {
-    clubs = client.sqlite.prepare<[], ClubRow>(`SELECT id, name FROM clubs`).all();
+    clubs = client.sqlite.prepare<[], ClubRow>(CLUB_SELECT).all();
   } else {
-    const resClubs = await client.pool.query<ClubRow>(`SELECT id, name FROM clubs`);
+    const resClubs = await client.pool.query<ClubRow>(CLUB_SELECT);
     clubs = resClubs.rows;
   }
 
   const clubMap = new Map(clubs.map((c) => [c.id, c.name]));
+  const colorMap = new Map(
+    clubs.map((c) => [
+      c.id,
+      { primary: c.primary_color ?? "#5C6B33", secondary: c.secondary_color ?? "#865732" },
+    ]),
+  );
   const stats = new Map<number, { w: number; d: number; l: number; gf: number; ga: number }>();
 
   for (const club of clubs) {
@@ -135,6 +146,7 @@ async function computeTableInner(
     table.push({
       clubId,
       clubName: clubMap.get(clubId) ?? "Unknown",
+      colors: colorMap.get(clubId) ?? { primary: "#5C6B33", secondary: "#865732" },
       played: s.w + s.d + s.l,
       won: s.w,
       drawn: s.d,

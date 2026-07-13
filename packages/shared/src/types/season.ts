@@ -14,6 +14,8 @@ export interface SeasonState {
 export interface LeagueTableRow {
   clubId: number;
   clubName: string;
+  /** Club identity colors so list surfaces can render the crest. */
+  colors: { primary: string; secondary: string };
   played: number;
   won: number;
   drawn: number;

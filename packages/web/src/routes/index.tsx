@@ -8,6 +8,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 
 import { Card } from "../components/ui/Card";
+import { HeroIllustration } from "../components/ui/HeroIllustration";
 import { ResultPill } from "../components/ui/ResultPill";
 import {
   fetchClubFinances,
@@ -104,18 +105,13 @@ function HomeHero({ clubName, season }: { clubName: string; season: Season | und
     ? `Season ${season.season + 1} · Match Week ${season.matchWeek}`
     : "Loading…";
   return (
-    <header className="border-b border-parchment-300 pb-6">
-      <div
-        data-testid="home-eyebrow-allowlist-number"
-        className="font-mono text-xs uppercase tracking-wide text-parchment-500"
-      >
-        {eyebrow}
-      </div>
-      <h1 className="mt-2 font-serif text-4xl font-medium text-parchment-900">{clubName}</h1>
-      <p className="mt-3 font-serif text-lg leading-relaxed text-parchment-700">
-        Welcome to the manager&rsquo;s office. Your season is below.
-      </p>
-    </header>
+    <HeroIllustration
+      folder="home-art"
+      artKey="default"
+      eyebrow={<span data-testid="home-eyebrow-allowlist-number">{eyebrow}</span>}
+      title={clubName}
+      subtitle="Welcome to the manager's office. Your season is below."
+    />
   );
 }
 
@@ -252,7 +248,7 @@ function LeaguePositionCard({
           </div>
         </div>
       </div>
-      {myIndex > 0 && (
+      {myIndex > 0 && leader.points > 0 && (
         <p className="mt-3 text-sm italic text-parchment-600">
           <span data-testid="player-facing">{leader.clubName}</span> lead the table with{" "}
           <span

@@ -628,9 +628,54 @@ unmarked trophy above his head at the center of the frame, teammates
 crowding around with arms raised, ticker-tape hanging in the floodlit
 air drawn as loose charcoal flecks, the stands behind dissolving into
 smudged darkness.`,
+  "home-art": `${HERO_COMMON}
+
+SCENE: the view from the manager's office window at dawn — an empty
+stadium bowl below, dew on the pitch, groundskeeper's stripes half
+mowed, a single distant figure walking the touchline, mist hanging in
+the goalmouths, the far stand dissolving into paper grain.`,
 };
 
 const HERO_SIZE = "2048x896"; // exactly 16:7; both edges multiples of 16
+
+// ── anonymous silhouettes ────────────────────────────────────────────────
+//
+// Fallback art for players who have no portrait yet (youth intake, new
+// signings, unscouted strangers). Deliberately identity-free: a figure
+// from behind or in deep shadow, so it can never read as the wrong
+// player. One generic + one per position family; useSketchArt picks
+// `default-{family}.webp` before the generic default.
+
+const SILHOUETTE_COMMON = `A raw, gritty charcoal study of a single
+anonymous footballer, seen FROM BEHIND or in deep silhouette. The face
+is never visible — no facial features at all. Rough-edged observational
+draftsmanship, visible charcoal dust and paper grain, heavy shadow mass,
+aggressive negative space. Strictly monochrome charcoal on toothed
+paper. Square 1:1 frame. Anonymous, generic, OPAQUE kit; no text,
+letters, numbers, or logos anywhere.`;
+
+const SILHOUETTE_PROMPTS: Record<string, string> = {
+  default: `${SILHOUETTE_COMMON}
+
+SUBJECT: a lone player standing in an empty stadium at dusk, seen from
+behind at medium distance, hands on hips, floodlight haze beyond.`,
+  "default-gk": `${SILHOUETTE_COMMON}
+
+SUBJECT: a goalkeeper seen from behind, gloves at his sides, alone in
+front of his goal, the net and penalty area faint beyond him.`,
+  "default-defender": `${SILHOUETTE_COMMON}
+
+SUBJECT: a defender seen from behind at the edge of his own box,
+arms spread to organise a line that is only suggested in the mist.`,
+  "default-midfielder": `${SILHOUETTE_COMMON}
+
+SUBJECT: a midfielder seen from behind at the centre circle, one foot
+resting on the ball, scanning a pitch that fades into negative space.`,
+  "default-forward": `${SILHOUETTE_COMMON}
+
+SUBJECT: a forward seen from behind at the penalty spot, shoulders
+set, facing a distant goalkeeper who is only a smudge of shadow.`,
+};
 
 // ── providers ────────────────────────────────────────────────────────────
 
@@ -775,6 +820,7 @@ interface Args {
   format: GenOptions["format"];
   compression: number;
   hero: string | null;
+  silhouettes: boolean;
   only: Set<number> | null;
   force: boolean;
   dryRun: boolean;
@@ -791,6 +837,7 @@ function parseArgs(argv: string[]): Args {
     format: "webp",
     compression: 88,
     hero: null,
+    silhouettes: false,
     only: null,
     force: false,
     dryRun: false,
@@ -894,6 +941,7 @@ function parseArgs(argv: string[]): Args {
       if (arg === "--hero") i += 1;
       continue;
     }
+    if (arg === "--silhouettes") out.silhouettes = true;
   }
   return out;
 }
@@ -934,6 +982,26 @@ async function main() {
     compression: args.compression,
   };
 
+  if (args.silhouettes) {
+    if (args.provider !== "openai") {
+      console.error("--silhouettes requires --provider openai.");
+      process.exit(1);
+    }
+    const outDir = resolve(repoRoot, "packages/web/public/player-art");
+    mkdirSync(outDir, { recursive: true });
+    for (const [name, prompt] of Object.entries(SILHOUETTE_PROMPTS)) {
+      if (args.dryRun) {
+        console.log(`── ${name}.${ext} ──\n${prompt}\n`);
+        continue;
+      }
+      console.log(`🎨 player-art/${name}.${ext} (${args.quality})…`);
+      const buf = await generateOne("openai", prompt, key, genOpts);
+      writeFileSync(resolve(outDir, `${name}.${ext}`), buf);
+      console.log(`✓ ${name}.${ext} (${buf.length.toLocaleString()} bytes)`);
+    }
+    return;
+  }
+
   if (args.hero) {
     if (args.provider !== "openai") {
       console.error("--hero requires --provider openai (exact 16:7 sizes).");
@@ -960,6 +1028,7 @@ async function main() {
         size: HERO_SIZE,
       });
       const outPath = resolve(repoRoot, `packages/web/public/${folder}/default.${ext}`);
+      mkdirSync(dirname(outPath), { recursive: true });
       writeFileSync(outPath, buf);
       console.log(`✓ ${outPath} (${buf.length.toLocaleString()} bytes)`);
     }
@@ -976,6 +1045,8 @@ async function main() {
   }
 
   const db = new Database(dbPath, { readonly: true });
+  const seedRow = db.prepare<[], { seed: number }>(`SELECT seed FROM runs LIMIT 1`).get();
+  const worldSeed = seedRow?.seed ?? null;
   const players = db
     .prepare<[], PlayerRow>(
       `SELECT id, name, age, nationality, preferred_foot, archetype_id, experience_years
@@ -1057,6 +1128,38 @@ async function main() {
     await new Promise((r) => setTimeout(r, 200));
   }
   await Promise.all(results);
+
+  // Manifest: records which world's identities the portrait pool
+  // belongs to, so a differently-seeded world can detect (and refuse to
+  // reuse) faces that aren't its own.
+  const manifestPath = resolve(outDir, "manifest.json");
+  let manifest: {
+    worldSeed: number | null;
+    model: string;
+    players: Record<string, { file: string; quality: string; generatedAt: string }>;
+  } = { worldSeed, model: OPENAI_MODEL, players: {} };
+  if (existsSync(manifestPath)) {
+    try {
+      manifest = {
+        ...manifest,
+        ...(JSON.parse(readFileSync(manifestPath, "utf8")) as typeof manifest),
+      };
+    } catch {
+      // Corrupt manifest — rebuild from this run.
+    }
+  }
+  manifest.worldSeed = worldSeed;
+  const stamp = new Date().toISOString();
+  for (const p of queue) {
+    if (existsSync(resolve(outDir, `${p.id}.${ext}`))) {
+      manifest.players[String(p.id)] = {
+        file: `${p.id}.${ext}`,
+        quality: args.quality,
+        generatedAt: stamp,
+      };
+    }
+  }
+  writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
 
   console.log(`\nDone — ${okCount} ok, ${failCount} failed.`);
 }
