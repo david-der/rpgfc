@@ -45,21 +45,29 @@ async function recordTable(season: number, week: number) {
   appendFileSync(resolve(OUT, "tables.ndjson"), JSON.stringify({ season, week, table }) + "\n");
 }
 
+/** Drive the turn loop through the masthead Continue button (Style
+ *  Guide v1.1 §15) — available on every page. Confirms progress by
+ *  polling season state instead of fixed sleeps, so query refetch
+ *  storms can't race the check. */
 async function advanceOnce(page: Page): Promise<"advanced" | "season-end" | "nothing"> {
-  await page.goto(`${BASE}/league`, { waitUntil: "networkidle" });
-  const fxTab = page.getByText(/^\s*Fixtures\s*$/i).first();
-  if (await fxTab.isVisible().catch(() => false)) {
-    await fxTab.click();
-    await page.waitForTimeout(250);
+  const before = await seasonState().catch(() => null);
+  if (!before) return "nothing";
+  const button = page.getByRole("button", { name: /advance · week|end season/i }).first();
+  try {
+    await button.waitFor({ state: "visible", timeout: 10_000 });
+  } catch {
+    return "nothing";
   }
-  const advance = page.getByRole("button", { name: /advance to next match week/i });
-  if (await advance.isVisible().catch(() => false)) {
-    await advance.click();
-    await page.waitForTimeout(1200);
-    return "advanced";
+  const label = (await button.textContent().catch(() => "")) ?? "";
+  await button.click();
+  const deadline = Date.now() + 20_000;
+  while (Date.now() < deadline) {
+    const now = await seasonState().catch(() => null);
+    if (now && (now.matchWeek !== before.matchWeek || now.season !== before.season)) {
+      return /end season/i.test(label) ? "season-end" : "advanced";
+    }
+    await page.waitForTimeout(300);
   }
-  const endSeason = page.getByRole("button", { name: /end season/i });
-  if (await endSeason.isVisible().catch(() => false)) return "season-end";
   return "nothing";
 }
 
@@ -123,7 +131,7 @@ async function playSeason(page: Page, seasonIndex: number) {
         await captureMatchReport(page, `${s}-w09-match-report`);
       }
     } else if (result === "season-end") {
-      console.log(`  🏁 season ${seasonIndex} complete after ${week} advances`);
+      console.log(`  🏁 season ${seasonIndex} ended via masthead after ${week} advances`);
       break;
     } else {
       errors.push(`season ${seasonIndex}: no advance/end button after week ${week}`);
@@ -136,21 +144,10 @@ async function playSeason(page: Page, seasonIndex: number) {
   await page.goto(`${BASE}/squad`, { waitUntil: "networkidle" });
   await snap(page, `${s}-w18-squad`);
 
-  console.log(`▶ Ending season ${seasonIndex}`);
-  await page.goto(`${BASE}/league`, { waitUntil: "networkidle" });
-  const fxTab = page.getByText(/^\s*Fixtures\s*$/i).first();
-  if (await fxTab.isVisible().catch(() => false)) {
-    await fxTab.click();
-    await page.waitForTimeout(300);
-  }
-  const endBtn = page.getByRole("button", { name: /end season/i });
-  if (await endBtn.isVisible().catch(() => false)) {
-    await endBtn.click();
-    await page.waitForTimeout(2000);
-    await snap(page, `${s}-end-transition`);
-  } else {
-    errors.push(`season ${seasonIndex}: end-season button not found`);
-  }
+  // The masthead Continue already rolled the season inside the loop —
+  // capture the ceremony and the archive it left behind.
+  await page.goto(`${BASE}/season/summary`, { waitUntil: "networkidle" });
+  await snap(page, `${s}-end-ceremony`);
   await page.goto(`${BASE}/seasons`, { waitUntil: "networkidle" });
   await snap(page, `${s}-end-archive`);
 }
