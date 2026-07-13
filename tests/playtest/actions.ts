@@ -26,7 +26,10 @@ async function main() {
   // 1. Bid attempt — go to market, click first listing, compose & submit.
   console.log("\n▶ Submitting a bid…");
   await page.goto(`${BASE}/transfers`, { waitUntil: "networkidle" });
-  const firstBid = page.locator('a[href^="/transfers/"]').filter({ hasNotText: "Transfers" }).first();
+  const firstBid = page
+    .locator('a[href^="/transfers/"]')
+    .filter({ hasNotText: "Transfers" })
+    .first();
   const href = await firstBid.getAttribute("href");
   console.log(`  target: ${href}`);
   if (href && href !== "/transfers") {
@@ -68,7 +71,8 @@ async function main() {
     const currentOptions = await formationSelect.locator("option").allTextContents();
     console.log(`  formations: ${currentOptions.join(", ")}`);
     // Pick a different formation.
-    const next = currentOptions.find((o) => !o.toLowerCase().includes("4-3-3")) ?? currentOptions[1];
+    const next =
+      currentOptions.find((o) => !o.toLowerCase().includes("4-3-3")) ?? currentOptions[1];
     if (next) {
       await formationSelect.selectOption({ label: next });
       await page.waitForTimeout(400);
@@ -86,8 +90,15 @@ async function main() {
   for (let i = 1; i <= 5; i++) {
     await page.goto(`${BASE}/league`, { waitUntil: "networkidle" });
     // The Advance button is on the Fixtures tab.
-    const fixturesTab = page.getByRole("tab", { name: /fixtures/i }).or(page.getByText(/fixtures/i, { exact: false }));
-    if (await fixturesTab.first().isVisible().catch(() => false)) {
+    const fixturesTab = page
+      .getByRole("tab", { name: /fixtures/i })
+      .or(page.getByText(/fixtures/i, { exact: false }));
+    if (
+      await fixturesTab
+        .first()
+        .isVisible()
+        .catch(() => false)
+    ) {
       await fixturesTab.first().click();
       await page.waitForTimeout(400);
     }

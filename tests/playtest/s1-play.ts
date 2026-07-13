@@ -34,7 +34,10 @@ async function main() {
       const h = await links.nth(i).getAttribute("href");
       if (h && h !== "/transfers" && !h.includes("?")) {
         bidsSeen += 1;
-        if (bidsSeen === idx) { href = h; break; }
+        if (bidsSeen === idx) {
+          href = h;
+          break;
+        }
       }
     }
     if (!href) {
@@ -44,14 +47,16 @@ async function main() {
     console.log(`  target: ${href}`);
     await page.goto(`${BASE}${href}`, { waitUntil: "networkidle" });
     // Bump fee tier to Notable / Significant via the Fee select.
-    const feeSelect = page.locator('select').first();
+    const feeSelect = page.locator("select").first();
     if (await feeSelect.isVisible().catch(() => false)) {
       const opts = await feeSelect.locator("option").allTextContents();
       console.log(`  fee options: ${opts.join(", ")}`);
-      await feeSelect.selectOption({ label: opts.includes("Notable") ? "Notable" : opts[opts.length - 2] ?? opts[0]! });
+      await feeSelect.selectOption({
+        label: opts.includes("Notable") ? "Notable" : (opts[opts.length - 2] ?? opts[0]!),
+      });
     }
     // Wage select is 2nd
-    const wageSelect = page.locator('select').nth(1);
+    const wageSelect = page.locator("select").nth(1);
     if (await wageSelect.isVisible().catch(() => false)) {
       const opts = await wageSelect.locator("option").allTextContents();
       await wageSelect.selectOption({ label: opts.includes("Notable") ? "Notable" : opts[0]! });
@@ -98,7 +103,8 @@ async function main() {
     await page.waitForTimeout(300);
     const adv = page.getByRole("button", { name: /advance to next match week/i });
     if (!(await adv.isVisible().catch(() => false))) {
-      console.log(`  MW${i}: no advance button`); break;
+      console.log(`  MW${i}: no advance button`);
+      break;
     }
     await adv.click();
     await page.waitForTimeout(900);
@@ -125,4 +131,7 @@ async function main() {
   console.log(`\nDone → ${OUT}`);
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

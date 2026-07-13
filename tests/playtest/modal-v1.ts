@@ -14,7 +14,9 @@ async function main() {
   const ctx = await b.newContext({ viewport: { width: 1440, height: 1100 } });
   const page = await ctx.newPage();
   page.on("pageerror", (e) => console.log(`[pageerror] ${e.message}`));
-  page.on("console", (m) => { if (m.type() === "error") console.log(`[console.error] ${m.text()}`); });
+  page.on("console", (m) => {
+    if (m.type() === "error") console.log(`[console.error] ${m.text()}`);
+  });
 
   // Open modal from Squad (Felipe Pereira, id 2, has art).
   await page.goto(`${BASE}/squad`, { waitUntil: "networkidle" });

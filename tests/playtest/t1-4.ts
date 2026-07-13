@@ -10,13 +10,19 @@ async function main() {
   const page = await ctx.newPage();
   // My Bids tab.
   await page.goto(`${BASE}/transfers`, { waitUntil: "networkidle" });
-  await page.getByText(/^\s*My Bids\s*$/i).first().click();
+  await page
+    .getByText(/^\s*My Bids\s*$/i)
+    .first()
+    .click();
   await page.waitForTimeout(500);
   await page.screenshot({ path: resolve(OUT, "t1-4-my-bids.png"), fullPage: false });
   console.log("📸 t1-4-my-bids");
   // Offers tab.
   await page.goto(`${BASE}/transfers`, { waitUntil: "networkidle" });
-  await page.getByText(/^\s*Offers\s*$/i).first().click();
+  await page
+    .getByText(/^\s*Offers\s*$/i)
+    .first()
+    .click();
   await page.waitForTimeout(500);
   await page.screenshot({ path: resolve(OUT, "t1-4-offers.png"), fullPage: false });
   console.log("📸 t1-4-offers");

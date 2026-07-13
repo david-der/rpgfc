@@ -27,8 +27,18 @@ async function shoot(page: Page, label: string, path: string): Promise<Shot> {
   if (resp && !resp.ok()) errors.push(`HTTP ${resp.status()}`);
   await page.waitForTimeout(400);
   await page.screenshot({ path: resolve(OUT, `${label}.png`), fullPage: true });
-  const heading = await page.locator("h1,h2").first().textContent().catch(() => "") ?? "";
-  const body = await page.locator("main, body").first().textContent().catch(() => "") ?? "";
+  const heading =
+    (await page
+      .locator("h1,h2")
+      .first()
+      .textContent()
+      .catch(() => "")) ?? "";
+  const body =
+    (await page
+      .locator("main, body")
+      .first()
+      .textContent()
+      .catch(() => "")) ?? "";
   return {
     label,
     url,
@@ -86,12 +96,16 @@ async function main() {
     if (href) {
       shots.push(await shoot(page, "14-player-profile", href));
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   // Pick a club to drill into.
   try {
     shots.push(await shoot(page, "15-club-detail", "/league/clubs/7")); // Real Oviedo historically
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   // Drill into a transfer composer for a listed player.
   try {
@@ -101,7 +115,9 @@ async function main() {
     if (href && href !== "/transfers") {
       shots.push(await shoot(page, "16-transfer-composer", href));
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   writeFileSync(resolve(OUT, "tour.json"), JSON.stringify(shots, null, 2), "utf8");
   // eslint-disable-next-line no-console

@@ -49,7 +49,10 @@ async function main() {
 
   // End season — click, then SCROLL TO TOP to catch the narrative.
   console.log("▶ End season — scroll to top after");
-  await page.getByText(/^\s*Fixtures\s*$/i).first().click();
+  await page
+    .getByText(/^\s*Fixtures\s*$/i)
+    .first()
+    .click();
   await page.waitForTimeout(400);
   const endBtn = page.getByRole("button", { name: /end season/i });
   if (await endBtn.isVisible().catch(() => false)) {
@@ -85,7 +88,10 @@ async function main() {
 
   // Check the Fixtures tab — is the S0/S1/S2/S3 mixing bug still there?
   await page.goto(`${BASE}/league`, { waitUntil: "networkidle" });
-  await page.getByText(/^\s*Fixtures\s*$/i).first().click();
+  await page
+    .getByText(/^\s*Fixtures\s*$/i)
+    .first()
+    .click();
   await page.waitForTimeout(400);
   await snap(page, "78-s3-fixtures-check");
 
@@ -93,7 +99,10 @@ async function main() {
   console.log("▶ S3 play");
   for (let i = 0; i < 3; i++) {
     await page.goto(`${BASE}/league`, { waitUntil: "networkidle" });
-    await page.getByText(/^\s*Fixtures\s*$/i).first().click();
+    await page
+      .getByText(/^\s*Fixtures\s*$/i)
+      .first()
+      .click();
     await page.waitForTimeout(300);
     const a = page.getByRole("button", { name: /advance to next match week/i });
     if (!(await a.isVisible().catch(() => false))) break;
@@ -107,4 +116,7 @@ async function main() {
   console.log(`\nDone → ${OUT}`);
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

@@ -51,7 +51,10 @@ async function main() {
   // End season — snap BEFORE clicking and AFTER clicking to catch the
   // narrative card.
   console.log("▶ End season (catch narrative)");
-  await page.getByText(/^\s*Fixtures\s*$/i).first().click();
+  await page
+    .getByText(/^\s*Fixtures\s*$/i)
+    .first()
+    .click();
   await page.waitForTimeout(300);
   await snap(page, "51-s1-end-season-before-click");
   const endBtn = page.getByRole("button", { name: /end season/i });
@@ -105,7 +108,10 @@ async function main() {
     await snap(page, "58-scouts-after-watch");
     // Back to Watchlist tab
     await page.goto(`${BASE}/transfers`, { waitUntil: "networkidle" });
-    await page.getByText(/^\s*Watchlist\s*$/i).first().click();
+    await page
+      .getByText(/^\s*Watchlist\s*$/i)
+      .first()
+      .click();
     await page.waitForTimeout(400);
     await snap(page, "59-watchlist-after-add");
   }
@@ -129,7 +135,10 @@ async function main() {
   // Finally: check if fixtures now link into matches.
   console.log("▶ Fixture → match link check");
   await page.goto(`${BASE}/league`, { waitUntil: "networkidle" });
-  await page.getByText(/^\s*Fixtures\s*$/i).first().click();
+  await page
+    .getByText(/^\s*Fixtures\s*$/i)
+    .first()
+    .click();
   await page.waitForTimeout(300);
   const matchLinks = page.locator('a[href*="/matches/"]');
   const mlCount = await matchLinks.count().catch(() => 0);
@@ -139,7 +148,10 @@ async function main() {
   console.log("▶ Play 3 MW in S2");
   for (let i = 0; i < 3; i++) {
     await page.goto(`${BASE}/league`, { waitUntil: "networkidle" });
-    await page.getByText(/^\s*Fixtures\s*$/i).first().click();
+    await page
+      .getByText(/^\s*Fixtures\s*$/i)
+      .first()
+      .click();
     await page.waitForTimeout(300);
     const a = page.getByRole("button", { name: /advance to next match week/i });
     if (!(await a.isVisible().catch(() => false))) break;
@@ -153,4 +165,7 @@ async function main() {
   console.log(`\nDone → ${OUT}`);
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

@@ -12,4 +12,7 @@ async function main() {
   await page.screenshot({ path: "/tmp/rpgfc-playtest/new-bestxi-season5.png", fullPage: true });
   await b.close();
 }
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

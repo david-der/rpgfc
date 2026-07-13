@@ -11,7 +11,10 @@ async function main() {
 
   // Find a listed player to compose a bid for.
   await page.goto(`${BASE}/transfers`, { waitUntil: "networkidle" });
-  const firstListing = page.locator('a[href^="/transfers/"]').filter({ hasNotText: "Transfers" }).first();
+  const firstListing = page
+    .locator('a[href^="/transfers/"]')
+    .filter({ hasNotText: "Transfers" })
+    .first();
   const href = await firstListing.getAttribute("href");
   await page.goto(`${BASE}${href}`, { waitUntil: "networkidle" });
   await page.waitForTimeout(500);

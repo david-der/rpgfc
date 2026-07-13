@@ -41,7 +41,10 @@ async function playOneSeason(page: Page, label: string) {
     const r = await advanceOnce(page);
     if (r === "advanced") {
       weeks += 1;
-      if (weeks > 42) { console.log("  ✗ runaway"); break; }
+      if (weeks > 42) {
+        console.log("  ✗ runaway");
+        break;
+      }
     } else if (r === "season-end") {
       console.log(`  🏁 end after ${weeks} advances`);
       break;
@@ -54,7 +57,10 @@ async function playOneSeason(page: Page, label: string) {
   // End the season
   await page.goto(`${BASE}/league`, { waitUntil: "networkidle" });
   const fxTab = page.getByText(/^\s*Fixtures\s*$/i).first();
-  if (await fxTab.isVisible().catch(() => false)) { await fxTab.click(); await page.waitForTimeout(200); }
+  if (await fxTab.isVisible().catch(() => false)) {
+    await fxTab.click();
+    await page.waitForTimeout(200);
+  }
   const endBtn = page.getByRole("button", { name: /end season/i });
   if (await endBtn.isVisible().catch(() => false)) {
     await endBtn.click();
@@ -78,7 +84,9 @@ async function main() {
   const ctx = await b.newContext({ viewport: { width: 1440, height: 1000 } });
   const page = await ctx.newPage();
   page.on("pageerror", (e) => console.log(`  [pageerror] ${e.message}`));
-  page.on("console", (m) => { if (m.type() === "error") console.log(`  [console.error] ${m.text()}`); });
+  page.on("console", (m) => {
+    if (m.type() === "error") console.log(`  [console.error] ${m.text()}`);
+  });
 
   // 0. Baseline: archive before any new rollovers
   await page.goto(`${BASE}/seasons`, { waitUntil: "networkidle" });
@@ -137,7 +145,10 @@ async function main() {
           await page.waitForTimeout(400);
           await snap(page, `s${i}-modal-back`);
         }
-        await page.getByTestId("player-modal-close").click().catch(() => {});
+        await page
+          .getByTestId("player-modal-close")
+          .click()
+          .catch(() => {});
       }
     }
   }
@@ -150,4 +161,7 @@ async function main() {
   console.log(`\nDone → ${OUT}`);
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

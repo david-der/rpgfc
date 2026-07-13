@@ -28,7 +28,10 @@ async function main() {
 
   // Back-button test: go league → fixtures tab via click, then browser back.
   await page.goto(`${BASE}/league`, { waitUntil: "networkidle" });
-  await page.getByText(/^\s*Fixtures\s*$/i).first().click();
+  await page
+    .getByText(/^\s*Fixtures\s*$/i)
+    .first()
+    .click();
   await page.waitForTimeout(400);
   const urlAfterClick = page.url();
   console.log(`  url after Fixtures click: ${urlAfterClick}`);

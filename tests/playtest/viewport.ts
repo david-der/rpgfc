@@ -38,7 +38,10 @@ async function main() {
 
   // Fixtures tab specifically — click it so we see an actual match.
   await page.goto(`${BASE}/league`, { waitUntil: "networkidle" });
-  await page.getByText(/^\s*Fixtures\s*$/i).first().click();
+  await page
+    .getByText(/^\s*Fixtures\s*$/i)
+    .first()
+    .click();
   await page.waitForTimeout(400);
   await snap(page, "vp-league-fixtures");
 
@@ -73,4 +76,7 @@ async function main() {
   console.log(`\nViewport shots → ${OUT}`);
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

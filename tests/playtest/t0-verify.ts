@@ -38,7 +38,10 @@ async function main() {
   // T0-2 Fixtures filter. After /league, click Fixtures tab, count MW1.
   console.log("\n▶ T0-2 Fixtures (single season)");
   await page.goto(`${BASE}/league`, { waitUntil: "networkidle" });
-  await page.getByText(/^\s*Fixtures\s*$/i).first().click();
+  await page
+    .getByText(/^\s*Fixtures\s*$/i)
+    .first()
+    .click();
   await page.waitForTimeout(500);
   await snap(page, "2-fixtures");
   // Count MW1 fixture cards.
@@ -50,11 +53,17 @@ async function main() {
   // T0-3 Offers tab.
   console.log("\n▶ T0-3 Offers labels");
   await page.goto(`${BASE}/transfers`, { waitUntil: "networkidle" });
-  await page.getByText(/^\s*Offers\s*$/i).first().click();
+  await page
+    .getByText(/^\s*Offers\s*$/i)
+    .first()
+    .click();
   await page.waitForTimeout(500);
   await snap(page, "3-offers");
   const offersTxt = (await page.locator("main, body").first().textContent()) ?? "";
-  const rivalBid = /Bid from\s+(AC Barcelona|Real Oviedo|Sporting Recife|Racing Porto Alegre|Sporting Madrid|Internacional Curitiba|AC Curitiba|Atlético Arnhem|Unión Salvador)/.test(offersTxt);
+  const rivalBid =
+    /Bid from\s+(AC Barcelona|Real Oviedo|Sporting Recife|Racing Porto Alegre|Sporting Madrid|Internacional Curitiba|AC Curitiba|Atlético Arnhem|Unión Salvador)/.test(
+      offersTxt,
+    );
   const selfBid = /Bid from Club Madrid/.test(offersTxt);
   console.log(`  rival-attributed bids: ${rivalBid ? "✓" : "✗"}`);
   console.log(`  self-attributed bids (bug regression): ${selfBid ? "✗ REGRESSED" : "✓"}`);
@@ -62,7 +71,10 @@ async function main() {
   // T0-4 Error wrapping — submit an extension that will probably be rejected.
   console.log("\n▶ T0-4 Friendly error on extend");
   await page.goto(`${BASE}/players/1`, { waitUntil: "networkidle" });
-  await page.getByText(/^\s*Contract\s*$/i).first().click();
+  await page
+    .getByText(/^\s*Contract\s*$/i)
+    .first()
+    .click();
   await page.waitForTimeout(400);
   // Pick Minimal wage + 1 season to provoke a PLAYER_WAGE_FLOOR rejection.
   const selects = await page.locator("select").all();
@@ -74,7 +86,11 @@ async function main() {
       await selects[2]!.selectOption({ label: "1 seasons" });
     } catch {
       // some dropdowns label it "1 season" — try that too
-      try { await selects[2]!.selectOption({ label: "1 season" }); } catch { /* ignore */ }
+      try {
+        await selects[2]!.selectOption({ label: "1 season" });
+      } catch {
+        /* ignore */
+      }
     }
   }
   const offerBtn = page.getByRole("button", { name: /offer extension/i });
@@ -112,7 +128,11 @@ async function main() {
       }),
     });
     let body: unknown = null;
-    try { body = await r.json(); } catch { /* ignore */ }
+    try {
+      body = await r.json();
+    } catch {
+      /* ignore */
+    }
     return { status: r.status, body };
   });
   console.log(`  status: ${resp.status}`);

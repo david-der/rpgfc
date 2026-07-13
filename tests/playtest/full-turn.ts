@@ -58,7 +58,10 @@ async function playSeason(page: Page, n: number) {
   while (true) {
     const r = await advanceOnce(page);
     if (r === "season-end") break;
-    if (r === "nothing") { console.log("  no button"); break; }
+    if (r === "nothing") {
+      console.log("  no button");
+      break;
+    }
   }
 
   // Final-week league table before ending
@@ -67,7 +70,10 @@ async function playSeason(page: Page, n: number) {
 
   // End season
   const fxTab = page.getByText(/^\s*Fixtures\s*$/i).first();
-  if (await fxTab.isVisible().catch(() => false)) { await fxTab.click(); await page.waitForTimeout(200); }
+  if (await fxTab.isVisible().catch(() => false)) {
+    await fxTab.click();
+    await page.waitForTimeout(200);
+  }
   const endBtn = page.getByRole("button", { name: /end season/i });
   if (await endBtn.isVisible().catch(() => false)) {
     await endBtn.click();
@@ -136,4 +142,7 @@ async function main() {
   console.log(`\nDone → ${OUT} (tag ${TAG})`);
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
