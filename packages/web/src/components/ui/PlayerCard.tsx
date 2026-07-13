@@ -7,11 +7,12 @@
 //   - No drop shadow (§3 ban) — hierarchy comes from border weight +
 //     background tier.
 //
-// Art is loaded from `/player-art/{playerId}.png` with a graceful
-// fallback to `/player-art/default.png`. When per-player art lands
-// later, drop files in and the UI picks them up — no code change.
+// Art is loaded from `/player-art/{playerId}.webp|png` (useSketchArt
+// candidate chain) with a graceful fallback to the folder default.
+// When per-player art lands later, drop files in and the UI picks
+// them up — no code change.
 
-import { useState } from "react";
+import { useSketchArt } from "../../hooks/useSketchArt";
 
 import type { RenderedClubRef } from "@rpgfc/shared";
 
@@ -36,7 +37,7 @@ export function PlayerCard({
   club,
   certaintyLabel,
 }: PlayerCardProps) {
-  const [src, setSrc] = useState(`/player-art/${playerId}.png`);
+  const { src, onError } = useSketchArt("player-art", playerId);
 
   // Club-primary drives the top stripe — the same var the AppShell uses
   // for the global 4px chrome. Falls back to moss-500 for free agents.
@@ -54,9 +55,7 @@ export function PlayerCard({
       <div className="relative bg-parchment-100">
         <img
           src={src}
-          onError={() => {
-            if (!src.endsWith("default.png")) setSrc("/player-art/default.png");
-          }}
+          onError={onError}
           alt=""
           role="presentation"
           className="block aspect-[4/3] w-full object-cover"
@@ -96,9 +95,7 @@ export function PlayerCard({
           {archetypeLabel ?? positionLabel} · {nationality}
         </div>
         <div className="mt-2 flex items-center justify-between border-t border-parchment-300 pt-2 text-[10px] uppercase tracking-wide text-parchment-500">
-          <span data-testid="player-facing">
-            {club?.name ?? "Free agent"}
-          </span>
+          <span data-testid="player-facing">{club?.name ?? "Free agent"}</span>
           <span className="text-parchment-400">{certaintyLabel}</span>
         </div>
       </figcaption>

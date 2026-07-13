@@ -4,12 +4,12 @@
 // room for an eyebrow + title overlaid on the parchment frame.
 //
 // Each caller points at its own art folder (/match-art, /ceremony-art,
-// future /scout-art …). The image is loaded by key + falls back to
-// `default.png` in the same folder when a caller-specific image isn't
-// present yet — so dropping Gemini-generated pieces in light up the
-// right contexts without code change.
+// future /scout-art …). The image is loaded by key (webp or png, via
+// useSketchArt) + falls back to the folder default when a
+// caller-specific image isn't present yet — so dropping generated
+// pieces in lights up the right contexts without code change.
 
-import { useState } from "react";
+import { useSketchArt } from "../../hooks/useSketchArt";
 
 import type { ReactNode } from "react";
 
@@ -39,7 +39,7 @@ export function HeroIllustration({
   subtitle,
   children,
 }: HeroIllustrationProps) {
-  const [src, setSrc] = useState(`/${folder}/${artKey}.png`);
+  const { src, onError } = useSketchArt(folder, artKey);
   const stripe = stripeColor ?? "#5C6B33"; // moss-500 default
 
   return (
@@ -51,9 +51,7 @@ export function HeroIllustration({
       <div className="relative bg-parchment-100">
         <img
           src={src}
-          onError={() => {
-            if (!src.endsWith("default.png")) setSrc(`/${folder}/default.png`);
-          }}
+          onError={onError}
           alt=""
           role="presentation"
           className="block aspect-[16/7] w-full object-cover"
@@ -78,9 +76,7 @@ export function HeroIllustration({
               {eyebrow}
             </div>
           )}
-          <h1 className="mt-1 font-serif text-4xl leading-tight text-parchment-900">
-            {title}
-          </h1>
+          <h1 className="mt-1 font-serif text-4xl leading-tight text-parchment-900">{title}</h1>
         </div>
       </div>
 
@@ -92,9 +88,7 @@ export function HeroIllustration({
         </div>
       )}
 
-      {children && (
-        <div className="border-t border-parchment-300 px-6 py-4">{children}</div>
-      )}
+      {children && <div className="border-t border-parchment-300 px-6 py-4">{children}</div>}
     </section>
   );
 }

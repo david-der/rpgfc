@@ -1,22 +1,38 @@
-// Generate per-player sketch art via Gemini 2.5 Flash Image.
+// Generate per-player sketch art + narrative hero panels.
+//
+// Providers: OpenAI GPT Image 2 (default) or Gemini 2.5 Flash Image
+// (kept for A/B comparison — it produced the original portrait corpus).
+// The prompt pipeline is identical for both so output differences are
+// the provider, not the brief.
 //
 // Usage:
-//   GEMINI_API_KEY=... pnpm gen-art [--db saves/playtest.db]
+//   OPENAI_API_KEY=... pnpm gen-art [--db saves/playtest.db]
+//                                   [--provider openai|gemini]
+//                                   [--quality low|medium|high]
+//                                   [--size WxH]
+//                                   [--format webp|png|jpeg]
+//                                   [--compression 0-100]
 //                                   [--only=1,2,3]
 //                                   [--force]
 //                                   [--dry-run]
 //                                   [--limit=N]
 //                                   [--concurrency=N]
 //
-// Output: packages/web/public/player-art/{playerId}.png
+//   pnpm gen-art --hero match-art|ceremony-art|all
+//     regenerates the HeroIllustration default panels at exactly
+//     2048x896 (16:7) — GPT Image 2 accepts custom dimensions, so the
+//     component no longer crops a squarer master.
 //
-// The PlayerCard + PlayerAvatar components already pick these up via
-// the /player-art/{id}.png convention; no code change needed once a
-// file lands.
+// Output: packages/web/public/player-art/{playerId}.{webp|png}
+// Consumers resolve art through useSketchArt ({key}.webp → {key}.png →
+// default.*), so webp output lights up with no code change and the
+// legacy Gemini .png corpus keeps working.
 //
-// Cost note: ~$0.039 per image at the Gemini paid tier as of 2025-04.
-// 200 players ≈ $8. Free-tier rate limits exist; the script throttles
-// itself and retries 429s.
+// Cost (official example pricing, 1024x1024): gpt-image-2 ≈ $0.006 low /
+// $0.053 medium / $0.211 high per image → 200 medium portraits ≈ $10.60
+// before retries. Gemini ≈ $0.039. Use --quality low for contact-sheet
+// exploration, medium for keepers. Default webp output also keeps the
+// shipped corpus far below the ~2 MB/image the Gemini PNGs weigh.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -112,10 +128,22 @@ headshot.`;
 
 const FRAMINGS: Weighted<string>[] = [
   { weight: 1, value: "tight head-and-shoulders portrait, face dominates, chest-up" },
-  { weight: 2, value: "waist-up medium shot, arms and torso visible, body language carries the frame" },
-  { weight: 3, value: "full-body shot at medium distance, feet planted in frame, stadium visible behind" },
-  { weight: 3, value: "wide action shot, subject fills about half the frame, room around them for environment" },
-  { weight: 1, value: "extreme wide environmental shot, figure small in frame, pitch/stadium dominates" },
+  {
+    weight: 2,
+    value: "waist-up medium shot, arms and torso visible, body language carries the frame",
+  },
+  {
+    weight: 3,
+    value: "full-body shot at medium distance, feet planted in frame, stadium visible behind",
+  },
+  {
+    weight: 3,
+    value: "wide action shot, subject fills about half the frame, room around them for environment",
+  },
+  {
+    weight: 1,
+    value: "extreme wide environmental shot, figure small in frame, pitch/stadium dominates",
+  },
 ];
 
 // ── Axis 2: COMPOSITION ──────────────────────────────────────────────────
@@ -123,36 +151,127 @@ const FRAMINGS: Weighted<string>[] = [
 
 const COMPOSITIONS: Weighted<string>[] = [
   { weight: 5, value: "single focal figure alone in frame" },
-  { weight: 3, value: "two players contesting the ball shoulder-to-shoulder, the focal player foregrounded, the opponent anonymous and partly cropped" },
-  { weight: 2, value: "focal player with an anonymous teammate just behind or beside, shared moment" },
+  {
+    weight: 3,
+    value:
+      "two players contesting the ball shoulder-to-shoulder, the focal player foregrounded, the opponent anonymous and partly cropped",
+  },
+  {
+    weight: 2,
+    value: "focal player with an anonymous teammate just behind or beside, shared moment",
+  },
   { weight: 1, value: "focal player with the goalkeeper or defender reacting in the background" },
-  { weight: 2, value: "figure against a sea of anonymous crowd silhouettes filling the frame behind" },
+  {
+    weight: 2,
+    value: "figure against a sea of anonymous crowd silhouettes filling the frame behind",
+  },
 ];
 
 // ── Axis 3: MOMENT ───────────────────────────────────────────────────────
 // What's actually happening. Archetype biases this slightly below.
 
 const MOMENTS: Moment[] = [
-  { key: "stoic-before-kickoff", tag: "any", prompt: "stoic portrait, looking off-camera, hands by sides, before kickoff" },
-  { key: "scanning-pitch", tag: "any", prompt: "scanning the pitch with hands on hips, jaw set, catching breath" },
-  { key: "mid-sprint", tag: "outfield", prompt: "mid-sprint in open play, one leg extended, ball at feet, hair pushed back by the run" },
-  { key: "striking-ball", tag: "attacker", prompt: "striking the ball with the instep mid-swing, long follow-through" },
-  { key: "heading", tag: "attacker-def", prompt: "rising to head the ball, airborne, eyes on the ball, chest forward" },
-  { key: "sliding-tackle", tag: "defender", prompt: "sliding tackle, one leg extended, grass spraying, ball just at the boot" },
-  { key: "diving-save", tag: "gk", prompt: "goalkeeper diving horizontally, fingertips on the ball, body fully extended" },
-  { key: "catching-cross", tag: "gk", prompt: "goalkeeper catching a cross at the peak of a jump, arms fully extended above the head" },
-  { key: "celebrating-knees", tag: "any", prompt: "celebrating a goal, knees on the turf, arms raised, head back" },
-  { key: "celebrating-run", tag: "any", prompt: "sprinting towards the corner flag in celebration, arms spread wide" },
-  { key: "collapse-exhaustion", tag: "any", prompt: "collapsing in exhaustion after the final whistle, on the ground on elbows and knees" },
-  { key: "arguing-ref", tag: "any", prompt: "arguing with an unseen referee, finger pointed, face twisted in disbelief" },
-  { key: "walking-tunnel", tag: "any", prompt: "walking out of the tunnel, focused expression, hand trailing along the wall" },
-  { key: "locker-room", tag: "any", prompt: "in the locker room post-match, shirt partly off, head bowed over a bench" },
-  { key: "sideline-water", tag: "any", prompt: "at the sideline, drinking from a water bottle, tracksuit on" },
-  { key: "sideline-warmup", tag: "any", prompt: "warming up on the touchline, pulling on a training top, half-turned to face the pitch" },
-  { key: "pointing-teammate", tag: "any", prompt: "pointing decisively at a teammate just out of frame, organising a set piece" },
-  { key: "chest-bump", tag: "any", prompt: "bumping chests with a teammate after a goal, both airborne" },
-  { key: "alone-after-whistle", tag: "any", prompt: "standing alone on the pitch after the final whistle, shoulders slightly slumped, fans blurred behind" },
-  { key: "free-kick-prep", tag: "any", prompt: "standing over the ball at a free kick, hands on hips, measuring the distance" },
+  {
+    key: "stoic-before-kickoff",
+    tag: "any",
+    prompt: "stoic portrait, looking off-camera, hands by sides, before kickoff",
+  },
+  {
+    key: "scanning-pitch",
+    tag: "any",
+    prompt: "scanning the pitch with hands on hips, jaw set, catching breath",
+  },
+  {
+    key: "mid-sprint",
+    tag: "outfield",
+    prompt: "mid-sprint in open play, one leg extended, ball at feet, hair pushed back by the run",
+  },
+  {
+    key: "striking-ball",
+    tag: "attacker",
+    prompt: "striking the ball with the instep mid-swing, long follow-through",
+  },
+  {
+    key: "heading",
+    tag: "attacker-def",
+    prompt: "rising to head the ball, airborne, eyes on the ball, chest forward",
+  },
+  {
+    key: "sliding-tackle",
+    tag: "defender",
+    prompt: "sliding tackle, one leg extended, grass spraying, ball just at the boot",
+  },
+  {
+    key: "diving-save",
+    tag: "gk",
+    prompt: "goalkeeper diving horizontally, fingertips on the ball, body fully extended",
+  },
+  {
+    key: "catching-cross",
+    tag: "gk",
+    prompt: "goalkeeper catching a cross at the peak of a jump, arms fully extended above the head",
+  },
+  {
+    key: "celebrating-knees",
+    tag: "any",
+    prompt: "celebrating a goal, knees on the turf, arms raised, head back",
+  },
+  {
+    key: "celebrating-run",
+    tag: "any",
+    prompt: "sprinting towards the corner flag in celebration, arms spread wide",
+  },
+  {
+    key: "collapse-exhaustion",
+    tag: "any",
+    prompt: "collapsing in exhaustion after the final whistle, on the ground on elbows and knees",
+  },
+  {
+    key: "arguing-ref",
+    tag: "any",
+    prompt: "arguing with an unseen referee, finger pointed, face twisted in disbelief",
+  },
+  {
+    key: "walking-tunnel",
+    tag: "any",
+    prompt: "walking out of the tunnel, focused expression, hand trailing along the wall",
+  },
+  {
+    key: "locker-room",
+    tag: "any",
+    prompt: "in the locker room post-match, shirt partly off, head bowed over a bench",
+  },
+  {
+    key: "sideline-water",
+    tag: "any",
+    prompt: "at the sideline, drinking from a water bottle, tracksuit on",
+  },
+  {
+    key: "sideline-warmup",
+    tag: "any",
+    prompt: "warming up on the touchline, pulling on a training top, half-turned to face the pitch",
+  },
+  {
+    key: "pointing-teammate",
+    tag: "any",
+    prompt: "pointing decisively at a teammate just out of frame, organising a set piece",
+  },
+  {
+    key: "chest-bump",
+    tag: "any",
+    prompt: "bumping chests with a teammate after a goal, both airborne",
+  },
+  {
+    key: "alone-after-whistle",
+    tag: "any",
+    prompt:
+      "standing alone on the pitch after the final whistle, shoulders slightly slumped, fans blurred behind",
+  },
+  {
+    key: "free-kick-prep",
+    tag: "any",
+    prompt: "standing over the ball at a free kick, hands on hips, measuring the distance",
+  },
 ];
 
 // ── Axis 4: ANGLE ────────────────────────────────────────────────────────
@@ -172,7 +291,10 @@ const ANGLES: Weighted<string>[] = [
 const SCENES: Weighted<string>[] = [
   { weight: 3, value: "stadium packed with anonymous crowd silhouettes" },
   { weight: 2, value: "stadium crowd at dusk, floodlights bleeding across the sky" },
-  { weight: 2, value: "rain-soaked pitch at night under floodlights, raindrops streaking the frame" },
+  {
+    weight: 2,
+    value: "rain-soaked pitch at night under floodlights, raindrops streaking the frame",
+  },
   { weight: 1, value: "empty training pitch at dawn, mist on the grass" },
   { weight: 1, value: "players' tunnel with tiled walls, harsh lighting" },
   { weight: 1, value: "locker room with hanging kit and benches" },
@@ -227,7 +349,10 @@ const MOODS: Weighted<string>[] = [
 
 // ── Weighted picker ──────────────────────────────────────────────────────
 
-interface Weighted<T> { weight: number; value: T; }
+interface Weighted<T> {
+  weight: number;
+  value: T;
+}
 
 interface Moment {
   key: string;
@@ -285,11 +410,7 @@ function tagsForRole(role: string): string[] {
   if (role === "Defensive Midfielder") {
     return ["any", "outfield", "defender"];
   }
-  if (
-    role === "Striker" ||
-    role === "Winger" ||
-    role === "Attacking Midfielder"
-  ) {
+  if (role === "Striker" || role === "Winger" || role === "Attacking Midfielder") {
     return ["any", "outfield", "attacker", "attacker-def"];
   }
   return ["any", "outfield"];
@@ -444,9 +565,10 @@ function buildPrompt(p: PlayerRow): string {
     ? " Keep the expression raw, unpolished, and gestural — do NOT clean up the face into a cartoon smile; keep the rugged anatomy intact."
     : "";
 
-  const sprinting = /sprint|mid-sprint|striking|heading|sliding|diving|chest-bump|celebrating-run/.test(
-    mix.moment.key + " " + mix.moment.prompt,
-  );
+  const sprinting =
+    /sprint|mid-sprint|striking|heading|sliding|diving|chest-bump|celebrating-run/.test(
+      mix.moment.key + " " + mix.moment.prompt,
+    );
   const motionGuard = sprinting
     ? " Convey motion through smudged charcoal edges and ghosted contour lines, NOT through cartoon speed-lines."
     : "";
@@ -468,10 +590,116 @@ function buildPrompt(p: PlayerRow): string {
   ].join("\n");
 }
 
+// ── hero panels (16:7) ───────────────────────────────────────────────────
+//
+// Wide narrative headers for HeroIllustration (match report, season
+// ceremony). Generated at exactly 2048x896 so the component's
+// aspect-[16/7] shows the full composition uncropped. The lower quarter
+// must stay quiet — the UI lays a parchment gradient + title over it.
+
+const HERO_COMMON = `Raw, gritty charcoal drawing. Wide cinematic
+panorama. Rough-edged observational draftsmanship, visible charcoal
+dust and paper grain, heavy cross-hatching and smudged gradients,
+uneven line pressure, broken contours, aggressive negative space.
+Strictly monochrome — charcoal, conté, or ink wash on toothed paper.
+
+Not comic-book line art, not anime, not clean vector, not a polished
+sports-marketing illustration.
+
+Keep the lower quarter of the frame compositionally quiet — mostly
+negative space or soft ground shadow, no focal detail there.
+
+ABSOLUTELY NO text, letters, numbers, logos, jersey numbers, sponsor
+boards, scoreboards, flags with symbols, or banners with writing
+anywhere in the image. Anonymous, generic kit.`;
+
+const HERO_PROMPTS: Record<string, string> = {
+  "match-art": `${HERO_COMMON}
+
+SCENE: a football match mid-play seen from high in the stands —
+twenty-two small anonymous figures scattered across a rain-streaked
+pitch under floodlights, one winger driving at a fullback near the
+touchline, the crowd a dark sea of hatched silhouettes rising into
+the haze.`,
+  "ceremony-art": `${HERO_COMMON}
+
+SCENE: a trophy ceremony at dusk — a captain hoisting a plain,
+unmarked trophy above his head at the center of the frame, teammates
+crowding around with arms raised, ticker-tape hanging in the floodlit
+air drawn as loose charcoal flecks, the stands behind dissolving into
+smudged darkness.`,
+};
+
+const HERO_SIZE = "2048x896"; // exactly 16:7; both edges multiples of 16
+
+// ── providers ────────────────────────────────────────────────────────────
+
+type Provider = "openai" | "gemini";
+
+interface GenOptions {
+  size: string;
+  quality: "low" | "medium" | "high";
+  format: "png" | "jpeg" | "webp";
+  compression: number; // jpeg/webp only
+}
+
+const OPENAI_MODEL = process.env["OPENAI_IMAGE_MODEL"] ?? "gpt-image-2";
+const OPENAI_ENDPOINT = "https://api.openai.com/v1/images/generations";
+
+interface OpenAIImageResponse {
+  data?: Array<{ b64_json?: string }>;
+  error?: { message?: string };
+}
+
+async function generateOpenAI(prompt: string, apiKey: string, opts: GenOptions): Promise<Buffer> {
+  const body: Record<string, unknown> = {
+    model: OPENAI_MODEL,
+    prompt,
+    size: opts.size,
+    quality: opts.quality,
+    output_format: opts.format,
+    // The style anchor forbids skin-through-fabric content by naming
+    // it; the default filter can false-positive on the words alone.
+    moderation: "low",
+  };
+  if (opts.format !== "png") body["output_compression"] = opts.compression;
+
+  let attempt = 0;
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    attempt += 1;
+    const res = await fetch(OPENAI_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(body),
+    });
+    if (res.status === 429 || res.status >= 500) {
+      if (attempt > 4) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`HTTP ${res.status}: ${text.slice(0, 360)}`);
+      }
+      const wait = 2000 * attempt;
+      console.error(`  ${res.status} — backing off ${wait}ms`);
+      await new Promise((r) => setTimeout(r, wait));
+      continue;
+    }
+    const json = (await res.json().catch(() => null)) as OpenAIImageResponse | null;
+    if (!res.ok || !json || json.error) {
+      throw new Error(json?.error?.message ?? `HTTP ${res.status}`);
+    }
+    const b64 = json.data?.[0]?.b64_json;
+    if (!b64) throw new Error("No image in response");
+    return Buffer.from(b64, "base64");
+  }
+}
+
 // ── Gemini call ──────────────────────────────────────────────────────────
 
-const MODEL = process.env["GEMINI_IMAGE_MODEL"] ?? "gemini-2.5-flash-image";
-const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
+const GEMINI_MODEL = process.env["GEMINI_IMAGE_MODEL"] ?? "gemini-2.5-flash-image";
+const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 interface GeminiPart {
   text?: string;
@@ -483,7 +711,7 @@ interface GeminiResponse {
   error?: { code?: number; message?: string; status?: string };
 }
 
-async function generateOne(prompt: string, apiKey: string): Promise<Buffer> {
+async function generateGemini(prompt: string, apiKey: string): Promise<Buffer> {
   const body = {
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: { responseModalities: ["IMAGE"] },
@@ -526,10 +754,27 @@ async function generateOne(prompt: string, apiKey: string): Promise<Buffer> {
   }
 }
 
+async function generateOne(
+  provider: Provider,
+  prompt: string,
+  apiKey: string,
+  opts: GenOptions,
+): Promise<Buffer> {
+  return provider === "openai"
+    ? generateOpenAI(prompt, apiKey, opts)
+    : generateGemini(prompt, apiKey);
+}
+
 // ── orchestration ────────────────────────────────────────────────────────
 
 interface Args {
   dbPath: string;
+  provider: Provider;
+  quality: GenOptions["quality"];
+  size: string;
+  format: GenOptions["format"];
+  compression: number;
+  hero: string | null;
   only: Set<number> | null;
   force: boolean;
   dryRun: boolean;
@@ -540,6 +785,12 @@ interface Args {
 function parseArgs(argv: string[]): Args {
   const out: Args = {
     dbPath: "saves/playtest.db",
+    provider: "openai",
+    quality: "medium",
+    size: "1024x1024",
+    format: "webp",
+    compression: 88,
+    hero: null,
     only: null,
     force: false,
     dryRun: false,
@@ -571,7 +822,10 @@ function parseArgs(argv: string[]): Args {
     const only = valueOf(i, "--only");
     if (only !== null) {
       out.only = new Set(
-        only.split(",").map((s) => Number(s.trim())).filter((n) => Number.isFinite(n)),
+        only
+          .split(",")
+          .map((s) => Number(s.trim()))
+          .filter((n) => Number.isFinite(n)),
       );
       if (arg === "--only") i += 1;
       continue;
@@ -588,8 +842,73 @@ function parseArgs(argv: string[]): Args {
       if (arg === "--concurrency") i += 1;
       continue;
     }
+    const provider = valueOf(i, "--provider");
+    if (provider !== null) {
+      if (provider !== "openai" && provider !== "gemini") {
+        console.error(`--provider must be openai or gemini, got "${provider}"`);
+        process.exit(1);
+      }
+      out.provider = provider;
+      if (arg === "--provider") i += 1;
+      continue;
+    }
+    const quality = valueOf(i, "--quality");
+    if (quality !== null) {
+      if (quality !== "low" && quality !== "medium" && quality !== "high") {
+        console.error(`--quality must be low, medium, or high, got "${quality}"`);
+        process.exit(1);
+      }
+      out.quality = quality;
+      if (arg === "--quality") i += 1;
+      continue;
+    }
+    const size = valueOf(i, "--size");
+    if (size !== null) {
+      if (!/^\d+x\d+$/.test(size)) {
+        console.error(`--size must look like 1024x1024, got "${size}"`);
+        process.exit(1);
+      }
+      out.size = size;
+      if (arg === "--size") i += 1;
+      continue;
+    }
+    const format = valueOf(i, "--format");
+    if (format !== null) {
+      if (format !== "png" && format !== "jpeg" && format !== "webp") {
+        console.error(`--format must be webp, png, or jpeg, got "${format}"`);
+        process.exit(1);
+      }
+      out.format = format;
+      if (arg === "--format") i += 1;
+      continue;
+    }
+    const compression = valueOf(i, "--compression");
+    if (compression !== null) {
+      out.compression = Number(compression);
+      if (arg === "--compression") i += 1;
+      continue;
+    }
+    const hero = valueOf(i, "--hero");
+    if (hero !== null) {
+      out.hero = hero;
+      if (arg === "--hero") i += 1;
+      continue;
+    }
   }
   return out;
+}
+
+/** Pull provider keys from .env.local / .env so they can live next to
+ *  DATABASE_URL etc. Real environment wins, then .env.local, then .env. */
+function loadEnvLocal(repoRoot: string): void {
+  for (const file of [".env.local", ".env"]) {
+    const envPath = resolve(repoRoot, file);
+    if (!existsSync(envPath)) continue;
+    for (const line of readFileSync(envPath, "utf8").split("\n")) {
+      const m = line.match(/^(OPENAI_API_KEY|GEMINI_API_KEY)=(.+)$/);
+      if (m && !process.env[m[1]!]) process.env[m[1]!] = m[2]!.trim();
+    }
+  }
 }
 
 async function main() {
@@ -597,27 +916,62 @@ async function main() {
 
   const here = dirname(fileURLToPath(import.meta.url));
   const repoRoot = resolve(here, "../../../..");
+
+  loadEnvLocal(repoRoot);
+  const keyVar = args.provider === "openai" ? "OPENAI_API_KEY" : "GEMINI_API_KEY";
+  const key = process.env[keyVar] ?? "";
+  if (!key && !args.dryRun) {
+    console.error(`Set ${keyVar} in your environment or .env.local at the repo root.`);
+    process.exit(1);
+  }
+  // Gemini only returns PNG; the format/compression flags are
+  // OpenAI-only knobs.
+  const ext = args.provider === "gemini" ? "png" : args.format;
+  const genOpts: GenOptions = {
+    size: args.size,
+    quality: args.quality,
+    format: args.format,
+    compression: args.compression,
+  };
+
+  if (args.hero) {
+    if (args.provider !== "openai") {
+      console.error("--hero requires --provider openai (exact 16:7 sizes).");
+      process.exit(1);
+    }
+    const folders = args.hero === "all" ? Object.keys(HERO_PROMPTS) : [args.hero];
+    for (const folder of folders) {
+      const prompt = HERO_PROMPTS[folder];
+      if (!prompt) {
+        console.error(
+          `Unknown hero folder "${folder}". Options: ${Object.keys(HERO_PROMPTS).join(", ")}, all`,
+        );
+        process.exit(1);
+      }
+      if (args.dryRun) {
+        console.log(`── ${folder}/default.${ext} @ ${HERO_SIZE} ──`);
+        console.log(prompt);
+        console.log();
+        continue;
+      }
+      console.log(`🎨 ${folder}/default.${ext} @ ${HERO_SIZE} (${args.quality})…`);
+      const buf = await generateOne("openai", prompt, key, {
+        ...genOpts,
+        size: HERO_SIZE,
+      });
+      const outPath = resolve(repoRoot, `packages/web/public/${folder}/default.${ext}`);
+      writeFileSync(outPath, buf);
+      console.log(`✓ ${outPath} (${buf.length.toLocaleString()} bytes)`);
+    }
+    return;
+  }
+
   const dbPath = resolve(repoRoot, args.dbPath);
   const outDir = resolve(repoRoot, "packages/web/public/player-art");
   mkdirSync(outDir, { recursive: true });
 
   if (!existsSync(dbPath)) {
     console.error(`No save DB at ${dbPath}. Pass --db <path>.`);
-    process.exit(1);
-  }
-  // Load .env.local at the project root so GEMINI_API_KEY can live
-  // there alongside DATABASE_URL etc. Done before the key check so the
-  // file actually beats the environment.
-  const envPath = resolve(repoRoot, ".env.local");
-  if (existsSync(envPath) && !process.env["GEMINI_API_KEY"]) {
-    for (const line of readFileSync(envPath, "utf8").split("\n")) {
-      const m = line.match(/^GEMINI_API_KEY=(.+)$/);
-      if (m) process.env["GEMINI_API_KEY"] = m[1]!.trim();
-    }
-  }
-  const key = process.env["GEMINI_API_KEY"] ?? "";
-  if (!key && !args.dryRun) {
-    console.error("Set GEMINI_API_KEY in your environment or .env.local at the repo root.");
     process.exit(1);
   }
 
@@ -634,16 +988,22 @@ async function main() {
 
   let queue = players.filter((p) => !args.only || args.only.has(p.id));
   if (!args.force) {
-    queue = queue.filter((p) => !existsSync(resolve(outDir, `${p.id}.png`)));
+    // Skip players that already have art in either format — the webp
+    // pipeline must not clobber the approved Gemini-era pngs unless
+    // --force says so.
+    queue = queue.filter(
+      (p) =>
+        !existsSync(resolve(outDir, `${p.id}.webp`)) && !existsSync(resolve(outDir, `${p.id}.png`)),
+    );
   }
   if (args.limit !== null) queue = queue.slice(0, args.limit);
 
-  console.log(
-    `🎨 ${queue.length} players to generate (out of ${players.length} contracted).`,
-  );
+  const model = args.provider === "openai" ? OPENAI_MODEL : GEMINI_MODEL;
+  console.log(`🎨 ${queue.length} players to generate (out of ${players.length} contracted).`);
   console.log(`   db:        ${dbPath}`);
   console.log(`   out:       ${outDir}`);
-  console.log(`   model:     ${MODEL}`);
+  console.log(`   model:     ${model} (${args.provider})`);
+  console.log(`   output:    ${args.size} · ${args.quality} · ${ext}`);
   console.log(`   parallel:  ${args.concurrency}`);
   if (args.dryRun) console.log(`   DRY RUN — printing 3 sample prompts:\n`);
 
@@ -681,10 +1041,10 @@ async function main() {
     inFlight += 1;
     const task = (async () => {
       try {
-        const png = await generateOne(buildPrompt(p), key);
-        writeFileSync(resolve(outDir, `${p.id}.png`), png);
+        const img = await generateOne(args.provider, buildPrompt(p), key, genOpts);
+        writeFileSync(resolve(outDir, `${p.id}.${ext}`), img);
         okCount += 1;
-        console.log(`✓ #${p.id} ${p.name} (${png.length.toLocaleString()} bytes)`);
+        console.log(`✓ #${p.id} ${p.name} (${img.length.toLocaleString()} bytes)`);
       } catch (e) {
         failCount += 1;
         console.error(`✗ #${p.id} ${p.name}: ${(e as Error).message}`);

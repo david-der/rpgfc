@@ -1,13 +1,14 @@
 // PlayerAvatar — bite-sized sister to PlayerCard. Same sketch-on-
 // parchment aesthetic, sized for list rows (squad page, watchlist,
-// rosters). Reuses the /player-art/{id}.png convention with a fallback
-// to default.png so dropping in per-player art lights up everywhere.
+// rosters). Reuses the /player-art/{id} convention (webp or png, via
+// useSketchArt) with a fallback to the folder default so dropping in
+// per-player art lights up everywhere.
 //
 // `rounded-full` is one of the two radius exceptions allowed by the
 // Style Guide (the other is the default 0 everywhere else). Avatars
 // qualify — circles + dots are the cited example. See packages/web/CLAUDE.md.
 
-import { useState } from "react";
+import { useSketchArt } from "../../hooks/useSketchArt";
 
 interface PlayerAvatarProps {
   playerId: number;
@@ -17,7 +18,7 @@ interface PlayerAvatarProps {
 }
 
 export function PlayerAvatar({ playerId, size = 48, ringColor }: PlayerAvatarProps) {
-  const [src, setSrc] = useState(`/player-art/${playerId}.png`);
+  const { src, onError } = useSketchArt("player-art", playerId);
   return (
     <span
       className="inline-block flex-none overflow-hidden rounded-full border-2 bg-parchment-100"
@@ -26,9 +27,7 @@ export function PlayerAvatar({ playerId, size = 48, ringColor }: PlayerAvatarPro
     >
       <img
         src={src}
-        onError={() => {
-          if (!src.endsWith("default.png")) setSrc("/player-art/default.png");
-        }}
+        onError={onError}
         alt=""
         className="block h-full w-full object-cover object-center"
         style={{
