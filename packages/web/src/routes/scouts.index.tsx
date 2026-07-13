@@ -9,12 +9,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
-import {
-  BADGE_CATEGORIES,
-  CERTAINTY_TIERS,
-  EXPERIENCE_TIERS,
-  FORM_TIERS,
-} from "@rpgfc/shared";
+import { BADGE_CATEGORIES, CERTAINTY_TIERS, EXPERIENCE_TIERS, FORM_TIERS } from "@rpgfc/shared";
 
 import { usePlayerModal } from "../components/PlayerModalProvider";
 import { BadgeChip } from "../components/ui/BadgeChip";
@@ -48,11 +43,12 @@ function ScoutingSearch() {
   const [onMarket, setOnMarket] = useState(false);
   const [preferredFoot, setPreferredFoot] = useState("");
 
-  // Fetch a large page — full database is 400 players, client-side
-  // filtering is fast and gives instant feedback as filters change.
+  // The intentional ten-club world contains two hundred senior players.
+  // One complete page keeps the exploratory filters instant; the API still
+  // provides correct cursor pagination for other consumers.
   const query = useQuery({
-    queryKey: ["scouting-search"],
-    queryFn: () => fetchPlayers({ limit: 100 }),
+    queryKey: ["scouting-search", onMarket],
+    queryFn: () => fetchPlayers({ limit: 250, ...(onMarket ? { onMarket: true } : {}) }),
     staleTime: 30_000,
   });
 
@@ -100,18 +96,10 @@ function ScoutingSearch() {
       items = items.filter((p) => p.formTier === form);
     }
     if (badgeCategory) {
-      items = items.filter((p) =>
-        p.badges.some((b) => b.category === badgeCategory),
-      );
+      items = items.filter((p) => p.badges.some((b) => b.category === badgeCategory));
     }
     if (preferredFoot) {
       items = items.filter((p) => p.preferredFoot === preferredFoot);
-    }
-    if (onMarket) {
-      // On-market filter was implemented server-side; for now we
-      // surface it as a UI hint. A proper filter would need the
-      // listings data joined — for now all players show.
-      // TODO: wire server-side onMarket filter when paginating.
     }
     return items;
   }, [
@@ -145,8 +133,18 @@ function ScoutingSearch() {
           />
         </label>
 
-        <FilterSelect label="Position" value={position} onChange={setPosition} options={POSITIONS} />
-        <FilterSelect label="Nationality" value={nationality} onChange={setNationality} options={nationalities} />
+        <FilterSelect
+          label="Position"
+          value={position}
+          onChange={setPosition}
+          options={POSITIONS}
+        />
+        <FilterSelect
+          label="Nationality"
+          value={nationality}
+          onChange={setNationality}
+          options={nationalities}
+        />
         <FilterSelect label="Club" value={club} onChange={setClub} options={clubs} />
         <FilterSelect
           label="Experience"
@@ -259,9 +257,7 @@ function ScoutingSearch() {
                     </td>
                     <td className="px-3 py-3 text-parchment-700">{player.experience}</td>
                     <td className="hidden px-3 py-3 md:table-cell">
-                      <CertaintyText certainty={player.certainty}>
-                        {player.certainty}
-                      </CertaintyText>
+                      <CertaintyText certainty={player.certainty}>{player.certainty}</CertaintyText>
                     </td>
                     <td className="hidden px-3 py-3 text-parchment-700 lg:table-cell">
                       {player.formTierLabel ?? "—"}

@@ -12,9 +12,11 @@ import type { PlayerKnowledge } from "./knowledge.js";
 export interface RenderContext {
   /** The game's current date — used for age math. Separate from real time. */
   now: Date;
-  /** Knowledge-graph snapshot for the player being rendered. The
-   *  rendering layer's `computeCertainty` reads this; route layers do
-   *  not interact with it directly. Optional so callers without a player
-   *  context (older tests, list pre-flight) can still build a context. */
+  /** Club managed by the current viewer. Club staff provide a Certain
+   *  projection of their own players without requiring scout reports. */
+  viewerClubId?: number;
+  /** Knowledge-graph snapshot for the player being rendered. The rendering
+   *  layer projects only observed facts from it; route layers do not
+   *  interact with it directly. */
   knowledge?: PlayerKnowledge;
 }

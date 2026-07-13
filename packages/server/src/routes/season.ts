@@ -13,11 +13,11 @@ import {
   advanceMatchdayRendered,
   computeBestXI,
   computeLeagueTable,
+  endSeason,
+  loadSeasonState,
   renderFixturesForUser,
 } from "../rendering/index.js";
 import type { BestXI } from "../rendering/index.js";
-import { loadSeasonState } from "../application/season/state.js";
-import { endSeason } from "../application/season/end.js";
 import type { DbClient } from "../db/client.js";
 
 export interface SeasonRouteDeps {
@@ -256,9 +256,7 @@ function buildNarrative(input: {
     parts.push(`${input.championName} lifted the Season ${input.season + 1} trophy.`);
   }
   if (input.topScorerName && input.topScorerGoals > 0) {
-    parts.push(
-      `${input.topScorerName} led the scoring charts with ${input.topScorerGoals} goals.`,
-    );
+    parts.push(`${input.topScorerName} led the scoring charts with ${input.topScorerGoals} goals.`);
   }
   return parts.join(" ");
 }

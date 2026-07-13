@@ -72,7 +72,7 @@ export function evaluateSellerProposal(input: SellerEvalInput): SellerEvalResult
   }
 
   // Listed path.
-  if (ratio >= 1.10) return { kind: "accept" };
+  if (ratio >= 1.1) return { kind: "accept" };
   if (!buyerCanAffordFee) return { kind: "reject", reason: "SELLER_BUDGET_STRAIN" };
   if (ratio >= 0.9) return { kind: "accept" };
   if (ratio >= 0.75) {

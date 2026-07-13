@@ -41,10 +41,7 @@ async function loadHistory(client: DbClient, playerId: number): Promise<FormRow[
   return res.rows;
 }
 
-export async function renderFormSeriesFor(
-  client: DbClient,
-  playerId: number,
-): Promise<FormSeries> {
+export async function renderFormSeriesFor(client: DbClient, playerId: number): Promise<FormSeries> {
   const rows = await loadHistory(client, playerId);
   const points: FormSeriesPoint[] = rows.map((r) => {
     const tier = (r.tier as FormTier) ?? "Average";

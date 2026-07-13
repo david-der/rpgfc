@@ -44,15 +44,15 @@ function ClubDetail() {
     <div className="mx-auto max-w-5xl px-6 py-10">
       {/* Breadcrumb back to league */}
       <div className="mb-4">
-        <Link to="/league" className="text-xs uppercase tracking-wide text-parchment-500 hover:text-parchment-900">
+        <Link
+          to="/league"
+          className="text-xs uppercase tracking-wide text-parchment-500 hover:text-parchment-900"
+        >
           ← League
         </Link>
       </div>
 
-      <SectionHeader
-        eyebrow={`${club.reputationTier} club`}
-        title={club.clubName}
-      />
+      <SectionHeader eyebrow={`${club.reputationTier} club`} title={club.clubName} />
 
       {/* Finance summary — tier words only for opposition clubs */}
       <section className="mt-8 grid gap-3 md:grid-cols-3">
@@ -105,7 +105,10 @@ function ClubDetail() {
                   </td>
                   <td className="hidden px-2 py-2 text-parchment-700 md:table-cell">
                     {p.seasonsRemaining !== null ? (
-                      <span data-testid="seasons-remaining-allowlist-number" className="font-mono tabular-nums">
+                      <span
+                        data-testid="seasons-remaining-allowlist-number"
+                        className="font-mono tabular-nums"
+                      >
                         {p.seasonsRemaining}
                       </span>
                     ) : (
@@ -129,9 +132,12 @@ function ClubDetail() {
             Recent form
           </h2>
           <div className="flex gap-1">
-            {club.recentMatches.slice().reverse().map((m) => (
-              <ResultChip key={m.matchId} result={m.result} />
-            ))}
+            {club.recentMatches
+              .slice()
+              .reverse()
+              .map((m) => (
+                <ResultChip key={m.matchId} result={m.result} />
+              ))}
           </div>
           <div className="mt-4 divide-y divide-parchment-200 border border-parchment-300 bg-parchment-100">
             {club.recentMatches.map((m) => (
@@ -144,7 +150,10 @@ function ClubDetail() {
                 <div className="flex items-center justify-between p-3 text-sm">
                   <span className="text-xs uppercase tracking-wide text-parchment-500">
                     MW{" "}
-                    <span data-testid="match-week-allowlist-number" className="font-mono tabular-nums">
+                    <span
+                      data-testid="match-week-allowlist-number"
+                      className="font-mono tabular-nums"
+                    >
                       {m.matchday}
                     </span>
                   </span>

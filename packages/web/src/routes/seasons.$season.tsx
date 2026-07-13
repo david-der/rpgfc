@@ -62,17 +62,12 @@ function HistoricalSeason() {
       >
         Season {s.season + 1}
       </h1>
-      <p className="mt-1 mb-6 max-w-prose font-serif text-xl text-parchment-900">
-        {s.narrative}
-      </p>
+      <p className="mt-1 mb-6 max-w-prose font-serif text-xl text-parchment-900">{s.narrative}</p>
 
       <section className="mt-4 grid gap-4 lg:grid-cols-3">
         <Card eyebrow="Champion" className="lg:col-span-2">
           <div className="flex items-baseline justify-between">
-            <span
-              data-testid="player-facing"
-              className="font-serif text-3xl text-parchment-900"
-            >
+            <span data-testid="player-facing" className="font-serif text-3xl text-parchment-900">
               {s.champion.clubName}
             </span>
             <span
@@ -161,9 +156,7 @@ function HistoricalSeason() {
                 >
                   {s.topAssister.assists}
                 </span>
-                <span className="text-xs uppercase tracking-wide text-parchment-500">
-                  assists
-                </span>
+                <span className="text-xs uppercase tracking-wide text-parchment-500">assists</span>
               </div>
             </div>
           </Card>

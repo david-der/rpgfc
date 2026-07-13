@@ -18,6 +18,7 @@ packages/web/dist/
 # ── test / coverage artifacts ───────────────────────────────────────────────
 coverage/
 .nyc_output/
+tests/playtest/results/
 **/test-results/
 **/playwright-report/
 playwright/.cache/

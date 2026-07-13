@@ -27,7 +27,6 @@ test("Reports tab renders scout report cards when knowledge exists", async ({ pa
   // auto-assigns scouts; if no reports exist, the "no reports" message
   // is the valid outcome — both are structural pass conditions.
   const hasReports = (await reportCards.count()) > 0;
-  const hasEmptyMessage =
-    (await page.locator("text=No scout reports yet").count()) > 0;
+  const hasEmptyMessage = (await page.locator("text=No scout reports yet").count()) > 0;
   expect(hasReports || hasEmptyMessage).toBe(true);
 });

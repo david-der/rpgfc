@@ -77,7 +77,7 @@ const ASKING_TIER_RANK: Record<string, number> = {
 const AGE_MIN_DEFAULT = 16;
 const AGE_MAX_DEFAULT = 40;
 
-interface MarketSearch {
+export interface MarketSearch {
   tab?: TransferTab;
   pos?: PositionBucket;
   ageMin?: number;
@@ -171,9 +171,7 @@ function TransferDashboard() {
             void navigate({
               search: (prev: MarketSearch) => {
                 const { tab: _tab, ...rest } = prev;
-                return key === "market"
-                  ? rest
-                  : { ...rest, tab: key as TransferTab };
+                return key === "market" ? rest : { ...rest, tab: key as TransferTab };
               },
             });
           }}
@@ -232,14 +230,12 @@ function MarketTab({ search }: { search: MarketSearch }) {
         break;
       case "price-low":
         sorted.sort(
-          (a, b) =>
-            (ASKING_TIER_RANK[a.askingTier] ?? 0) - (ASKING_TIER_RANK[b.askingTier] ?? 0),
+          (a, b) => (ASKING_TIER_RANK[a.askingTier] ?? 0) - (ASKING_TIER_RANK[b.askingTier] ?? 0),
         );
         break;
       case "price-high":
         sorted.sort(
-          (a, b) =>
-            (ASKING_TIER_RANK[b.askingTier] ?? 0) - (ASKING_TIER_RANK[a.askingTier] ?? 0),
+          (a, b) => (ASKING_TIER_RANK[b.askingTier] ?? 0) - (ASKING_TIER_RANK[a.askingTier] ?? 0),
         );
         break;
       case "recent":
@@ -275,8 +271,7 @@ function MarketTab({ search }: { search: MarketSearch }) {
 
   function clearFilters() {
     void navigate({
-      search: (prev: MarketSearch): MarketSearch =>
-        prev.tab ? { tab: prev.tab } : {},
+      search: (prev: MarketSearch): MarketSearch => (prev.tab ? { tab: prev.tab } : {}),
     });
   }
 
@@ -414,9 +409,7 @@ function MarketTab({ search }: { search: MarketSearch }) {
 
       {filtered.length === 0 ? (
         <div className="border border-parchment-300 bg-parchment-100 p-8 text-center">
-          <p className="font-serif text-base text-parchment-700">
-            No listings match your filters.
-          </p>
+          <p className="font-serif text-base text-parchment-700">No listings match your filters.</p>
           {hasActiveFilter && (
             <button
               type="button"
@@ -451,9 +444,8 @@ function MyBidsTab() {
     (b: { state: string }) =>
       !["Signed", "Expired", "Cancelled", "SellerRejected", "PlayerRejected"].includes(b.state),
   );
-  const resolved = bids.filter(
-    (b: { state: string }) =>
-      ["Signed", "Expired", "Cancelled", "SellerRejected", "PlayerRejected"].includes(b.state),
+  const resolved = bids.filter((b: { state: string }) =>
+    ["Signed", "Expired", "Cancelled", "SellerRejected", "PlayerRejected"].includes(b.state),
   );
 
   return (
@@ -509,9 +501,13 @@ function BidCard({ bid, currentMatchWeek }: { bid: BidItem; currentMatchWeek: nu
   const modal = usePlayerModal();
   const deadline = bid.deadline_match_week ?? 0;
   const weeksLeft = Math.max(0, deadline - currentMatchWeek);
-  const isResolved = ["Signed", "Expired", "Cancelled", "SellerRejected", "PlayerRejected"].includes(
-    bid.state,
-  );
+  const isResolved = [
+    "Signed",
+    "Expired",
+    "Cancelled",
+    "SellerRejected",
+    "PlayerRejected",
+  ].includes(bid.state);
   const isRejected = bid.state === "SellerRejected" || bid.state === "PlayerRejected";
   const prose = bid.rejection_reason ? REJECTION_PROSE[bid.rejection_reason] : null;
 
@@ -599,36 +595,34 @@ function OffersTab() {
         const prose = offer.rejection_reason ? REJECTION_PROSE[offer.rejection_reason] : null;
         const isRejected = offer.state === "SellerRejected" || offer.state === "PlayerRejected";
         return (
-        <div
-          key={offer.id}
-          className="flex items-start justify-between border border-parchment-300 bg-parchment-100 p-4"
-        >
-          <div className="min-w-0 flex-1">
-            <button
-              type="button"
-              onClick={() => modal.open(offer.player_id)}
-              className="block text-left font-serif text-base text-parchment-900 hover:text-moss-700"
-            >
-              <span data-testid="player-facing">{offer.player_name}</span>
-            </button>
-            <div className="mt-1 text-xs text-parchment-500">
-              Bid from {offer.from_club_name}
-            </div>
-            {isRejected && prose && (
-              <p
-                data-testid="player-facing"
-                className="mt-2 max-w-prose font-serif text-sm italic text-parchment-700"
-              >
-                &ldquo;{prose}&rdquo;
-              </p>
-            )}
-          </div>
-          <span
-            className={`border px-2 py-0.5 font-sans text-xs uppercase tracking-wide ${STATE_COLOR[offer.state] ?? ""}`}
+          <div
+            key={offer.id}
+            className="flex items-start justify-between border border-parchment-300 bg-parchment-100 p-4"
           >
-            {BID_STATE_LABELS[offer.state] ?? offer.state}
-          </span>
-        </div>
+            <div className="min-w-0 flex-1">
+              <button
+                type="button"
+                onClick={() => modal.open(offer.player_id)}
+                className="block text-left font-serif text-base text-parchment-900 hover:text-moss-700"
+              >
+                <span data-testid="player-facing">{offer.player_name}</span>
+              </button>
+              <div className="mt-1 text-xs text-parchment-500">Bid from {offer.from_club_name}</div>
+              {isRejected && prose && (
+                <p
+                  data-testid="player-facing"
+                  className="mt-2 max-w-prose font-serif text-sm italic text-parchment-700"
+                >
+                  &ldquo;{prose}&rdquo;
+                </p>
+              )}
+            </div>
+            <span
+              className={`border px-2 py-0.5 font-sans text-xs uppercase tracking-wide ${STATE_COLOR[offer.state] ?? ""}`}
+            >
+              {BID_STATE_LABELS[offer.state] ?? offer.state}
+            </span>
+          </div>
         );
       })}
     </div>
@@ -718,9 +712,7 @@ function CompletedTab() {
   const { deals } = query.data;
   if (deals.length === 0) {
     return (
-      <p className="text-sm italic text-parchment-500">
-        No completed transfers yet this season.
-      </p>
+      <p className="text-sm italic text-parchment-500">No completed transfers yet this season.</p>
     );
   }
 

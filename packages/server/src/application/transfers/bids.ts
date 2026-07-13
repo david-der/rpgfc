@@ -88,7 +88,6 @@ interface PlayerRow {
   nationality: string;
 }
 
-
 // ── loaders ───────────────────────────────────────────────────────────────
 
 async function loadBid(client: DbClient, id: number): Promise<BidRow | null> {
@@ -164,15 +163,14 @@ async function estimateUnlistedValue(client: DbClient, playerId: number): Promis
     .prepare<
       [number],
       { name: string; archetype_id: string; experience_years: number }
-    >(
-      `SELECT name, archetype_id, experience_years FROM players WHERE id = ?`,
-    )
+    >(`SELECT name, archetype_id, experience_years FROM players WHERE id = ?`)
     .get(playerId);
   if (!row) return 1_000_000_00;
   const badgeRows = client.sqlite
-    .prepare<[number], { badge_key: string }>(
-      `SELECT badge_key FROM player_badges WHERE player_id = ?`,
-    )
+    .prepare<
+      [number],
+      { badge_key: string }
+    >(`SELECT badge_key FROM player_badges WHERE player_id = ?`)
     .all(playerId);
   return estimateValueCents({
     name: row.name,
@@ -196,7 +194,6 @@ async function loadPlayer(client: DbClient, id: number): Promise<PlayerRow | nul
   );
   return res.rows[0] ?? null;
 }
-
 
 // ── row → ref conversion ──────────────────────────────────────────────────
 
@@ -252,9 +249,15 @@ async function insertBid(
          VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)`,
       )
       .run(
-        row.playerId, row.fromClubId, row.toClubId, row.state, row.stance,
-        row.submittedMatchWeek ?? null, row.deadlineMatchWeek ?? null,
-        row.now, row.now,
+        row.playerId,
+        row.fromClubId,
+        row.toClubId,
+        row.state,
+        row.stance,
+        row.submittedMatchWeek ?? null,
+        row.deadlineMatchWeek ?? null,
+        row.now,
+        row.now,
       );
     return Number(result.lastInsertRowid);
   }
@@ -266,9 +269,15 @@ async function insertBid(
      VALUES ($1, $2, $3, $4, $5, NULL, $6, $7, $8, $9)
      RETURNING id`,
     [
-      row.playerId, row.fromClubId, row.toClubId, row.state, row.stance,
-      row.submittedMatchWeek ?? null, row.deadlineMatchWeek ?? null,
-      row.now, row.now,
+      row.playerId,
+      row.fromClubId,
+      row.toClubId,
+      row.state,
+      row.stance,
+      row.submittedMatchWeek ?? null,
+      row.deadlineMatchWeek ?? null,
+      row.now,
+      row.now,
     ],
   );
   return res.rows[0]!.id;
@@ -383,8 +392,8 @@ export async function submitBid(client: DbClient, input: SubmitBidInput): Promis
   // Listed players have an explicit asking price. For unlisted inquiries
   // we fall back to the valuation formula — the bid still submits, but
   // the seller's acceptance threshold is stricter (see evaluators.ts).
-  const askingCents = listing?.asking_price_cents
-    ?? (await estimateUnlistedValue(client, input.playerId));
+  const askingCents =
+    listing?.asking_price_cents ?? (await estimateUnlistedValue(client, input.playerId));
   const player = await loadPlayer(client, input.playerId);
   if (!player) {
     throw new BidPreconditionError("That player could not be found.");
@@ -402,10 +411,7 @@ export async function submitBid(client: DbClient, input: SubmitBidInput): Promis
   // you make one offer and wait for a response.
   if (client.dialect === "sqlite") {
     const existing = client.sqlite
-      .prepare<
-        [number, number],
-        { id: number }
-      >(
+      .prepare<[number, number], { id: number }>(
         `SELECT id FROM bids
          WHERE from_club_id = ? AND player_id = ?
            AND state NOT IN ('Signed', 'SellerRejected', 'PlayerRejected', 'Expired', 'Cancelled')`,

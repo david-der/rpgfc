@@ -29,7 +29,7 @@ test.describe("fixtures tab — Story 06/07/08", () => {
     await page.locator('[data-testid="advance-matchday"]').click();
 
     await page.waitForTimeout(300);
-    const pills = page.locator('span:has(span.sr-only)');
+    const pills = page.locator("span:has(span.sr-only)");
     expect(await pills.count()).toBeGreaterThan(0);
   });
 

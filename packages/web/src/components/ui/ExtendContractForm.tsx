@@ -97,11 +97,7 @@ export function ExtendContractForm({ playerId, currentRolePromise }: ExtendContr
           {mutation.isPending ? "Offering…" : "Offer extension"}
         </button>
         {resultMsg && (
-          <span
-            className={`text-sm ${
-              mutation.isSuccess ? "text-moss-700" : "text-clay-700"
-            }`}
-          >
+          <span className={`text-sm ${mutation.isSuccess ? "text-moss-700" : "text-clay-700"}`}>
             {resultMsg}
           </span>
         )}

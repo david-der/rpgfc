@@ -39,10 +39,7 @@ export function createSquadRoute(deps: SquadRouteDeps) {
         const { role } = c.req.valid("json");
         const squad = await setSquadRoleRendered(deps.db, { playerId, role });
         if (!squad) {
-          return c.json(
-            { error: { code: "not_found", message: "Squad entry not found" } },
-            404,
-          );
+          return c.json({ error: { code: "not_found", message: "Squad entry not found" } }, 404);
         }
         return c.json(squad);
       },

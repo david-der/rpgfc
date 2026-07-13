@@ -6,8 +6,8 @@
 //   - Players: compact MatchPerformanceList
 //
 // All numeric stats (goals, xG, passes, etc) are allowlisted facts.
-// The qualitative performance tier is the "rating" chip — it's the
-// quality judgement; everything numeric describes what happened.
+// The qualitative performance tier is the judgement; everything numeric
+// describes a concrete event from the causal match ledger.
 
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -16,6 +16,7 @@ import { HeroIllustration } from "../components/ui/HeroIllustration";
 import { MatchPerformanceList } from "../components/ui/MatchPerformanceList";
 import { MatchStatsTable } from "../components/ui/MatchStatsTable";
 import { MatchTeamSummary } from "../components/ui/MatchTeamSummary";
+import { MatchTimeline } from "../components/ui/MatchTimeline";
 import { TabBar, type TabDefinition } from "../components/ui/TabBar";
 import { fetchMatch } from "../lib/api";
 
@@ -75,6 +76,7 @@ function MatchReport() {
               ))}
             </article>
           )}
+          <MatchTimeline events={match.events} />
           {match.performances.length > 0 && (
             <MatchTeamSummary
               homeName={match.home.name}
@@ -90,32 +92,34 @@ function MatchReport() {
     {
       key: "stats",
       label: "Stats",
-      content: match.performances.length > 0 ? (
-        <MatchStatsTable
-          homeName={match.home.name}
-          awayName={match.away.name}
-          homeId={match.home.id}
-          awayId={match.away.id}
-          performances={match.performances}
-        />
-      ) : (
-        <p className="text-sm italic text-parchment-500">No stats available yet.</p>
-      ),
+      content:
+        match.performances.length > 0 ? (
+          <MatchStatsTable
+            homeName={match.home.name}
+            awayName={match.away.name}
+            homeId={match.home.id}
+            awayId={match.away.id}
+            performances={match.performances}
+          />
+        ) : (
+          <p className="text-sm italic text-parchment-500">No stats available yet.</p>
+        ),
     },
     {
       key: "players",
       label: "Players",
-      content: match.performances.length > 0 ? (
-        <MatchPerformanceList
-          homeName={match.home.name}
-          awayName={match.away.name}
-          homeId={match.home.id}
-          awayId={match.away.id}
-          performances={match.performances}
-        />
-      ) : (
-        <p className="text-sm italic text-parchment-500">No players to show yet.</p>
-      ),
+      content:
+        match.performances.length > 0 ? (
+          <MatchPerformanceList
+            homeName={match.home.name}
+            awayName={match.away.name}
+            homeId={match.home.id}
+            awayId={match.away.id}
+            performances={match.performances}
+          />
+        ) : (
+          <p className="text-sm italic text-parchment-500">No players to show yet.</p>
+        ),
     },
   ];
 
@@ -126,8 +130,7 @@ function MatchReport() {
         artKey={match.id}
         eyebrow={
           <>
-            Match Week{" "}
-            <span data-testid="match-week-allowlist-number">{match.matchday}</span>
+            Match Week <span data-testid="match-week-allowlist-number">{match.matchday}</span>
           </>
         }
         title={

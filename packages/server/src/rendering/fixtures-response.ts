@@ -23,9 +23,7 @@ interface MatchRow {
 }
 
 function parseState(raw: string): MatchState {
-  return (MATCH_STATES as readonly string[]).includes(raw)
-    ? (raw as MatchState)
-    : "Scheduled";
+  return (MATCH_STATES as readonly string[]).includes(raw) ? (raw as MatchState) : "Scheduled";
 }
 
 async function loadCurrentSeason(client: DbClient): Promise<number> {
@@ -70,11 +68,7 @@ async function loadAllMatches(client: DbClient, season: number): Promise<MatchRo
   return res.rows;
 }
 
-function userResult(
-  row: MatchRow,
-  state: MatchState,
-  userClubId: number,
-): "W" | "D" | "L" | null {
+function userResult(row: MatchRow, state: MatchState, userClubId: number): "W" | "D" | "L" | null {
   if (state !== "Played") return null;
   if (row.home_goals === null || row.away_goals === null) return null;
   const isHome = row.home_club_id === userClubId;

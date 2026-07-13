@@ -41,9 +41,7 @@ describe("Story 05 seed — tactics + squad_entries", () => {
     expect(clubs.length).toBeGreaterThan(0);
     for (const club of clubs) {
       const rows = db.sqlite
-        .prepare<[number], { n: number }>(
-          `SELECT COUNT(*) AS n FROM tactics WHERE club_id = ?`,
-        )
+        .prepare<[number], { n: number }>(`SELECT COUNT(*) AS n FROM tactics WHERE club_id = ?`)
         .get(club.id);
       expect(rows?.n ?? 0).toBe(1);
     }

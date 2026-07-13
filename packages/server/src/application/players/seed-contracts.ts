@@ -39,7 +39,7 @@ function wageFor(experienceYears: number, rng: { next(): number }): number {
   // above it so the contract sits comfortably inside the player's
   // acceptance band.
   const expRamp = [
-    600_000,   // $6k/week at 0 years
+    600_000, // $6k/week at 0 years
     2_000_000, // $20k/week at 5 years
     4_000_000, // $40k/week at 10 years
     6_500_000, // $65k/week at 15 years
@@ -74,9 +74,7 @@ export async function seedContractsIfEmpty(client: DbClient): Promise<ContractSe
       .get();
     if ((existing?.n ?? 0) > 0) return { contractsCreated: 0, skipped: true };
   } else {
-    const res = await client.pool.query<{ n: string }>(
-      `SELECT COUNT(*)::text AS n FROM contracts`,
-    );
+    const res = await client.pool.query<{ n: string }>(`SELECT COUNT(*)::text AS n FROM contracts`);
     if (Number(res.rows[0]?.n ?? 0) > 0) return { contractsCreated: 0, skipped: true };
   }
 
@@ -121,9 +119,10 @@ export async function seedContractsIfEmpty(client: DbClient): Promise<ContractSe
 async function loadContractedPlayers(client: DbClient): Promise<PlayerRow[]> {
   if (client.dialect === "sqlite") {
     return client.sqlite
-      .prepare<[], PlayerRow>(
-        `SELECT id, club_id, experience_years FROM players WHERE club_id IS NOT NULL`,
-      )
+      .prepare<
+        [],
+        PlayerRow
+      >(`SELECT id, club_id, experience_years FROM players WHERE club_id IS NOT NULL`)
       .all();
   }
   const res = await client.pool.query<PlayerRow>(

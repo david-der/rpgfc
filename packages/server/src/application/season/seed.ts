@@ -7,6 +7,7 @@
 
 import type { DbClient } from "../../db/client.js";
 import { generateFullSeason } from "./schedule.js";
+import { fixtureSeed } from "./seed-value.js";
 
 // ── save_state auto-create ───────────────────────────────────────────────
 
@@ -37,19 +38,6 @@ export interface FixturesSeedResult {
   skipped: boolean;
 }
 
-const WORLD_SEED_MULTIPLIER = 31;
-
-function hashSeed(matchday: number, homeId: number, awayId: number): number {
-  // Simple deterministic hash. The shape doesn't matter much — what
-  // matters is that the per-match seeds are unique and stable across
-  // restarts so the sim's PRNG produces the same goals on rerun.
-  let h = WORLD_SEED_MULTIPLIER;
-  h = (h * 73856093) ^ matchday;
-  h = (h * 19349663) ^ homeId;
-  h = (h * 83492791) ^ awayId;
-  return h >>> 0;
-}
-
 export async function seedFixturesIfEmpty(client: DbClient): Promise<FixturesSeedResult> {
   if (client.dialect === "sqlite") {
     const existing = client.sqlite
@@ -69,19 +57,33 @@ export async function seedFixturesIfEmpty(client: DbClient): Promise<FixturesSee
 
   const clubIds = await loadClubIds(client);
   if (clubIds.length < 2) return { matchesCreated: 0, matchdays: 0, skipped: false };
+  const worldSeed = await loadWorldSeed(client);
 
   const schedule = generateFullSeason(clubIds);
   let created = 0;
 
   for (const md of schedule) {
     for (const fx of md.fixtures) {
-      const seed = hashSeed(md.matchday, fx.homeClubId, fx.awayClubId);
+      const seed = fixtureSeed(worldSeed, 0, md.matchday, fx.homeClubId, fx.awayClubId);
       await insertMatch(client, md.matchday, fx.homeClubId, fx.awayClubId, seed, 0);
       created++;
     }
   }
 
   return { matchesCreated: created, matchdays: schedule.length, skipped: false };
+}
+
+async function loadWorldSeed(client: DbClient): Promise<number> {
+  if (client.dialect === "sqlite") {
+    return (
+      client.sqlite.prepare<[], { seed: number }>(`SELECT seed FROM runs ORDER BY id LIMIT 1`).get()
+        ?.seed ?? 42
+    );
+  }
+  const result = await client.pool.query<{ seed: number }>(
+    `SELECT seed FROM runs ORDER BY id LIMIT 1`,
+  );
+  return result.rows[0]?.seed ?? 42;
 }
 
 async function loadClubIds(client: DbClient): Promise<number[]> {
@@ -91,9 +93,7 @@ async function loadClubIds(client: DbClient): Promise<number[]> {
       .all()
       .map((r) => r.id);
   }
-  const res = await client.pool.query<{ id: number }>(
-    `SELECT id FROM clubs ORDER BY id`,
-  );
+  const res = await client.pool.query<{ id: number }>(`SELECT id FROM clubs ORDER BY id`);
   return res.rows.map((r) => r.id);
 }
 

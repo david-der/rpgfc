@@ -25,10 +25,10 @@ import {
 import {
   BidPreconditionError,
   forceAcceptBidRendered,
+  loadSeasonState,
   renderTransfersPage,
   submitBidRendered,
 } from "../rendering/index.js";
-import { loadSeasonState } from "../application/season/state.js";
 import type { DbClient } from "../db/client.js";
 
 export interface TransfersRouteDeps {
@@ -145,7 +145,10 @@ interface CompletedDealRow {
   role_promise: string;
 }
 
-async function loadCompletedDeals(client: DbClient, userClubId: number): Promise<CompletedDealRow[]> {
+async function loadCompletedDeals(
+  client: DbClient,
+  userClubId: number,
+): Promise<CompletedDealRow[]> {
   if (client.dialect !== "sqlite") return [];
   return client.sqlite
     .prepare<[number, number], CompletedDealRow>(
@@ -192,36 +195,28 @@ export function createTransfersRoute(deps: TransfersRouteDeps) {
       const items = await loadWatchlist(deps.db, deps.userClubId);
       return c.json({ items });
     })
-    .post(
-      "/watchlist/:playerId",
-      zValidator("param", playerIdParam),
-      async (c) => {
-        const { playerId } = c.req.valid("param");
-        const now = deps.now().toISOString();
-        if (deps.db.dialect === "sqlite") {
-          deps.db.sqlite
-            .prepare(
-              `INSERT OR IGNORE INTO watchlist (club_id, player_id, added_at)
+    .post("/watchlist/:playerId", zValidator("param", playerIdParam), async (c) => {
+      const { playerId } = c.req.valid("param");
+      const now = deps.now().toISOString();
+      if (deps.db.dialect === "sqlite") {
+        deps.db.sqlite
+          .prepare(
+            `INSERT OR IGNORE INTO watchlist (club_id, player_id, added_at)
                VALUES (?, ?, ?)`,
-            )
-            .run(deps.userClubId, playerId, now);
-        }
-        return c.json({ added: true });
-      },
-    )
-    .delete(
-      "/watchlist/:playerId",
-      zValidator("param", playerIdParam),
-      async (c) => {
-        const { playerId } = c.req.valid("param");
-        if (deps.db.dialect === "sqlite") {
-          deps.db.sqlite
-            .prepare(`DELETE FROM watchlist WHERE club_id = ? AND player_id = ?`)
-            .run(deps.userClubId, playerId);
-        }
-        return c.json({ removed: true });
-      },
-    )
+          )
+          .run(deps.userClubId, playerId, now);
+      }
+      return c.json({ added: true });
+    })
+    .delete("/watchlist/:playerId", zValidator("param", playerIdParam), async (c) => {
+      const { playerId } = c.req.valid("param");
+      if (deps.db.dialect === "sqlite") {
+        deps.db.sqlite
+          .prepare(`DELETE FROM watchlist WHERE club_id = ? AND player_id = ?`)
+          .run(deps.userClubId, playerId);
+      }
+      return c.json({ removed: true });
+    })
     // Completed deals.
     .get("/completed", async (c) => {
       const deals = await loadCompletedDeals(deps.db, deps.userClubId);
@@ -260,10 +255,7 @@ export function createTransfersRoute(deps: TransfersRouteDeps) {
           // BidPreconditionError → 400 with the friendly message. Anything
           // else bubbles as a 500 via Hono's default handler.
           if (err instanceof BidPreconditionError) {
-            return c.json(
-              { error: { code: "bid_precondition", message: err.message } },
-              400,
-            );
+            return c.json({ error: { code: "bid_precondition", message: err.message } }, 400);
           }
           throw err;
         }

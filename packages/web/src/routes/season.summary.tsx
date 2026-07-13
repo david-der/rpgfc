@@ -65,10 +65,7 @@ function SeasonSummary() {
       <section className="mt-8 grid gap-4 lg:grid-cols-3">
         <Card eyebrow="Champion" className="lg:col-span-2">
           <div className="flex items-baseline justify-between">
-            <span
-              data-testid="player-facing"
-              className="font-serif text-3xl text-parchment-900"
-            >
+            <span data-testid="player-facing" className="font-serif text-3xl text-parchment-900">
               {s.champion.clubName}
             </span>
             <span
@@ -160,9 +157,7 @@ function SeasonSummary() {
                 >
                   {s.topAssister.assists}
                 </span>
-                <span className="text-xs uppercase tracking-wide text-parchment-500">
-                  assists
-                </span>
+                <span className="text-xs uppercase tracking-wide text-parchment-500">assists</span>
               </div>
             </div>
           </Card>
@@ -170,7 +165,6 @@ function SeasonSummary() {
       </section>
 
       {s.bestXI && <BestXISection bestXI={s.bestXI} />}
-
 
       {/* Full final table */}
       <section className="mt-8">

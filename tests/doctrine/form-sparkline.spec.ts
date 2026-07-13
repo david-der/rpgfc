@@ -9,9 +9,7 @@ import { expect, test } from "@playwright/test";
 const DIGIT_RE = /\d/;
 
 test.describe("form sparkline — Story 06", () => {
-  test("AC-19: /players/$id sparkline contains no digits in its rendered DOM", async ({
-    page,
-  }) => {
+  test("AC-19: /players/$id sparkline contains no digits in its rendered DOM", async ({ page }) => {
     // Advance the matchday so player 1 has form data to read.
     await page.goto("/league");
     await page.getByRole("tab", { name: "Fixtures" }).click();

@@ -13,6 +13,7 @@ import {
   seedPreferencesIfEmpty,
 } from "../application/transfers/seed-listings.js";
 import { seedTacticsIfEmpty } from "../application/tactics/seed.js";
+import { MOOD_LABEL_POOLS } from "../application/squad/harmony.js";
 import { seedSquadIfEmpty } from "../application/squad/seed.js";
 import { createApiApp } from "../index.js";
 
@@ -119,9 +120,7 @@ describe("tactics + squad routes — Story 05", () => {
       .prepare<
         [],
         { player_id: number }
-      >(
-        `SELECT player_id FROM squad_entries WHERE club_id = 1 AND role = 'Starter' LIMIT 1`,
-      )
+      >(`SELECT player_id FROM squad_entries WHERE club_id = 1 AND role = 'Starter' LIMIT 1`)
       .get();
     expect(row).toBeDefined();
     const playerId = row!.player_id;
@@ -139,10 +138,10 @@ describe("tactics + squad routes — Story 05", () => {
       )
       .run(playerId, nowIso);
 
-    // Baseline: promiseMoodLabel on /players/:id is the Content template.
+    // Baseline: promiseMoodLabel on /players/:id is a Content-pool voice.
     const before = await app.request(`/api/players/${playerId}`);
     const beforeBody = (await before.json()) as { promiseMoodLabel?: string };
-    expect(beforeBody.promiseMoodLabel).toContain("Playing the role we promised");
+    expect(MOOD_LABEL_POOLS.Content).toContain(beforeBody.promiseMoodLabel);
 
     // Demote to Rotation — mood should flip to Concerned.
     const update = await app.request(`/api/squad/${playerId}/role`, {
@@ -154,6 +153,6 @@ describe("tactics + squad routes — Story 05", () => {
 
     const after = await app.request(`/api/players/${playerId}`);
     const afterBody = (await after.json()) as { promiseMoodLabel?: string };
-    expect(afterBody.promiseMoodLabel).toMatch(/ask|meant|said/);
+    expect(MOOD_LABEL_POOLS.Concerned).toContain(afterBody.promiseMoodLabel);
   });
 });

@@ -9,6 +9,8 @@ import type {
   MatchState,
   RenderedMatch,
   RenderedMatchClub,
+  RenderedMatchEvent,
+  RenderedMatchEventKind,
   RenderedMatchPerformance,
 } from "@rpgfc/shared";
 import { ARCHETYPE_BY_ID, FORM_TIER_LABELS, MATCH_STATES } from "@rpgfc/shared";
@@ -68,9 +70,7 @@ interface ClubRow {
 }
 
 function parseState(raw: string): MatchState {
-  return (MATCH_STATES as readonly string[]).includes(raw)
-    ? (raw as MatchState)
-    : "Scheduled";
+  return (MATCH_STATES as readonly string[]).includes(raw) ? (raw as MatchState) : "Scheduled";
 }
 
 async function loadMatch(client: DbClient, matchId: number): Promise<MatchRow | null> {
@@ -94,10 +94,7 @@ async function loadMatch(client: DbClient, matchId: number): Promise<MatchRow | 
   return res.rows[0] ?? null;
 }
 
-async function loadPerformances(
-  client: DbClient,
-  matchId: number,
-): Promise<PerformanceJoinRow[]> {
+async function loadPerformances(client: DbClient, matchId: number): Promise<PerformanceJoinRow[]> {
   if (client.dialect === "sqlite") {
     return client.sqlite
       .prepare<[number], PerformanceJoinRow>(
@@ -134,12 +131,109 @@ async function loadPerformances(
   return res.rows;
 }
 
+async function loadCausalEvidence(client: DbClient, matchId: number): Promise<string[]> {
+  let rows: Array<{ evidence_json: string }>;
+  if (client.dialect === "sqlite") {
+    rows = client.sqlite
+      .prepare<
+        [number],
+        { evidence_json: string }
+      >(`SELECT evidence_json FROM match_events WHERE match_id = ? ORDER BY sequence`)
+      .all(matchId);
+  } else {
+    const result = await client.pool.query<{ evidence_json: string }>(
+      `SELECT evidence_json FROM match_events WHERE match_id = $1 ORDER BY sequence`,
+      [matchId],
+    );
+    rows = result.rows;
+  }
+  const evidence = new Set<string>();
+  for (const row of rows) {
+    try {
+      const parsed = JSON.parse(row.evidence_json) as unknown;
+      if (!Array.isArray(parsed)) continue;
+      for (const code of parsed) if (typeof code === "string") evidence.add(code);
+    } catch {
+      // A corrupt evidence payload should not prevent the factual report.
+    }
+  }
+  return [...evidence];
+}
+
+interface MatchEventRow {
+  sequence: number;
+  minute: number;
+  kind: string;
+  club_id: number | null;
+  primary_name: string | null;
+  secondary_name: string | null;
+  outcome: string | null;
+}
+
+const KEY_EVENT_KINDS: readonly RenderedMatchEventKind[] = [
+  "Chance",
+  "Save",
+  "Goal",
+  "Card",
+  "Injury",
+  "Substitution",
+];
+
+function eventDescription(row: MatchEventRow): string {
+  const primary = row.primary_name ?? "A player";
+  const secondary = row.secondary_name;
+  if (row.kind === "Goal") return `${primary} finished the move.`;
+  if (row.kind === "Save") return `${primary} made the save.`;
+  if (row.kind === "Chance") {
+    return secondary
+      ? `${primary} created an opening for ${secondary}.`
+      : `${primary} created an opening.`;
+  }
+  if (row.kind === "Card") {
+    return `${primary} was shown ${row.outcome === "red" ? "a red card" : "a yellow card"}.`;
+  }
+  if (row.kind === "Injury") return `${primary} was forced out through injury.`;
+  if (row.kind === "Substitution") {
+    return secondary ? `${primary} replaced ${secondary}.` : `${primary} entered the match.`;
+  }
+  return `${primary} shaped an important moment.`;
+}
+
+async function loadMatchTimeline(client: DbClient, matchId: number): Promise<RenderedMatchEvent[]> {
+  let rows: MatchEventRow[];
+  const select = `SELECT e.sequence, e.minute, e.kind, e.club_id,
+                         p1.name AS primary_name, p2.name AS secondary_name, e.outcome
+                  FROM match_events e
+                  LEFT JOIN players p1 ON p1.id = e.primary_player_id
+                  LEFT JOIN players p2 ON p2.id = e.secondary_player_id`;
+  if (client.dialect === "sqlite") {
+    rows = client.sqlite
+      .prepare<[number], MatchEventRow>(`${select} WHERE e.match_id = ? ORDER BY e.sequence`)
+      .all(matchId);
+  } else {
+    const result = await client.pool.query<MatchEventRow>(
+      `${select} WHERE e.match_id = $1 ORDER BY e.sequence`,
+      [matchId],
+    );
+    rows = result.rows;
+  }
+  return rows
+    .filter((row) => (KEY_EVENT_KINDS as readonly string[]).includes(row.kind))
+    .map((row) => ({
+      sequence: row.sequence,
+      minute: row.minute,
+      kind: row.kind as RenderedMatchEventKind,
+      clubId: row.club_id,
+      primaryPlayerName: row.primary_name,
+      secondaryPlayerName: row.secondary_name,
+      description: eventDescription(row),
+    }));
+}
+
 async function loadClubMap(client: DbClient): Promise<Map<number, ClubRow>> {
   const out = new Map<number, ClubRow>();
   if (client.dialect === "sqlite") {
-    const rows = client.sqlite
-      .prepare<[], ClubRow>(`SELECT id, name FROM clubs`)
-      .all();
+    const rows = client.sqlite.prepare<[], ClubRow>(`SELECT id, name FROM clubs`).all();
     for (const r of rows) out.set(r.id, r);
     return out;
   }
@@ -151,9 +245,7 @@ async function loadClubMap(client: DbClient): Promise<Map<number, ClubRow>> {
 function buildPerformance(row: PerformanceJoinRow): RenderedMatchPerformance {
   const archetype = ARCHETYPE_BY_ID[row.archetype_id];
   const tier = (row.tier as FormTier) ?? "Average";
-  const passAccuracy = row.passes_attempted > 0
-    ? row.passes_completed / row.passes_attempted
-    : 0;
+  const passAccuracy = row.passes_attempted > 0 ? row.passes_completed / row.passes_attempted : 0;
   return {
     playerId: row.player_id,
     playerName: row.player_name,
@@ -210,14 +302,21 @@ export async function renderMatchById(
 
   let performances: RenderedMatchPerformance[] = [];
   let narrative: string[] = [];
+  let events: RenderedMatchEvent[] = [];
   if (state === "Played") {
-    const rows = await loadPerformances(client, matchId);
+    const [rows, evidence, timeline] = await Promise.all([
+      loadPerformances(client, matchId),
+      loadCausalEvidence(client, matchId),
+      loadMatchTimeline(client, matchId),
+    ]);
     performances = rows.map(buildPerformance);
+    events = timeline;
     narrative = buildMatchNarrative({
       seed: row.seed,
       home,
       away,
       performances,
+      evidence,
     });
   }
 
@@ -228,6 +327,7 @@ export async function renderMatchById(
     home,
     away,
     narrative,
+    events,
     performances,
   };
 }

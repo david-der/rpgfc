@@ -60,10 +60,7 @@ function PerformanceRow({ perf }: { perf: RenderedMatchPerformance }) {
       <div className="flex flex-none flex-col items-end gap-1 font-mono text-xs text-parchment-700">
         {perf.goals > 0 && (
           <span>
-            <span
-              data-testid="goals-allowlist-number"
-              className="font-semibold text-parchment-900"
-            >
+            <span data-testid="goals-allowlist-number" className="font-semibold text-parchment-900">
               {perf.goals}
             </span>
             <span className="ml-1 uppercase tracking-wide">G</span>

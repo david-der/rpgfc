@@ -63,7 +63,7 @@ function SeasonsArchive() {
     for (const s of chrono) {
       if (s.userFinishPosition !== null) {
         const hasPriorBaseline = runningBest !== null;
-        if (!hasPriorBaseline || s.userFinishPosition < runningBest) {
+        if (runningBest === null || s.userFinishPosition < runningBest) {
           bestFinishYetMap.set(s.season, hasPriorBaseline);
           runningBest =
             runningBest === null
@@ -82,8 +82,8 @@ function SeasonsArchive() {
     <div className="mx-auto max-w-4xl px-6 py-10">
       <h1 className="mb-2 font-serif text-3xl text-parchment-900">History</h1>
       <p className="mb-6 max-w-prose text-parchment-600">
-        Every completed season, with its champion and your finish. The current
-        season isn&rsquo;t here yet — end it from the League page to lock it in.
+        Every completed season, with its champion and your finish. The current season isn&rsquo;t
+        here yet — end it from the League page to lock it in.
       </p>
 
       {/* All-time ribbon */}
@@ -92,9 +92,7 @@ function SeasonsArchive() {
         className="mb-8 grid grid-cols-1 gap-0 border border-parchment-300 bg-parchment-100 sm:grid-cols-3 sm:divide-x sm:divide-parchment-300"
       >
         <div className="flex flex-col px-5 py-4">
-          <span className="text-[10px] uppercase tracking-wide text-parchment-500">
-            Trophies
-          </span>
+          <span className="text-[10px] uppercase tracking-wide text-parchment-500">Trophies</span>
           <span
             data-testid="archive-all-time-trophies-allowlist-number"
             className="mt-1 font-mono text-3xl tabular-nums text-parchment-900"
@@ -114,9 +112,7 @@ function SeasonsArchive() {
               {allTime.bestFinish}
             </span>
           ) : (
-            <span className="mt-1 font-serif text-lg italic text-parchment-500">
-              None yet
-            </span>
+            <span className="mt-1 font-serif text-lg italic text-parchment-500">None yet</span>
           )}
         </div>
         <div className="flex flex-col border-t border-parchment-300 px-5 py-4 sm:border-t-0">

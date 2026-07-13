@@ -8,27 +8,24 @@
 //      (Story 05's PITCH_SLOT_POSITION_FAMILIES).
 //
 // The result is a sensible XI even if the user has never opened
-// /tactics. We pad up to 11 players with whoever's left so the engine
-// always receives a complete side.
+// /tactics. A club that cannot field a legal side fails before the
+// engine receives fabricated player data.
 
 import type { PitchSlot } from "@rpgfc/shared";
-import {
-  ARCHETYPE_BY_ID,
-  FORMATION_SLOTS,
-  PITCH_SLOT_POSITION_FAMILIES,
-} from "@rpgfc/shared";
+import { ARCHETYPE_BY_ID, FORMATION_SLOTS, PITCH_SLOT_POSITION_FAMILIES } from "@rpgfc/shared";
 
 import type { DbClient } from "../../db/client.js";
-import { getTactics } from "../tactics/repository.js";
+import { compilePlayer, type HiddenPlayerSimulationSource } from "../../sim/compile-player.js";
 import type { SimSide } from "../../sim/interface.js";
+import { getTactics, loadTacticalFamiliarity } from "../tactics/repository.js";
 
-interface SquadCandidate {
-  playerId: number;
-  archetypeId: string;
-  positionLabel: string;
-  badgeCount: number;
+interface SquadCandidate extends HiddenPlayerSimulationSource {
   squadRole: string;
+  injuryMatchesRemaining: number;
+  suspensionMatchesRemaining: number;
 }
+
+const REQUIRED_STARTERS = 11;
 
 const ROLE_ORDER: Record<string, number> = {
   Starter: 0,
@@ -42,40 +39,91 @@ function matchesFamily(positionLabel: string, families: readonly string[]): bool
   return families.some((family) => upper.includes(family.toUpperCase()));
 }
 
-async function loadSquadCandidates(
-  client: DbClient,
-  clubId: number,
-): Promise<SquadCandidate[]> {
+async function loadSquadCandidates(client: DbClient, clubId: number): Promise<SquadCandidate[]> {
   if (client.dialect === "sqlite") {
-    return client.sqlite
+    const rows = client.sqlite
       .prepare<[number], SquadCandidate>(
         `SELECT s.player_id AS playerId,
                 p.archetype_id AS archetypeId,
                 p.archetype_id AS positionLabel,
                 (SELECT COUNT(*) FROM player_badges b WHERE b.player_id = s.player_id) AS badgeCount,
-                s.role AS squadRole
+                s.role AS squadRole,
+                p.hidden_attrs_json AS hiddenAttrsJson,
+                p.mental_traits_json AS mentalTraitsJson,
+                COALESCE(pc.fatigue_load, 0) AS fatigue,
+                COALESCE(pc.injury_matches_remaining, 0) AS injuryMatchesRemaining,
+                COALESCE(pd.suspension_matches_remaining, 0) AS suspensionMatchesRemaining
          FROM squad_entries s
          JOIN players p ON p.id = s.player_id
+         LEFT JOIN player_condition pc ON pc.player_id = s.player_id
+         LEFT JOIN player_discipline pd
+           ON pd.player_id = s.player_id
+          AND pd.competition_key = 'league'
+          AND pd.season = COALESCE((SELECT season FROM save_state WHERE id = 1), 0)
          WHERE s.club_id = ?
          ORDER BY s.player_id`,
       )
       .all(clubId);
+    const badgeRows = client.sqlite
+      .prepare<[number], { player_id: number; badge_key: string }>(
+        `SELECT pb.player_id, pb.badge_key
+         FROM player_badges pb
+         JOIN players p ON p.id = pb.player_id
+         WHERE p.club_id = ?
+         ORDER BY pb.player_id, pb.badge_key`,
+      )
+      .all(clubId);
+    const badgeMap = new Map<number, string[]>();
+    for (const row of badgeRows) {
+      const keys = badgeMap.get(row.player_id) ?? [];
+      keys.push(row.badge_key);
+      badgeMap.set(row.player_id, keys);
+    }
+    return rows.map((row) => ({ ...row, badgeKeys: badgeMap.get(row.playerId) ?? [] }));
   }
   const res = await client.pool.query<SquadCandidate>(
     `SELECT s.player_id AS "playerId",
             p.archetype_id AS "archetypeId",
             p.archetype_id AS "positionLabel",
             (SELECT COUNT(*) FROM player_badges b WHERE b.player_id = s.player_id) AS "badgeCount",
-            s.role AS "squadRole"
+            s.role AS "squadRole",
+            p.hidden_attrs_json AS "hiddenAttrsJson",
+            p.mental_traits_json AS "mentalTraitsJson",
+            COALESCE(pc.fatigue_load, 0) AS fatigue,
+            COALESCE(pc.injury_matches_remaining, 0) AS "injuryMatchesRemaining",
+            COALESCE(pd.suspension_matches_remaining, 0) AS "suspensionMatchesRemaining"
      FROM squad_entries s
      JOIN players p ON p.id = s.player_id
+     LEFT JOIN player_condition pc ON pc.player_id = s.player_id
+     LEFT JOIN player_discipline pd
+       ON pd.player_id = s.player_id
+      AND pd.competition_key = 'league'
+      AND pd.season = COALESCE((SELECT season FROM save_state WHERE id = 1), 0)
      WHERE s.club_id = $1
      ORDER BY s.player_id`,
     [clubId],
   );
+  const badgeRes = await client.pool.query<{ player_id: number; badge_key: string }>(
+    `SELECT pb.player_id, pb.badge_key
+     FROM player_badges pb
+     JOIN players p ON p.id = pb.player_id
+     WHERE p.club_id = $1
+     ORDER BY pb.player_id, pb.badge_key`,
+    [clubId],
+  );
+  const badgeMap = new Map<number, string[]>();
+  for (const row of badgeRes.rows) {
+    const keys = badgeMap.get(row.player_id) ?? [];
+    keys.push(row.badge_key);
+    badgeMap.set(row.player_id, keys);
+  }
   return res.rows.map((r) => ({
     ...r,
     badgeCount: Number(r.badgeCount),
+    fatigue: Number(r.fatigue),
+    injuryMatchesRemaining: Number(r.injuryMatchesRemaining),
+    suspensionMatchesRemaining: Number(r.suspensionMatchesRemaining),
+    badgeKeys: badgeMap.get(r.playerId) ?? [],
   }));
 }
 
@@ -87,7 +135,16 @@ function positionLabelOf(archetypeId: string): string {
 
 export async function pickStarters(client: DbClient, clubId: number): Promise<SimSide> {
   const tactics = await getTactics(client, clubId);
-  const candidates = await loadSquadCandidates(client, clubId);
+  const familiarity = await loadTacticalFamiliarity(client, tactics);
+  const candidates = (await loadSquadCandidates(client, clubId)).filter(
+    (candidate) =>
+      candidate.injuryMatchesRemaining <= 0 && candidate.suspensionMatchesRemaining <= 0,
+  );
+  if (candidates.length < REQUIRED_STARTERS) {
+    throw new Error(
+      `Cannot field club ${clubId}: only ${candidates.length} eligible players are available; ${REQUIRED_STARTERS} are required. Restore player availability or add eligible players before advancing.`,
+    );
+  }
 
   // Sort the bench by squad role first, then by descending badge count
   // so the strongest unpinned players slot in first when filling gaps.
@@ -96,6 +153,8 @@ export async function pickStarters(client: DbClient, clubId: number): Promise<Si
     .sort((a, b) => {
       const r = (ROLE_ORDER[a.squadRole] ?? 9) - (ROLE_ORDER[b.squadRole] ?? 9);
       if (r !== 0) return r;
+      const fatigueDifference = a.fatigue - b.fatigue;
+      if (Math.abs(fatigueDifference) >= 20) return fatigueDifference;
       return b.badgeCount - a.badgeCount;
     });
 
@@ -131,43 +190,51 @@ export async function pickStarters(client: DbClient, clubId: number): Promise<Si
     }
   }
 
-  // If the squad has fewer than 11 contracted players, pad with a
-  // synthetic empty starter so the engine still receives 11 entries.
-  // This shouldn't happen in Story 06's seeded world (clubs have 12+
-  // players each) but it keeps the contract honest.
-  while (assigned.length < 11) {
-    const pad: (typeof remaining)[number] = {
-      playerId: -1 - assigned.length,
-      archetypeId: "filler",
-      positionLabel: "??",
-      badgeCount: 0,
-      squadRole: "Backup",
-    };
-    assigned.push({ slot: slots[assigned.length] ?? "GK", candidate: pad });
-  }
+  const starters = assigned
+    .slice(0, REQUIRED_STARTERS)
+    .map(({ slot, candidate }) => compilePlayer(slot, candidate));
+  const benchCandidates = pickBench(
+    remaining.filter((candidate) => !claimed.has(candidate.playerId)),
+    7,
+  );
 
   return {
     clubId,
-    starters: assigned.slice(0, 11).map(({ slot, candidate }) => ({
-      playerId: candidate.playerId,
-      badgeCount: candidate.badgeCount,
-      positionFit: matchesFamily(
-        candidate.positionLabel,
-        PITCH_SLOT_POSITION_FAMILIES[slot],
-      ),
-      positionFamily: familyFromSlot(slot),
-      primaryRole:
-        ARCHETYPE_BY_ID[candidate.archetypeId]?.primaryRole ?? "Central Midfielder",
-    })),
+    formation: tactics.formation,
+    playingStyle: tactics.playingStyle,
+    instructions: [...tactics.instructions],
+    familiarity,
+    starters,
+    bench: benchCandidates.map((candidate) => compilePlayer(candidate.positionLabel, candidate)),
   };
 }
 
-// Map a PitchSlot to a coarse family the sim uses to pick stat
-// distributions. GK slot is the only unique one; everything else
-// groups into defender / midfielder / forward.
-function familyFromSlot(slot: string): "gk" | "defender" | "midfielder" | "forward" {
-  if (slot === "GK") return "gk";
-  if (/^(LB|RB|LWB|RWB|DC)/.test(slot)) return "defender";
-  if (/^(DMC|MC|AMC)/.test(slot)) return "midfielder";
-  return "forward"; // LW, RW, ST*
+function pickBench(candidates: SquadCandidate[], limit: number): SquadCandidate[] {
+  const selected: SquadCandidate[] = [];
+  const used = new Set<number>();
+  for (const family of ["gk", "defender", "midfielder", "forward"] as const) {
+    const candidate = candidates.find(
+      (entry) =>
+        familyFromPositionLabel(entry.positionLabel) === family && !used.has(entry.playerId),
+    );
+    if (candidate) {
+      selected.push(candidate);
+      used.add(candidate.playerId);
+    }
+  }
+  for (const candidate of candidates) {
+    if (selected.length >= limit) break;
+    if (used.has(candidate.playerId)) continue;
+    selected.push(candidate);
+    used.add(candidate.playerId);
+  }
+  return selected.slice(0, limit);
+}
+
+function familyFromPositionLabel(label: string): "gk" | "defender" | "midfielder" | "forward" {
+  const upper = label.toUpperCase();
+  if (upper.includes("GK")) return "gk";
+  if (/CB|FB|LB|RB|WB/.test(upper)) return "defender";
+  if (/DM|CM|AM|LM|RM/.test(upper)) return "midfielder";
+  return "forward";
 }

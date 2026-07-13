@@ -10,33 +10,20 @@
 // please do not introduce a number-carrying shape without an allowlist
 // mechanism.
 
-import type { BadgeRef, NaturalGiftKey } from "@rpgfc/shared";
+import type { BadgeRef, CertaintyTier, MentalTraitKey, NaturalGiftKey } from "@rpgfc/shared";
 import { ARCHETYPE_BY_ID } from "@rpgfc/shared";
-import type { HiddenPlayer } from "@rpgfc/shared/types/hidden";
-
-import { tierWordFor } from "../thesaurus.js";
 
 export interface ProseInputs {
-  hidden: HiddenPlayer;
+  name: string;
+  archetypeId: string;
+  identityFact: { key: NaturalGiftKey; valueTier: string } | null;
+  mentalFact: {
+    key: MentalTraitKey;
+    valueTier: string;
+    certainty: CertaintyTier;
+  } | null;
+  mentalEvidenceSource: "club" | "scout";
   badges: BadgeRef[];
-  precision: "fine" | "coarse";
-}
-
-// Pick the single highest-scored standout gift and the single lowest-scored
-// standout gift. Returns the attribute key + tier word so callers can weave
-// both into a sentence.
-function standouts(hidden: HiddenPlayer, precision: "fine" | "coarse") {
-  const entries = Object.entries(hidden.hiddenAttrs) as Array<[NaturalGiftKey, number]>;
-  entries.sort((a, b) => b[1] - a[1]);
-  const top = entries[0];
-  const bottom = entries[entries.length - 1];
-  if (!top || !bottom)
-    return { topWord: "capable", bottomWord: "ordinary", topKey: "pace" as NaturalGiftKey };
-  return {
-    topKey: top[0],
-    topWord: tierWordFor(top[0], top[1], precision),
-    bottomWord: tierWordFor(bottom[0], bottom[1], precision),
-  };
 }
 
 const GIFT_LABEL: Record<NaturalGiftKey, string> = {
@@ -52,13 +39,44 @@ const GIFT_LABEL: Record<NaturalGiftKey, string> = {
   reflexes: "reflexes",
 };
 
+const MENTAL_LABEL: Record<MentalTraitKey, string> = {
+  ambition: "ambition",
+  leadership: "leadership",
+  temperament: "temperament",
+  workEthic: "work ethic",
+  sociability: "social presence",
+  riskTolerance: "risk appetite",
+  professionalism: "professional habits",
+};
+
+function mentalEvidenceSentence(
+  mentalFact: ProseInputs["mentalFact"],
+  source: ProseInputs["mentalEvidenceSource"],
+): string | null {
+  if (!mentalFact || mentalFact.certainty === "Unknown") return null;
+  const subject = MENTAL_LABEL[mentalFact.key];
+  if (source === "club") {
+    return `Club staff regard his ${subject} as ${mentalFact.valueTier}.`;
+  }
+  if (mentalFact.certainty === "Speculation") {
+    return `Scouts tentatively describe his ${subject} as ${mentalFact.valueTier}.`;
+  }
+  if (mentalFact.certainty === "Likely") {
+    return `Scouts increasingly describe his ${subject} as ${mentalFact.valueTier}.`;
+  }
+  if (mentalFact.certainty === "Confident") {
+    return `Scouts consistently describe his ${subject} as ${mentalFact.valueTier}.`;
+  }
+  return `Scouts are clear that his ${subject} are ${mentalFact.valueTier}.`;
+}
+
 // Sentence shapes — at least 4 per archetype is the Story 01 target, but
 // since most of them compose in the same way we use a shared template list
 // keyed by primaryRole and let the variation come from rng-picked sentence
 // patterns within a deterministic shape.
 const SHAPES: readonly string[] = [
   "A {position} with {topWord} {topLabel}.",
-  "{position} — {topWord} {topLabel}, {bottomWord} in the rough patches.",
+  "{position} — {topWord} {topLabel} is the clearest observed quality.",
   "Plays as a {position}. {topWord} {topLabel} is the calling card.",
   "{position}. {topWord} {topLabel}, and a {badgeHint}.",
 ];
@@ -74,30 +92,38 @@ function stableIndex(seed: string, mod: number): number {
 }
 
 export function generateIdentityProse(inputs: ProseInputs): string {
-  const { hidden, badges, precision } = inputs;
-  const archetype = ARCHETYPE_BY_ID[hidden.archetypeId];
+  const { name, archetypeId, identityFact, badges, mentalFact, mentalEvidenceSource } = inputs;
+  const archetype = ARCHETYPE_BY_ID[archetypeId];
   const position = archetype?.displayName ?? "player";
+  const mentalSentence = mentalEvidenceSentence(mentalFact, mentalEvidenceSource);
 
-  const { topWord, topKey, bottomWord } = standouts(hidden, precision);
-  const topLabel = GIFT_LABEL[topKey];
+  if (!identityFact) {
+    if (!mentalSentence) {
+      return `A ${position.toLowerCase()} whose defining qualities remain unclear.`;
+    }
+    return `A ${position.toLowerCase()} whose footballing qualities remain unclear. ${mentalSentence}`;
+  }
+
+  const topWord = identityFact.valueTier;
+  const topLabel = GIFT_LABEL[identityFact.key];
 
   const firstBadge = badges[0];
   const badgeHint = firstBadge
     ? firstBadge.name.toLowerCase()
     : "reliable, day-to-day professional";
 
-  const shapeIndex = stableIndex(hidden.name, SHAPES.length);
+  const shapeIndex = stableIndex(name, SHAPES.length);
   const shape = SHAPES[shapeIndex] ?? SHAPES[0]!;
 
-  const out = shape
+  const identity = shape
     .replace("{position}", position)
     .replace("{topWord}", topWord)
     .replace("{topLabel}", topLabel)
-    .replace("{bottomWord}", bottomWord)
     .replace("{badgeHint}", badgeHint);
 
   // Strip any accidental digit leak at the boundary. Belt and suspenders
   // for AC-08 — if a future template drifts, the regex catches it and the
   // sentence simply loses the offending run. A unit test also asserts this.
+  const out = mentalSentence ? `${identity} ${mentalSentence}` : identity;
   return out.replace(/\d+(\.\d+)?/g, "");
 }

@@ -36,7 +36,9 @@ function CardBody({ fixture }: FixtureCardProps) {
           </div>
         </div>
         <div className="w-24 flex-none text-center">
-          {fixture.state === "Played" && fixture.home.goals !== null && fixture.away.goals !== null ? (
+          {fixture.state === "Played" &&
+          fixture.home.goals !== null &&
+          fixture.away.goals !== null ? (
             <Scoreline home={fixture.home.goals} away={fixture.away.goals} />
           ) : (
             <span className="text-xs uppercase tracking-wide text-parchment-500">vs</span>

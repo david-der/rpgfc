@@ -63,6 +63,85 @@ describe("/api/players — Story 01 AC-11/12/13", () => {
     expect(body.mentalTraits).toBeUndefined();
   });
 
+  it("does not reveal an external player's unobserved badges or defining gift", async () => {
+    const app = createApiApp({ ...baseDeps(db), userClubId: 1 });
+    const res = await app.request("/api/players/21");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      badges: unknown[];
+      certainty: string;
+      prose: { identity: string };
+    };
+
+    expect(body.badges).toEqual([]);
+    expect(body.certainty).toBe("Unknown");
+    expect(body.prose.identity).toContain("defining qualities remain unclear");
+  });
+
+  it("renders only the external facts the manager has observed", async () => {
+    if (db.dialect !== "sqlite") return;
+    db.sqlite
+      .prepare(
+        `INSERT INTO knowledge_nodes
+           (run_id, subject_kind, subject_id, fact_type, fact_key,
+            fact_value_tier, certainty, observed_at, source_scout_id)
+         VALUES (?, 'player', ?, ?, ?, ?, ?, ?, NULL)`,
+      )
+      .run(
+        1,
+        21,
+        "natural_gift_tier",
+        "passing",
+        "otherworldly",
+        "Confident",
+        REFERENCE_DATE.toISOString(),
+      );
+    db.sqlite
+      .prepare(
+        `INSERT INTO knowledge_nodes
+           (run_id, subject_kind, subject_id, fact_type, fact_key,
+            fact_value_tier, certainty, observed_at, source_scout_id)
+         VALUES (?, 'player', ?, ?, ?, ?, ?, ?, NULL)`,
+      )
+      .run(
+        1,
+        21,
+        "badge_presence",
+        "clutch_finisher",
+        "present",
+        "Likely",
+        REFERENCE_DATE.toISOString(),
+      );
+
+    const app = createApiApp({ ...baseDeps(db), userClubId: 1 });
+    const res = await app.request("/api/players/21");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      badges: Array<{ key: string; certainty: string }>;
+      certainty: string;
+      prose: { identity: string };
+    };
+
+    expect(body.prose.identity).toContain("otherworldly distribution");
+    expect(body.certainty).toBe("Confident");
+    expect(body.badges).toEqual([
+      expect.objectContaining({ key: "clutch_finisher", certainty: "Likely" }),
+    ]);
+  });
+
+  it("renders managed-club knowledge as Certain without a scout observation", async () => {
+    const app = createApiApp({ ...baseDeps(db), userClubId: 1 });
+    const res = await app.request("/api/players/1");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      certainty: string;
+      prose: { identity: string };
+    };
+
+    expect(body.certainty).toBe("Certain");
+    expect(body.prose.identity).not.toContain("defining qualities remain unclear");
+  });
+
   it("returns 404 for a non-existent player", async () => {
     const app = createApiApp(baseDeps(db));
     const res = await app.request("/api/players/999999");

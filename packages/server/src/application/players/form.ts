@@ -36,11 +36,7 @@ interface PerformanceTierRow {
   tier: string;
 }
 
-export async function recentFormFor(
-  client: DbClient,
-  playerId: number,
-  n = 5,
-): Promise<FormTier> {
+export async function recentFormFor(client: DbClient, playerId: number, n = 5): Promise<FormTier> {
   let rows: PerformanceTierRow[];
   if (client.dialect === "sqlite") {
     rows = client.sqlite

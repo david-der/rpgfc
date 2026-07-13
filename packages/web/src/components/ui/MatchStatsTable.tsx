@@ -2,7 +2,7 @@
 // report's Stats tab.
 //
 // All numeric cells are allowlisted facts (goals, xG, passes, etc.),
-// not ratings. The qualitative tier chip is the "rating" headline.
+// not ratings. The qualitative tier chip is the performance headline.
 
 import type { FormTier, RenderedMatchPerformance } from "@rpgfc/shared";
 
@@ -24,13 +24,7 @@ const TIER_CLASS: Record<FormTier, string> = {
   Dreadful: "border-form-dreadful text-form-dreadful font-semibold italic",
 };
 
-export function MatchStatsTable({
-  homeName,
-  awayName,
-  homeId,
-  awayId,
-  performances,
-}: Props) {
+export function MatchStatsTable({ homeName, awayName, homeId, awayId, performances }: Props) {
   const home = performances.filter((p) => p.clubId === homeId);
   const away = performances.filter((p) => p.clubId === awayId);
   return (
@@ -51,22 +45,52 @@ function StatsBlock({ title, rows }: { title: string; rows: RenderedMatchPerform
           <thead className="border-b border-parchment-300 bg-parchment-100 uppercase tracking-wide text-[10px] text-parchment-500">
             <tr>
               <th className="px-3 py-2 text-left">Player</th>
-              <th className="px-2 py-2 text-left">Rating</th>
-              <th className="px-2 py-2 text-right" title="Goals">G</th>
-              <th className="px-2 py-2 text-right" title="Assists">A</th>
-              <th className="px-2 py-2 text-right" title="Shots (on target)">Sh</th>
-              <th className="px-2 py-2 text-right" title="Expected Goals">xG</th>
-              <th className="px-2 py-2 text-right" title="Key passes">KP</th>
-              <th className="px-2 py-2 text-right" title="Passes completed / attempted">Passes</th>
-              <th className="px-2 py-2 text-right" title="Pass accuracy">Pass %</th>
-              <th className="px-2 py-2 text-right" title="Dribbles completed">Drb</th>
-              <th className="px-2 py-2 text-right" title="Tackles won / attempted">Tk</th>
-              <th className="px-2 py-2 text-right" title="Interceptions">Int</th>
-              <th className="px-2 py-2 text-right" title="Clearances">Clr</th>
-              <th className="px-2 py-2 text-right" title="Aerials won / contested">Aer</th>
-              <th className="px-2 py-2 text-right" title="Saves">Sv</th>
-              <th className="px-2 py-2 text-right" title="Fouls committed / drawn">Fo</th>
-              <th className="px-2 py-2 text-right" title="Cards (yellow/red)">Crd</th>
+              <th className="px-2 py-2 text-left">Performance</th>
+              <th className="px-2 py-2 text-right" title="Goals">
+                G
+              </th>
+              <th className="px-2 py-2 text-right" title="Assists">
+                A
+              </th>
+              <th className="px-2 py-2 text-right" title="Shots (on target)">
+                Sh
+              </th>
+              <th className="px-2 py-2 text-right" title="Expected Goals">
+                xG
+              </th>
+              <th className="px-2 py-2 text-right" title="Key passes">
+                KP
+              </th>
+              <th className="px-2 py-2 text-right" title="Passes completed / attempted">
+                Passes
+              </th>
+              <th className="px-2 py-2 text-right" title="Pass accuracy">
+                Pass %
+              </th>
+              <th className="px-2 py-2 text-right" title="Dribbles completed">
+                Drb
+              </th>
+              <th className="px-2 py-2 text-right" title="Tackles won / attempted">
+                Tk
+              </th>
+              <th className="px-2 py-2 text-right" title="Interceptions">
+                Int
+              </th>
+              <th className="px-2 py-2 text-right" title="Clearances">
+                Clr
+              </th>
+              <th className="px-2 py-2 text-right" title="Aerials won / contested">
+                Aer
+              </th>
+              <th className="px-2 py-2 text-right" title="Saves">
+                Sv
+              </th>
+              <th className="px-2 py-2 text-right" title="Fouls committed / drawn">
+                Fo
+              </th>
+              <th className="px-2 py-2 text-right" title="Cards (yellow/red)">
+                Crd
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-parchment-200 bg-parchment-50">
@@ -108,9 +132,7 @@ function StatsBlock({ title, rows }: { title: string; rows: RenderedMatchPerform
                   {p.passesCompleted}/{p.passesAttempted}
                 </td>
                 <td className="px-2 py-2 text-right font-mono tabular-nums text-parchment-700">
-                  {p.passesAttempted > 0
-                    ? `${Math.round(p.passAccuracy * 100)}%`
-                    : "—"}
+                  {p.passesAttempted > 0 ? `${Math.round(p.passAccuracy * 100)}%` : "—"}
                 </td>
                 <Num v={p.dribblesCompleted} />
                 <td className="px-2 py-2 text-right font-mono tabular-nums text-parchment-700">
@@ -119,9 +141,7 @@ function StatsBlock({ title, rows }: { title: string; rows: RenderedMatchPerform
                 <Num v={p.interceptions} />
                 <Num v={p.clearances} />
                 <td className="px-2 py-2 text-right font-mono tabular-nums text-parchment-700">
-                  {p.aerialsContested > 0
-                    ? `${p.aerialsWon}/${p.aerialsContested}`
-                    : "—"}
+                  {p.aerialsContested > 0 ? `${p.aerialsWon}/${p.aerialsContested}` : "—"}
                 </td>
                 <Num v={p.saves} strong={p.saves > 0} />
                 <td className="px-2 py-2 text-right font-mono tabular-nums text-parchment-700">
@@ -143,15 +163,7 @@ function StatsBlock({ title, rows }: { title: string; rows: RenderedMatchPerform
   );
 }
 
-function Num({
-  v,
-  testid,
-  strong,
-}: {
-  v: number;
-  testid?: string;
-  strong?: boolean;
-}) {
+function Num({ v, testid, strong }: { v: number; testid?: string; strong?: boolean }) {
   return (
     <td
       className={`px-2 py-2 text-right font-mono tabular-nums ${

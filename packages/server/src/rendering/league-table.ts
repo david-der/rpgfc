@@ -19,10 +19,7 @@ interface ClubRow {
   name: string;
 }
 
-async function loadResults(
-  client: DbClient,
-  season: number,
-): Promise<MatchResultRow[]> {
+async function loadResults(client: DbClient, season: number): Promise<MatchResultRow[]> {
   // ORDER BY matchday, id so the "recent form" scan below processes the
   // played matches chronologically — same as the UI's fixtures list.
   if (client.dialect === "sqlite") {
@@ -47,10 +44,7 @@ async function loadResults(
 
 /** Map of clubId → finish position (1-indexed) for the given season,
  *  or empty when the season has no played matches. */
-async function lastSeasonFinishMap(
-  client: DbClient,
-  season: number,
-): Promise<Map<number, number>> {
+async function lastSeasonFinishMap(client: DbClient, season: number): Promise<Map<number, number>> {
   if (season < 0) return new Map();
   // Avoid recursive lookups by computing without last-season context.
   const prior = await computeLeagueTableRaw(client, season);
@@ -61,10 +55,7 @@ async function lastSeasonFinishMap(
 
 /** Compute without last-season context (used internally to seed the
  *  last-season lookup for the CURRENT season without recursion). */
-async function computeLeagueTableRaw(
-  client: DbClient,
-  season: number,
-): Promise<LeagueTableRow[]> {
+async function computeLeagueTableRaw(client: DbClient, season: number): Promise<LeagueTableRow[]> {
   return computeTableInner(client, season, new Map());
 }
 
@@ -85,21 +76,14 @@ async function computeTableInner(
   let clubs: ClubRow[];
 
   if (client.dialect === "sqlite") {
-    clubs = client.sqlite
-      .prepare<[], ClubRow>(`SELECT id, name FROM clubs`)
-      .all();
+    clubs = client.sqlite.prepare<[], ClubRow>(`SELECT id, name FROM clubs`).all();
   } else {
-    const resClubs = await client.pool.query<ClubRow>(
-      `SELECT id, name FROM clubs`,
-    );
+    const resClubs = await client.pool.query<ClubRow>(`SELECT id, name FROM clubs`);
     clubs = resClubs.rows;
   }
 
   const clubMap = new Map(clubs.map((c) => [c.id, c.name]));
-  const stats = new Map<
-    number,
-    { w: number; d: number; l: number; gf: number; ga: number }
-  >();
+  const stats = new Map<number, { w: number; d: number; l: number; gf: number; ga: number }>();
 
   for (const club of clubs) {
     stats.set(club.id, { w: 0, d: 0, l: 0, gf: 0, ga: 0 });

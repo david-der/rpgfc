@@ -94,6 +94,7 @@ export type {
   PlayingStyle,
   RenderedSlotAssignment,
   RenderedTactics,
+  TacticalFamiliarityTier,
   Tactics,
   TeamInstruction,
 } from "./tactics.js";
@@ -107,6 +108,7 @@ export {
   PLAYING_STYLES,
   TEAM_INSTRUCTIONS,
   TEAM_INSTRUCTION_LABELS,
+  TACTICAL_FAMILIARITY_TIERS,
   slotLabelFor,
 } from "./tactics.js";
 
@@ -126,11 +128,7 @@ export {
   SQUAD_ROLE_LABELS,
 } from "./squad.js";
 
-export type {
-  LeagueTableRow,
-  SeasonState,
-  SeasonSummary,
-} from "./season.js";
+export type { LeagueTableRow, SeasonState, SeasonSummary } from "./season.js";
 
 export type {
   FormSeries,
@@ -141,6 +139,11 @@ export type {
   RenderedFixturesPage,
   RenderedMatch,
   RenderedMatchClub,
+  RenderedMatchEvent,
+  RenderedMatchEventKind,
   RenderedMatchPerformance,
 } from "./form.js";
 export { FORM_TIERS, FORM_TIER_LABELS, MATCH_STATES } from "./form.js";
+
+export type { AvailabilityState, ConditionTier, RenderedAvailability } from "./availability.js";
+export { AVAILABILITY_STATES, CONDITION_TIERS } from "./availability.js";

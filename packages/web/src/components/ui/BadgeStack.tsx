@@ -18,7 +18,7 @@ interface BadgeStackProps {
 export function BadgeStack({ badges }: BadgeStackProps) {
   if (badges.length === 0) {
     return (
-      <p className="text-sm italic text-parchment-500">No badges recorded for this player yet.</p>
+      <p className="text-sm italic text-parchment-500">No badges confirmed for this player yet.</p>
     );
   }
 

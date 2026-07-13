@@ -119,7 +119,7 @@ async function main() {
     logger.info({ contracts: contractSeed.contractsCreated }, "Seeded initial contracts");
   }
 
-  // Story 06/07: full-season fixtures (38 match weeks for 20 clubs).
+  // Story 09: the playable baseline is a ten-club, eighteen-week season.
   const fixturesSeed = await seedFixturesIfEmpty(dbClient);
   if (!fixturesSeed.skipped) {
     logger.info(

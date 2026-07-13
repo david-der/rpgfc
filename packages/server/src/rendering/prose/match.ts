@@ -1,6 +1,6 @@
 // Match narrative prose builder — Story 06.
 //
-// Stitches a 2–3 paragraph match report from the engine's
+// Stitches a four-paragraph match report from the engine's
 // SimMatchResult-style outputs (already mapped to RenderedMatch by
 // the time we land here, but we work with the structural shape so
 // the function stays pure).
@@ -23,6 +23,8 @@ export interface MatchNarrativeInput {
   home: RenderedMatchClub;
   away: RenderedMatchClub;
   performances: RenderedMatchPerformance[];
+  /** Stable cause codes read from the persisted match event ledger. */
+  evidence: string[];
 }
 
 const VENUE_PHRASES = [
@@ -54,14 +56,8 @@ export function buildMatchNarrative(input: MatchNarrativeInput): string[] {
   const adjective = rng.pick(BAND_ADJECTIVES[band]);
   const venuePhrase = rng.pick(VENUE_PHRASES);
 
-  const winner =
-    homeGoals === awayGoals
-      ? null
-      : homeGoals > awayGoals
-        ? input.home
-        : input.away;
-  const loser =
-    homeGoals === awayGoals ? null : winner === input.home ? input.away : input.home;
+  const winner = homeGoals === awayGoals ? null : homeGoals > awayGoals ? input.home : input.away;
+  const loser = homeGoals === awayGoals ? null : winner === input.home ? input.away : input.home;
 
   const homeStandouts = pickStandouts(input.performances, input.home.id);
   const awayStandouts = pickStandouts(input.performances, input.away.id);
@@ -75,22 +71,36 @@ export function buildMatchNarrative(input: MatchNarrativeInput): string[] {
   }
   // The first standout with a goal becomes the prose subject.
   const firstScorer =
-    [...homeStandouts, ...awayStandouts].find((p) => p.goals > 0 && p.eventDescription) ??
-    null;
+    [...homeStandouts, ...awayStandouts].find((p) => p.goals > 0 && p.eventDescription) ?? null;
   if (firstScorer && firstScorer.eventDescription) {
     lead.push(`${firstScorer.playerName} ${firstScorer.eventDescription}.`);
   }
 
-  // ── Body paragraph: the losing or drawn side's reply. ──────────────────
-  const body: string[] = [];
-  const replyCandidates =
-    loser !== null
-      ? input.performances.filter((p) => p.clubId === loser.id && p.eventDescription !== null)
-      : input.performances.filter((p) => p.eventDescription !== null);
-  const reply = replyCandidates[0];
-  if (reply && reply.eventDescription) {
-    body.push(`${reply.playerName} ${reply.eventDescription}.`);
-  }
+  // ── Tactical paragraph: only claims causes persisted by the engine. ────
+  const evidence = new Set(input.evidence);
+  const tactical = evidence.has("COUNTER_V_HIGH_LINE")
+    ? "Transitions repeatedly found space behind the high line, turning regains into immediate danger."
+    : evidence.has("HIGH_PRESS") || evidence.has("PRESSURE_FORCED_TURNOVER")
+      ? "The press repeatedly disrupted build-up, forcing rushed possession and creating the clearest territorial swings."
+      : evidence.has("POSSESSION_STRUCTURE") || evidence.has("PLAY_OUT_FROM_BACK")
+        ? "Patient possession and structured build-up created the platform for the strongest attacking spells."
+        : evidence.has("FINAL_THIRD_CREATION")
+          ? "The decisive pattern came through composed final-third creation rather than isolated chances."
+          : "The contest was shaped by the struggle to turn build-up into controlled possession.";
+
+  const flow =
+    homeGoals === awayGoals
+      ? "Neither side held control for long; each response changed the rhythm before the other could settle."
+      : winner && loser
+        ? `${winner.name} managed the important phases more cleanly, while ${loser.name} were left chasing the changing rhythm.`
+        : "The balance shifted often enough to leave both benches with decisions to revisit.";
+
+  const standout = [...homeStandouts, ...awayStandouts][0];
+  const personnel = standout
+    ? standout.eventDescription
+      ? `${standout.playerName} ${standout.eventDescription}, providing the clearest individual thread through the match.`
+      : `${standout.playerName} remained central to the strongest passages of play.`
+    : "The important work was spread across both units rather than resting on one obvious figure.";
 
   // ── Closing line: a single short summary. ─────────────────────────────
   const closingPool = [
@@ -101,9 +111,5 @@ export function buildMatchNarrative(input: MatchNarrativeInput): string[] {
   ];
   const closing = rng.pick(closingPool);
 
-  const paragraphs: string[] = [];
-  if (lead.length > 0) paragraphs.push(lead.join(" "));
-  if (body.length > 0) paragraphs.push(body.join(" "));
-  paragraphs.push(closing);
-  return paragraphs;
+  return [lead.join(" "), tactical, `${flow} ${personnel}`, closing];
 }

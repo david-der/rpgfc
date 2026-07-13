@@ -115,10 +115,7 @@ function familyOf(archetypeId: string): string {
   return "other";
 }
 
-export async function generateAiBids(
-  client: DbClient,
-  matchWeek: number,
-): Promise<number> {
+export async function generateAiBids(client: DbClient, matchWeek: number): Promise<number> {
   if (client.dialect !== "sqlite") return 0;
 
   const clubs = await loadClubs(client);

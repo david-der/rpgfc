@@ -4,7 +4,8 @@
 //
 // AC coverage from docs/stories/STORY_02_Navigation.md:
 //   AC-01 — render every item from the registry
-//   AC-02 — active-state resolution across `/`, `/players`, `/players/1`, `/elsewhere`
+//   AC-02 — active-state resolution across `/`, a registered section,
+//   a deep link within that section, and `/elsewhere`
 //   AC-03 — zero radius + no shadow
 //   AC-10 — visible focus ring classes
 //   AC-11 — nav / link / aria-current screen-reader semantics
@@ -42,15 +43,15 @@ function renderNavAt(path: string) {
     path: "/",
     component: () => <p>home</p>,
   });
-  const playersRoute = createRoute({
+  const scoutsRoute = createRoute({
     getParentRoute: () => rootRoute,
-    path: "/players",
-    component: () => <p>players</p>,
+    path: "/scouts",
+    component: () => <p>scouting</p>,
   });
-  const playerProfileRoute = createRoute({
+  const scoutDetailRoute = createRoute({
     getParentRoute: () => rootRoute,
-    path: "/players/$id",
-    component: () => <p>profile</p>,
+    path: "/scouts/$id",
+    component: () => <p>scout detail</p>,
   });
   const elsewhereRoute = createRoute({
     getParentRoute: () => rootRoute,
@@ -60,8 +61,8 @@ function renderNavAt(path: string) {
 
   const routeTree = rootRoute.addChildren([
     indexRoute,
-    playersRoute,
-    playerProfileRoute,
+    scoutsRoute,
+    scoutDetailRoute,
     elsewhereRoute,
   ]);
 
@@ -94,22 +95,22 @@ describe("NavBar — Story 02", () => {
     expect(active?.textContent).toBe("Home");
   });
 
-  it("AC-02: active state resolves on `/players` → Players", async () => {
-    renderNavAt("/players");
+  it("AC-02: active state resolves on `/scouts` → Scouting", async () => {
+    renderNavAt("/scouts");
     const nav = await screen.findByRole("navigation", { name: "Primary" });
     const active = within(nav)
       .getAllByRole("link")
       .find((el) => el.getAttribute("aria-current") === "page");
-    expect(active?.textContent).toBe("Players");
+    expect(active?.textContent).toBe("Scouting");
   });
 
-  it("AC-02: deep-link `/players/1` still highlights Players", async () => {
-    renderNavAt("/players/1");
+  it("AC-02: deep-link `/scouts/1` still highlights Scouting", async () => {
+    renderNavAt("/scouts/1");
     const nav = await screen.findByRole("navigation", { name: "Primary" });
     const active = within(nav)
       .getAllByRole("link")
       .find((el) => el.getAttribute("aria-current") === "page");
-    expect(active?.textContent).toBe("Players");
+    expect(active?.textContent).toBe("Scouting");
   });
 
   it("AC-02: `/elsewhere` leaves every item inactive", async () => {

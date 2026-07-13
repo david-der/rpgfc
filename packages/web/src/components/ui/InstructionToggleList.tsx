@@ -13,11 +13,7 @@ interface InstructionToggleListProps {
   disabled?: boolean;
 }
 
-export function InstructionToggleList({
-  value,
-  onChange,
-  disabled,
-}: InstructionToggleListProps) {
+export function InstructionToggleList({ value, onChange, disabled }: InstructionToggleListProps) {
   const selected = new Set(value);
 
   function toggle(instruction: TeamInstruction) {

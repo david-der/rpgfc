@@ -45,10 +45,7 @@ function squadRoleIndex(role: SquadRole): number {
   return SQUAD_ROLE_INDEX[role];
 }
 
-export function moodFor(
-  promise: PlayingTimeRole | null,
-  role: SquadRole,
-): PromiseMood {
+export function moodFor(promise: PlayingTimeRole | null, role: SquadRole): PromiseMood {
   if (promise === null) return "Content";
   const promisedRole = squadRoleFor(promise);
   const delta = squadRoleIndex(role) - squadRoleIndex(promisedRole);
@@ -59,20 +56,42 @@ export function moodFor(
   return "Furious";
 }
 
-// Short prose templates — one per mood, ≤80 chars so a PromiseMoodChip
-// renders on one line at the standard column widths. Story 05 ships
-// the starter pool; Story 06+ can grow it per-match ("a hat-trick from
-// the bench") without changing the API.
-const MOOD_LABELS: Record<PromiseMood, string> = {
-  Eager: "Exceeding the role we promised him — watch him thrive.",
-  Content: "Playing the role we promised.",
-  Concerned: "Beginning to ask whether we meant what we said.",
-  Disappointed: "We promised him more than this. He remembers.",
-  Furious: "A star was promised. A youth slot is what he got.",
+// Short prose templates — a small pool per mood, ≤80 chars so a
+// PromiseMoodChip renders on one line at the standard column widths.
+// Selection is deterministic per player (seed = player id) so a player
+// keeps one voice while a watch list of three no longer repeats a
+// single sentence verbatim.
+export const MOOD_LABEL_POOLS: Record<PromiseMood, readonly string[]> = {
+  Eager: [
+    "Exceeding the role we promised him — watch him thrive.",
+    "Given more than his word demanded, and repaying it.",
+    "The promise undersold him. He plays like he knows it.",
+  ],
+  Content: [
+    "Playing the role we promised.",
+    "Getting exactly the football he signed up for.",
+    "No complaints — the word given is the word kept.",
+  ],
+  Concerned: [
+    "Beginning to ask whether we meant what we said.",
+    "Watching the team sheet a little too closely lately.",
+    "Not angry yet. But he counts the weeks since we promised.",
+  ],
+  Disappointed: [
+    "We promised him more than this. He remembers.",
+    "The gap between the promise and the minutes is widening.",
+    "Told he mattered; the selections keep saying otherwise.",
+  ],
+  Furious: [
+    "A star was promised. A youth slot is what he got.",
+    "He calls the promise what it was — a lie with a signature.",
+    "Done waiting. Everyone in the dressing room knows it.",
+  ],
 };
 
-export function moodLabel(mood: PromiseMood): string {
-  return MOOD_LABELS[mood];
+export function moodLabel(mood: PromiseMood, seed = 0): string {
+  const pool = MOOD_LABEL_POOLS[mood];
+  return pool[Math.abs(seed) % pool.length]!;
 }
 
 // Harmony is min-of-mood, not average: one furious player drags the

@@ -63,6 +63,7 @@ export function createApiApp(deps: ApiDeps) {
   const userClubId = deps.userClubId ?? 1;
   const playersApp = createPlayersRoute({
     db: deps.db,
+    userClubId,
     devEndpointsEnabled: deps.devEndpointsEnabled,
     now: deps.now,
   });

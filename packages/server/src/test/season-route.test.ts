@@ -112,10 +112,7 @@ describe("season + matches + form routes — Story 06", () => {
     if (db.dialect !== "sqlite") return;
     // Pick a player from a club that just played in matchday 1.
     const row = db.sqlite
-      .prepare<
-        [],
-        { player_id: number }
-      >(
+      .prepare<[], { player_id: number }>(
         `SELECT pmp.player_id
          FROM player_match_performance pmp
          LIMIT 1`,
@@ -140,9 +137,7 @@ describe("season + matches + form routes — Story 06", () => {
       .prepare<
         [],
         { player_id: number }
-      >(
-        `SELECT pmp.player_id FROM player_match_performance pmp LIMIT 1`,
-      )
+      >(`SELECT pmp.player_id FROM player_match_performance pmp LIMIT 1`)
       .get();
     const app = createApiApp(baseDeps(db));
     const res = await app.request(`/api/players/${row!.player_id}`);

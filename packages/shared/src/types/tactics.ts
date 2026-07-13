@@ -6,14 +6,7 @@
 // small enough to read/write whole) — the application layer treats it
 // as the authoritative starting-XI picker source.
 
-export const FORMATIONS = [
-  "4-4-2",
-  "4-3-3",
-  "4-2-3-1",
-  "3-5-2",
-  "3-4-3",
-  "5-3-2",
-] as const;
+export const FORMATIONS = ["4-4-2", "4-3-3", "4-2-3-1", "3-5-2", "3-4-3", "5-3-2"] as const;
 export type Formation = (typeof FORMATIONS)[number];
 
 export const PLAYING_STYLES = [
@@ -34,6 +27,9 @@ export const TEAM_INSTRUCTIONS = [
   "StayCompact",
 ] as const;
 export type TeamInstruction = (typeof TEAM_INSTRUCTIONS)[number];
+
+export const TACTICAL_FAMILIARITY_TIERS = ["Learning", "Settling", "Familiar"] as const;
+export type TacticalFamiliarityTier = (typeof TACTICAL_FAMILIARITY_TIERS)[number];
 
 export const TEAM_INSTRUCTION_LABELS: Record<TeamInstruction, string> = {
   PlayOutFromTheBack: "Play out from the back",
@@ -91,7 +87,9 @@ export const PITCH_SLOT_LABELS: Record<PitchSlot, string> = {
 
 // Some formations use the same slot IDs but display differently.
 // E.g., 4-4-2's wide positions are midfielders (LM/RM), not wingers.
-export const FORMATION_LABEL_OVERRIDES: Partial<Record<Formation, Partial<Record<PitchSlot, string>>>> = {
+export const FORMATION_LABEL_OVERRIDES: Partial<
+  Record<Formation, Partial<Record<PitchSlot, string>>>
+> = {
   "4-4-2": { LW: "LM", RW: "RM" },
   "4-2-3-1": { MCC: "CDM" },
 };
@@ -169,6 +167,7 @@ export interface RenderedTactics {
   playingStyleLabel: string;
   instructions: TeamInstruction[];
   instructionLabels: string[];
+  familiarity: TacticalFamiliarityTier;
   assignments: RenderedSlotAssignment[];
   updatedAt: string;
 }

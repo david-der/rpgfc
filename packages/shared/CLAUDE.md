@@ -11,14 +11,15 @@ workspace: **the public barrel must stay safe for the web.**
   `BadgeRef`, `BadgeCategory`, `CertaintyTier`, `ExperienceTier`, their
   `readonly` constant arrays, and plain constants like `APP_NAME`.
 - **`src/types/hidden.ts`** — the deliberate side-door. Only the server's
-  `rendering/**` module imports from it, via
-  `@rpgfc/shared/types/hidden`. The web package is blocked from reaching
-  this path by the root ESLint `no-restricted-imports` rule on
-  `packages/web/**` (pattern: `*/hidden*`).
+  `rendering/**` public projection and protected `sim/compile-player.ts`
+  compiler import from it. The web package is blocked from reaching this
+  path by the root ESLint `no-restricted-imports` rule on `packages/web/**`
+  (pattern: `*/hidden*`).
 
 **Never re-export anything from `types/hidden.ts` through the public
 barrel.** If you need a new hidden-only helper, add it to `hidden.ts` and
-let the server's rendering layer import it directly. If a helper is
+let the server's rendering layer or protected simulation compiler import it
+directly. If a helper is
 actually safe for both sides, it isn't a hidden helper — put it in the
 public barrel from the start.
 

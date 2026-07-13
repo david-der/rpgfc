@@ -10,13 +10,7 @@
 // operation. Because a player may only appear in one slot at a time,
 // `setAssignment` also clears any prior slot the same player occupied.
 
-import type {
-  Formation,
-  PitchSlot,
-  PlayingStyle,
-  Tactics,
-  TeamInstruction,
-} from "@rpgfc/shared";
+import type { Formation, PitchSlot, PlayingStyle, Tactics, TeamInstruction } from "@rpgfc/shared";
 import { FORMATION_SLOTS, FORMATIONS, PLAYING_STYLES, TEAM_INSTRUCTIONS } from "@rpgfc/shared";
 
 import type { DbClient } from "../../db/client.js";
@@ -38,9 +32,7 @@ const DEFAULT_PLAYING_STYLE: PlayingStyle = "Balanced";
 const DEFAULT_INSTRUCTIONS: TeamInstruction[] = ["PressHigh", "StayCompact"];
 
 function parseFormation(raw: string): Formation {
-  return (FORMATIONS as readonly string[]).includes(raw)
-    ? (raw as Formation)
-    : DEFAULT_FORMATION;
+  return (FORMATIONS as readonly string[]).includes(raw) ? (raw as Formation) : DEFAULT_FORMATION;
 }
 
 function parsePlayingStyle(raw: string): PlayingStyle {
@@ -91,10 +83,107 @@ function rowToTactics(row: TacticsRow): Tactics {
   };
 }
 
-async function loadTacticsRow(
+export function tacticSignature(input: {
+  formation: Formation;
+  playingStyle: PlayingStyle;
+  instructions: readonly TeamInstruction[];
+}): string {
+  return [input.formation, input.playingStyle, [...input.instructions].sort().join(",")].join("|");
+}
+
+export async function loadTacticalFamiliarity(client: DbClient, tactics: Tactics): Promise<number> {
+  const signature = tacticSignature(tactics);
+  const now = new Date().toISOString();
+  if (client.dialect === "sqlite") {
+    const row = client.sqlite
+      .prepare<[number], { tactic_signature: string; familiarity_load: number }>(
+        `SELECT tactic_signature, familiarity_load
+         FROM tactical_familiarity WHERE club_id = ?`,
+      )
+      .get(tactics.clubId);
+    if (!row) {
+      client.sqlite
+        .prepare(
+          `INSERT INTO tactical_familiarity
+             (club_id, tactic_signature, familiarity_load, updated_at)
+           VALUES (?, ?, 100, ?)`,
+        )
+        .run(tactics.clubId, signature, now);
+      return 100;
+    }
+    if (row.tactic_signature !== signature) {
+      client.sqlite
+        .prepare(
+          `UPDATE tactical_familiarity
+           SET tactic_signature = ?, familiarity_load = 0, updated_at = ?
+           WHERE club_id = ?`,
+        )
+        .run(signature, now, tactics.clubId);
+      return 0;
+    }
+    return row.familiarity_load;
+  }
+  const result = await client.pool.query<{
+    tactic_signature: string;
+    familiarity_load: number;
+  }>(`SELECT tactic_signature, familiarity_load FROM tactical_familiarity WHERE club_id = $1`, [
+    tactics.clubId,
+  ]);
+  const row = result.rows[0];
+  if (!row) {
+    await client.pool.query(
+      `INSERT INTO tactical_familiarity
+         (club_id, tactic_signature, familiarity_load, updated_at)
+       VALUES ($1, $2, 100, $3)`,
+      [tactics.clubId, signature, now],
+    );
+    return 100;
+  }
+  if (row.tactic_signature !== signature) {
+    await client.pool.query(
+      `UPDATE tactical_familiarity
+       SET tactic_signature = $1, familiarity_load = 0, updated_at = $2
+       WHERE club_id = $3`,
+      [signature, now, tactics.clubId],
+    );
+    return 0;
+  }
+  return Number(row.familiarity_load);
+}
+
+async function resetFamiliarity(
   client: DbClient,
   clubId: number,
-): Promise<TacticsRow | null> {
+  signature: string,
+  now: string,
+): Promise<void> {
+  if (client.dialect === "sqlite") {
+    client.sqlite
+      .prepare(
+        `INSERT INTO tactical_familiarity
+           (club_id, tactic_signature, familiarity_load, updated_at)
+         VALUES (?, ?, 0, ?)
+         ON CONFLICT(club_id) DO UPDATE SET
+           tactic_signature = excluded.tactic_signature,
+           familiarity_load = 0,
+           updated_at = excluded.updated_at`,
+      )
+      .run(clubId, signature, now);
+    return;
+  }
+  await client.pool.query(
+    `INSERT INTO tactical_familiarity
+       (club_id, tactic_signature, familiarity_load, updated_at)
+     VALUES ($1, $2, 0, $3)
+     ON CONFLICT(club_id) DO UPDATE SET
+       tactic_signature = EXCLUDED.tactic_signature,
+       familiarity_load = 0,
+       updated_at = EXCLUDED.updated_at`,
+    [clubId, signature, now],
+  );
+}
+
+async function loadTacticsRow(client: DbClient, clubId: number): Promise<TacticsRow | null> {
   if (client.dialect === "sqlite") {
     return (
       client.sqlite
@@ -201,11 +290,9 @@ export interface UpsertTacticsInput {
 // Updates the top-level tactic fields (formation/style/instructions). If
 // the formation change drops some slots from the allowed set, the
 // corresponding assignments are dropped too — Story 05 §9.3 mitigation.
-export async function upsertTactics(
-  client: DbClient,
-  input: UpsertTacticsInput,
-): Promise<Tactics> {
+export async function upsertTactics(client: DbClient, input: UpsertTacticsInput): Promise<Tactics> {
   const current = await getTactics(client, input.clubId);
+  await loadTacticalFamiliarity(client, current);
   const nowIso = (input.now ?? new Date()).toISOString();
   const allowed = new Set(FORMATION_SLOTS[input.formation]);
   const nextAssignments: Partial<Record<PitchSlot, number>> = {};
@@ -242,15 +329,13 @@ export async function upsertTactics(
              instructions_json = $3, assignments_json = $4,
              updated_at = $5
        WHERE id = $6`,
-      [
-        input.formation,
-        input.playingStyle,
-        instructionsJson,
-        assignmentsJson,
-        nowIso,
-        current.id,
-      ],
+      [input.formation, input.playingStyle, instructionsJson, assignmentsJson, nowIso, current.id],
     );
+  }
+
+  const nextSignature = tacticSignature(input);
+  if (nextSignature !== tacticSignature(current)) {
+    await resetFamiliarity(client, input.clubId, nextSignature, nowIso);
   }
 
   return {
@@ -302,9 +387,7 @@ export async function setAssignment(
 
   if (client.dialect === "sqlite") {
     client.sqlite
-      .prepare(
-        `UPDATE tactics SET assignments_json = ?, updated_at = ? WHERE id = ?`,
-      )
+      .prepare(`UPDATE tactics SET assignments_json = ?, updated_at = ? WHERE id = ?`)
       .run(assignmentsJson, nowIso, current.id);
   } else {
     await client.pool.query(

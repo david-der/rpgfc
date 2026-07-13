@@ -62,11 +62,12 @@ export function generateRoundRobin(clubIds: readonly number[]): ScheduleMatchday
       // so the fixed pin doesn't always start at home.
       const evenRound = r % 2 === 0;
       const pinIsLeft = i === 0 && a === fixed;
-      const pair: FixturePair = pinIsLeft && !evenRound
-        ? { homeClubId: b, awayClubId: a }
-        : evenRound
-          ? { homeClubId: a, awayClubId: b }
-          : { homeClubId: b, awayClubId: a };
+      const pair: FixturePair =
+        pinIsLeft && !evenRound
+          ? { homeClubId: b, awayClubId: a }
+          : evenRound
+            ? { homeClubId: a, awayClubId: b }
+            : { homeClubId: b, awayClubId: a };
       fixtures.push(pair);
     }
 
@@ -81,7 +82,7 @@ export function generateRoundRobin(clubIds: readonly number[]): ScheduleMatchday
 
 // Story 07: full season — both halves. The second half mirrors the
 // first with home/away swapped and matchday numbers offset by the
-// half-season length. For 20 clubs this yields 38 match weeks.
+// half-season length. For the ten-club baseline this yields 18 match weeks.
 export function generateFullSeason(clubIds: readonly number[]): ScheduleMatchday[] {
   const firstHalf = generateRoundRobin(clubIds);
   const offset = firstHalf.length;

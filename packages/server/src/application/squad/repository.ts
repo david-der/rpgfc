@@ -31,10 +31,7 @@ function rowToEntry(row: SquadEntryRow): SquadEntry {
   };
 }
 
-export async function listSquadByClub(
-  client: DbClient,
-  clubId: number,
-): Promise<SquadEntry[]> {
+export async function listSquadByClub(client: DbClient, clubId: number): Promise<SquadEntry[]> {
   if (client.dialect === "sqlite") {
     return client.sqlite
       .prepare<[number], SquadEntryRow>(
@@ -83,9 +80,7 @@ export async function upsertSquadEntry(
   if (existing) {
     if (client.dialect === "sqlite") {
       client.sqlite
-        .prepare(
-          `UPDATE squad_entries SET club_id = ?, role = ?, updated_at = ? WHERE id = ?`,
-        )
+        .prepare(`UPDATE squad_entries SET club_id = ?, role = ?, updated_at = ? WHERE id = ?`)
         .run(input.clubId, input.role, nowIso, existing.id);
     } else {
       await client.pool.query(

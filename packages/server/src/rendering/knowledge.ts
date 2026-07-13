@@ -6,7 +6,8 @@
 //   - computeCertainty (overall + per-badge)
 //   - the Reports tab (per-fact disagreement surfacing)
 
-import type { CertaintyTier } from "@rpgfc/shared";
+import type { CertaintyTier, MentalTraitKey, NaturalGiftKey } from "@rpgfc/shared";
+import { NATURAL_GIFT_KEYS } from "@rpgfc/shared";
 
 import type { DbClient } from "../db/client.js";
 
@@ -27,6 +28,30 @@ export interface PlayerKnowledge {
   best: Map<string, FactObservation>;
 }
 
+export interface ProjectedGiftFact {
+  key: NaturalGiftKey;
+  valueTier: string;
+  certainty: CertaintyTier;
+}
+
+export interface ProjectedBadgeFact {
+  key: string;
+  certainty: CertaintyTier;
+}
+
+export interface ProjectedMentalFact {
+  key: MentalTraitKey;
+  valueTier: string;
+  certainty: CertaintyTier;
+}
+
+export interface PlayerKnowledgeProjection {
+  identityFact: ProjectedGiftFact | null;
+  mentalFact: ProjectedMentalFact | null;
+  badges: ProjectedBadgeFact[];
+  identityCertainty: CertaintyTier;
+}
+
 const CERTAINTY_RANK: Record<CertaintyTier, number> = {
   Unknown: 0,
   Speculation: 1,
@@ -37,6 +62,73 @@ const CERTAINTY_RANK: Record<CertaintyTier, number> = {
 
 function isHigher(a: CertaintyTier, b: CertaintyTier): boolean {
   return CERTAINTY_RANK[a] > CERTAINTY_RANK[b];
+}
+
+const NATURAL_GIFT_KEY_SET = new Set<string>(NATURAL_GIFT_KEYS);
+
+function compareObservations(a: FactObservation, b: FactObservation): number {
+  const certainty = CERTAINTY_RANK[b.certainty] - CERTAINTY_RANK[a.certainty];
+  if (certainty !== 0) return certainty;
+  return b.observedAt.localeCompare(a.observedAt);
+}
+
+/** Build the presentation-safe view of an external player. The projection
+ * trusts what was observed, including mistaken observations; checking it
+ * against hidden truth here would turn scouting uncertainty into a leak. */
+export function projectPlayerKnowledge(
+  knowledge: PlayerKnowledge | undefined,
+): PlayerKnowledgeProjection {
+  if (!knowledge) {
+    return {
+      identityFact: null,
+      mentalFact: null,
+      badges: [],
+      identityCertainty: "Unknown",
+    };
+  }
+
+  const giftObservation = [...knowledge.best.values()]
+    .filter(
+      (fact) => fact.factType === "natural_gift_tier" && NATURAL_GIFT_KEY_SET.has(fact.factKey),
+    )
+    .sort(compareObservations)[0];
+
+  const identityFact: ProjectedGiftFact | null = giftObservation
+    ? {
+        key: giftObservation.factKey as NaturalGiftKey,
+        valueTier: giftObservation.factValueTier,
+        certainty: giftObservation.certainty,
+      }
+    : null;
+
+  const mentalObservation = knowledge.best.get("mental_trait_tier:professionalism");
+  const mentalFact: ProjectedMentalFact | null = mentalObservation
+    ? {
+        key: "professionalism",
+        valueTier: mentalObservation.factValueTier,
+        certainty: mentalObservation.certainty,
+      }
+    : null;
+
+  const badges = [...knowledge.best.values()]
+    .filter(
+      (fact) =>
+        fact.factType === "badge_presence" && fact.factValueTier.toLowerCase() === "present",
+    )
+    .sort(compareObservations)
+    .map((fact) => ({ key: fact.factKey, certainty: fact.certainty }));
+
+  return {
+    identityFact,
+    mentalFact,
+    badges,
+    identityCertainty:
+      identityFact && mentalFact
+        ? isHigher(identityFact.certainty, mentalFact.certainty)
+          ? identityFact.certainty
+          : mentalFact.certainty
+        : (identityFact?.certainty ?? mentalFact?.certainty ?? "Unknown"),
+  };
 }
 
 interface RawRow {

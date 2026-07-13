@@ -44,9 +44,10 @@ export async function extendContract(
 
   // Verify the player is at the club.
   const player = client.sqlite
-    .prepare<[number], { id: number; club_id: number | null }>(
-      `SELECT id, club_id FROM players WHERE id = ?`,
-    )
+    .prepare<
+      [number],
+      { id: number; club_id: number | null }
+    >(`SELECT id, club_id FROM players WHERE id = ?`)
     .get(input.playerId);
   if (!player) return { kind: "error", message: "Player not found" };
   if (player.club_id !== input.clubId) {
@@ -79,9 +80,10 @@ export async function extendContract(
   //  - Role promise: must meet their minimum playing time preference.
   //  - Region / forbidden clubs: skipped (they're already here).
   const currentContract = client.sqlite
-    .prepare<[number], { weekly_wage_cents: number }>(
-      `SELECT weekly_wage_cents FROM contracts WHERE player_id = ?`,
-    )
+    .prepare<
+      [number],
+      { weekly_wage_cents: number }
+    >(`SELECT weekly_wage_cents FROM contracts WHERE player_id = ?`)
     .get(input.playerId);
   const currentWage = currentContract?.weekly_wage_cents ?? 0;
   const wageFloor = prefs?.wage_floor_cents ?? 0;
@@ -114,9 +116,10 @@ export async function extendContract(
 
   // Check club can afford the signing bonus.
   const budget = client.sqlite
-    .prepare<[number], { cash_reserve_cents: number }>(
-      `SELECT cash_reserve_cents FROM club_identity_ext WHERE club_id = ?`,
-    )
+    .prepare<
+      [number],
+      { cash_reserve_cents: number }
+    >(`SELECT cash_reserve_cents FROM club_identity_ext WHERE club_id = ?`)
     .get(input.clubId);
   if (!budget || budget.cash_reserve_cents < input.signingBonusCents) {
     return { kind: "reject", reason: "CLUB_CANNOT_AFFORD_BONUS" };
@@ -137,8 +140,14 @@ export async function extendContract(
        VALUES (?, ?, ?, ?, ?, ?, NULL, 0, NULL, ?, ?)`,
     )
     .run(
-      input.playerId, input.clubId, input.wageCents, input.signingBonusCents,
-      input.seasons, input.rolePromise, scheduleJson, now,
+      input.playerId,
+      input.clubId,
+      input.wageCents,
+      input.signingBonusCents,
+      input.seasons,
+      input.rolePromise,
+      scheduleJson,
+      now,
     );
 
   // Deduct signing bonus, log the event.
@@ -150,9 +159,10 @@ export async function extendContract(
       .run(input.signingBonusCents, input.clubId);
 
     const state = client.sqlite
-      .prepare<[], { season: number; next_match_week: number }>(
-        `SELECT season, next_match_week FROM save_state WHERE id = 1`,
-      )
+      .prepare<
+        [],
+        { season: number; next_match_week: number }
+      >(`SELECT season, next_match_week FROM save_state WHERE id = 1`)
       .get();
     client.sqlite
       .prepare(

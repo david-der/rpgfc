@@ -12,8 +12,9 @@ import type { PromiseMood, SquadRole } from "@rpgfc/shared";
 
 import { usePlayerModal } from "../components/PlayerModalProvider";
 import { HarmonyChip } from "../components/ui/HarmonyChip";
+import { AvailabilityChip } from "../components/ui/AvailabilityChip";
 import { PlayerAvatar } from "../components/ui/PlayerAvatar";
-import { RatingSparkline } from "../components/ui/RatingSparkline";
+import { FormStrip } from "../components/ui/FormStrip";
 import { SectionHeader } from "../components/ui/SectionHeader";
 import { SquadRoleSelect } from "../components/ui/SquadRoleSelect";
 import { fetchSquad, setSquadRole } from "../lib/api";
@@ -112,8 +113,7 @@ function SquadList() {
   const worstMoods = [...squad.entries]
     .filter((e) => e.promiseMood !== null)
     .sort(
-      (a, b) =>
-        MOOD_ORDER[a.promiseMood as PromiseMood] - MOOD_ORDER[b.promiseMood as PromiseMood],
+      (a, b) => MOOD_ORDER[a.promiseMood as PromiseMood] - MOOD_ORDER[b.promiseMood as PromiseMood],
     )
     .slice(0, 3);
 
@@ -159,9 +159,7 @@ function SquadList() {
             return (
               <section key={bucket} data-testid={`squad-bucket-${bucket.toLowerCase()}`}>
                 <header className="mb-2 flex items-baseline justify-between border-b border-parchment-300 pb-1">
-                  <h2 className="font-serif text-lg text-parchment-900">
-                    {BUCKET_LABELS[bucket]}
-                  </h2>
+                  <h2 className="font-serif text-lg text-parchment-900">{BUCKET_LABELS[bucket]}</h2>
                   <span
                     data-testid={`squad-bucket-${bucket.toLowerCase()}-count-allowlist-number`}
                     className="font-mono text-xs uppercase tracking-wide tabular-nums text-parchment-500"
@@ -279,7 +277,8 @@ function SquadRow({
           >
             {entry.age}
           </span>
-          <RatingSparkline ratings={entry.last5Ratings} size={10} />
+          <FormStrip tiers={entry.recentForm} size={10} />
+          <AvailabilityChip availability={entry.availability} />
         </div>
         {showNudge && (
           <div className="mt-1 text-xs italic text-parchment-600">

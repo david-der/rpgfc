@@ -1,7 +1,7 @@
 // Best XI of the season — drawn as an actual formation on a pitch.
 // GK at the back (top), 3 DEF across, 4 MID across, 3 FWD across the
-// front. Role is implicit from position on the pitch, so the cards
-// drop the role pill and lead with the rating.
+// front. Role is implicit from position on the pitch; each card leads
+// with qualitative evidence from the player's season instead of a rating.
 
 import { usePlayerModal } from "../PlayerModalProvider";
 
@@ -11,9 +11,9 @@ interface BestXIEntry {
   club_name: string;
   role: string;
   appearances: number;
-  avg_rating_x10: number;
   goals: number;
   assists: number;
+  evidence: string[];
 }
 
 interface BestXIProps {
@@ -63,34 +63,18 @@ export function BestXISection(props: BestXIProps) {
 // 0 shadow, parchment palette only.
 function Pitch({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      className="relative border border-parchment-300 bg-[repeating-linear-gradient(180deg,theme(colors.parchment.100)_0px,theme(colors.parchment.100)_24px,theme(colors.parchment.50)_24px,theme(colors.parchment.50)_48px)] px-4 py-6"
-    >
+    <div className="relative border border-parchment-300 bg-[repeating-linear-gradient(180deg,theme(colors.parchment.100)_0px,theme(colors.parchment.100)_24px,theme(colors.parchment.50)_24px,theme(colors.parchment.50)_48px)] px-4 py-6">
       <div className="relative flex flex-col gap-5">{children}</div>
     </div>
   );
 }
 
 function Line({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex items-stretch justify-around gap-3">
-      {children}
-    </div>
-  );
+  return <div className="flex items-stretch justify-around gap-3">{children}</div>;
 }
 
-function Slot({
-  entry,
-  slot,
-  idx,
-}: {
-  entry: BestXIEntry;
-  slot: string;
-  idx: number;
-}) {
+function Slot({ entry, slot, idx }: { entry: BestXIEntry; slot: string; idx: number }) {
   const modal = usePlayerModal();
-  const ratingWhole = Math.floor(entry.avg_rating_x10 / 10);
-  const ratingFrac = entry.avg_rating_x10 % 10;
   return (
     <button
       type="button"
@@ -107,10 +91,10 @@ function Slot({
         {entry.club_name}
       </span>
       <span
-        data-testid={`bestxi-${slot}-${idx}-rating-allowlist-number`}
-        className="mt-2 font-mono text-xl leading-none tabular-nums text-parchment-700"
+        data-testid="player-facing"
+        className="mt-2 font-serif text-sm leading-snug text-parchment-700"
       >
-        {ratingWhole}.{ratingFrac}
+        {entry.evidence[0] ?? "Trusted throughout the campaign"}
       </span>
       <span className="mt-2 flex items-baseline justify-center gap-2 font-mono text-[11px] tabular-nums text-parchment-600">
         <span>
@@ -120,9 +104,7 @@ function Slot({
           <span className="ml-0.5 text-parchment-500">apps</span>
         </span>
         <span>
-          <span data-testid={`bestxi-${slot}-${idx}-goals-allowlist-number`}>
-            {entry.goals}
-          </span>
+          <span data-testid={`bestxi-${slot}-${idx}-goals-allowlist-number`}>{entry.goals}</span>
           <span className="ml-0.5 text-parchment-500">G</span>
         </span>
         <span>

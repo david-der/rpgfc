@@ -36,15 +36,6 @@ type Squad = Awaited<ReturnType<typeof fetchSquad>>;
 type Bids = Awaited<ReturnType<typeof fetchMyBids>>;
 type Offers = Awaited<ReturnType<typeof fetchOffers>>;
 
-function formatCents(cents: number): string {
-  const sign = cents < 0 ? "-" : "";
-  const abs = Math.abs(cents);
-  if (abs >= 1_000_000_000_00) return `${sign}$${(abs / 1_000_000_000_00).toFixed(1)}B`;
-  if (abs >= 1_000_000_00) return `${sign}$${(abs / 1_000_000_00).toFixed(1)}M`;
-  if (abs >= 1_000_00) return `${sign}$${(abs / 1_000_00).toFixed(0)}K`;
-  return `${sign}$${(abs / 100).toFixed(0)}`;
-}
-
 function Home() {
   const seasonQ = useQuery({ queryKey: ["season-state"], queryFn: fetchSeasonState });
   const tableQ = useQuery({ queryKey: ["league-table"], queryFn: fetchLeagueTable });
@@ -99,10 +90,7 @@ function SystemFooter() {
       <span data-testid="health-dialect" className="font-mono text-parchment-700">
         {health.data?.dialect ?? "—"}
       </span>
-      <span
-        data-testid="health-commit-allowlist-number"
-        className="font-mono text-parchment-500"
-      >
+      <span data-testid="health-commit-allowlist-number" className="font-mono text-parchment-500">
         {health.data?.commit ?? "—"}
       </span>
     </footer>
@@ -141,7 +129,11 @@ function LastResultCard({
   finances: Finances | undefined;
 }) {
   if (!fx || !finances) {
-    return <Card eyebrow="Last Result" title="—"><p className="text-parchment-500">Loading…</p></Card>;
+    return (
+      <Card eyebrow="Last Result" title="—">
+        <p className="text-parchment-500">Loading…</p>
+      </Card>
+    );
   }
   const last = findLastResult(fx, finances.clubId);
   if (!last) {
@@ -194,7 +186,10 @@ function NextFixtureCard({
       <Card eyebrow="Next Fixture" title="Season complete">
         <p className="text-parchment-600">
           Every fixture has been played. Head to{" "}
-          <Link to="/league" className="underline">the League page</Link> to end the season.
+          <Link to="/league" className="underline">
+            the League page
+          </Link>{" "}
+          to end the season.
         </p>
       </Card>
     );
@@ -260,7 +255,10 @@ function LeaguePositionCard({
       {myIndex > 0 && (
         <p className="mt-3 text-sm italic text-parchment-600">
           <span data-testid="player-facing">{leader.clubName}</span> lead the table with{" "}
-          <span data-testid="home-leader-points-allowlist-number" className="font-mono tabular-nums">
+          <span
+            data-testid="home-leader-points-allowlist-number"
+            className="font-mono tabular-nums"
+          >
             {leader.points}
           </span>
           .
@@ -281,29 +279,17 @@ function LeaguePositionCard({
 function BudgetCard({ finances }: { finances: Finances | undefined }) {
   if (!finances) return null;
   const f = finances;
-  const pct =
-    f.wageBudgetCents > 0 ? Math.round((f.wageBillCents / f.wageBudgetCents) * 100) : 0;
   const healthy = f.wageBillVsBudget === "healthy";
   return (
     <Card eyebrow="Budget">
       <div>
-        <div
-          data-testid="home-cash-allowlist-number"
-          className="font-mono text-3xl font-medium tabular-nums text-parchment-900"
-        >
-          {formatCents(f.cashCents)}
-        </div>
+        <div className="font-serif text-2xl font-medium text-parchment-900">{f.cashTier}</div>
         <div className="mt-1 text-xs uppercase tracking-wide text-parchment-500">Cash reserve</div>
       </div>
       <div className="mt-4 border-t border-parchment-300 pt-3">
         <div className="flex items-baseline justify-between">
           <span className="text-xs uppercase tracking-wide text-parchment-500">Weekly wages</span>
-          <span
-            data-testid="home-wages-allowlist-number"
-            className="font-mono tabular-nums text-parchment-900"
-          >
-            {formatCents(f.wageBillCents)}
-          </span>
+          <span className="font-medium text-parchment-900">{f.wageBillTier}</span>
         </div>
         <div className="mt-2 flex items-center gap-2">
           <span
@@ -317,12 +303,7 @@ function BudgetCard({ finances }: { finances: Finances | undefined }) {
           >
             {healthy ? "Healthy" : f.wageBillVsBudget === "tight" ? "Tight" : "Overspent"}
           </span>
-          <span className="text-xs text-parchment-500">
-            <span data-testid="home-wage-pct-allowlist-number" className="font-mono tabular-nums">
-              {pct}%
-            </span>{" "}
-            of budget used
-          </span>
+          <span className="text-xs text-parchment-500">against the current wage budget</span>
         </div>
       </div>
       <Link
@@ -408,15 +389,9 @@ function YouthIntakeCard({ squad }: { squad: Squad | undefined }) {
       <ul className="mt-3 space-y-1 text-sm text-parchment-700">
         {arrivals.slice(0, 3).map((e) => (
           <li key={e.playerId}>
-            <Link
-              to="/players/$id"
-              params={{ id: String(e.playerId) }}
-              className="hover:underline"
-            >
+            <Link to="/players/$id" params={{ id: String(e.playerId) }} className="hover:underline">
               <span data-testid="player-facing">{e.playerName}</span>
-              <span className="ml-2 text-xs text-parchment-500">
-                ({e.positionLabel})
-              </span>
+              <span className="ml-2 text-xs text-parchment-500">({e.positionLabel})</span>
             </Link>
           </li>
         ))}
@@ -443,15 +418,23 @@ function TransferActivityCard({
   if (!bids || !offers) return null;
   const activeBids =
     bids.bids?.filter((b) =>
-      ["Submitted", "SellerReviewing", "SellerAccepted", "SellerCountered", "PlayerReviewing"].includes(
-        b.state,
-      ),
+      [
+        "Submitted",
+        "SellerReviewing",
+        "SellerAccepted",
+        "SellerCountered",
+        "PlayerReviewing",
+      ].includes(b.state),
     ).length ?? 0;
   const activeOffers =
     offers.offers?.filter((o) =>
-      ["Submitted", "SellerReviewing", "SellerAccepted", "SellerCountered", "PlayerReviewing"].includes(
-        o.state,
-      ),
+      [
+        "Submitted",
+        "SellerReviewing",
+        "SellerAccepted",
+        "SellerCountered",
+        "PlayerReviewing",
+      ].includes(o.state),
     ).length ?? 0;
   return (
     <Card eyebrow="Transfers">

@@ -62,16 +62,35 @@ export interface RenderedMatchPerformance {
   redCards: number;
 }
 
+export type RenderedMatchEventKind =
+  | "Chance"
+  | "Save"
+  | "Goal"
+  | "Card"
+  | "Injury"
+  | "Substitution";
+
+export interface RenderedMatchEvent {
+  sequence: number;
+  minute: number;
+  kind: RenderedMatchEventKind;
+  clubId: number | null;
+  primaryPlayerName: string | null;
+  secondaryPlayerName: string | null;
+  description: string;
+}
+
 export interface RenderedMatch {
   id: number;
   matchday: number;
   state: MatchState;
   home: RenderedMatchClub;
   away: RenderedMatchClub;
-  /** 2–3 short paragraphs of prose stitched from the highest-tier
-   *  performers and the scoreline. Empty array when state is
-   *  Scheduled. */
+  /** At least four short paragraphs derived from the score, performers,
+   *  and persisted causal evidence. Empty when Scheduled. */
   narrative: string[];
+  /** Key moments projected from the persisted causal event ledger. */
+  events: RenderedMatchEvent[];
   performances: RenderedMatchPerformance[];
 }
 

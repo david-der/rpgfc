@@ -23,6 +23,7 @@ import {
 
 import {
   getTactics,
+  loadTacticalFamiliarity,
   setAssignment,
   upsertTactics,
   type SetAssignmentResult,
@@ -36,18 +37,16 @@ interface PlayerNameRow {
   archetype_id: string;
 }
 
-async function loadPlayerMap(
-  client: DbClient,
-  ids: number[],
-): Promise<Map<number, PlayerNameRow>> {
+async function loadPlayerMap(client: DbClient, ids: number[]): Promise<Map<number, PlayerNameRow>> {
   const out = new Map<number, PlayerNameRow>();
   if (ids.length === 0) return out;
   if (client.dialect === "sqlite") {
     const placeholders = ids.map(() => "?").join(",");
     const rows = client.sqlite
-      .prepare<number[], PlayerNameRow>(
-        `SELECT id, name, archetype_id FROM players WHERE id IN (${placeholders})`,
-      )
+      .prepare<
+        number[],
+        PlayerNameRow
+      >(`SELECT id, name, archetype_id FROM players WHERE id IN (${placeholders})`)
       .all(...ids);
     for (const row of rows) out.set(row.id, row);
     return out;
@@ -67,7 +66,7 @@ function buildAssignments(
   const slots = FORMATION_SLOTS[tactics.formation];
   return slots.map((slot) => {
     const playerId = tactics.assignments[slot] ?? null;
-    const player = playerId !== null ? players.get(playerId) ?? null : null;
+    const player = playerId !== null ? (players.get(playerId) ?? null) : null;
     const archetype = player ? ARCHETYPE_BY_ID[player.archetype_id] : undefined;
     return {
       slot,
@@ -86,6 +85,7 @@ function formatInstructions(instructions: TeamInstruction[]): string[] {
 function renderTactics(
   tactics: Tactics,
   players: Map<number, PlayerNameRow>,
+  familiarityLoad: number,
 ): RenderedTactics {
   return {
     id: tactics.id,
@@ -97,6 +97,7 @@ function renderTactics(
     playingStyleLabel: tactics.playingStyle,
     instructions: [...tactics.instructions],
     instructionLabels: formatInstructions(tactics.instructions),
+    familiarity: familiarityLoad < 30 ? "Learning" : familiarityLoad < 75 ? "Settling" : "Familiar",
     assignments: buildAssignments(tactics, players),
     updatedAt: tactics.updatedAt,
   };
@@ -115,8 +116,9 @@ export async function renderTacticsForClub(
   clubId: number,
 ): Promise<RenderedTactics> {
   const tactics = await getTactics(client, clubId);
+  const familiarity = await loadTacticalFamiliarity(client, tactics);
   const players = await loadPlayerMap(client, pinnedPlayerIds(tactics));
-  return renderTactics(tactics, players);
+  return renderTactics(tactics, players, familiarity);
 }
 
 export async function upsertTacticsRendered(
@@ -135,8 +137,9 @@ export async function upsertTacticsRendered(
     instructions: input.instructions,
   };
   const tactics = await upsertTactics(client, upsertInput);
+  const familiarity = await loadTacticalFamiliarity(client, tactics);
   const players = await loadPlayerMap(client, pinnedPlayerIds(tactics));
-  return renderTactics(tactics, players);
+  return renderTactics(tactics, players, familiarity);
 }
 
 export type SetAssignmentRenderedResult =
@@ -149,6 +152,7 @@ export async function setAssignmentRendered(
 ): Promise<SetAssignmentRenderedResult> {
   const result: SetAssignmentResult = await setAssignment(client, input);
   if (!result.ok) return { ok: false, reason: result.reason };
+  const familiarity = await loadTacticalFamiliarity(client, result.tactics);
   const players = await loadPlayerMap(client, pinnedPlayerIds(result.tactics));
-  return { ok: true, tactics: renderTactics(result.tactics, players) };
+  return { ok: true, tactics: renderTactics(result.tactics, players, familiarity) };
 }

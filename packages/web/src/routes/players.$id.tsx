@@ -46,8 +46,10 @@ import {
   fetchPlayerForm,
   fetchPlayerHistory,
   fetchPlayerReports,
+  fetchScouts,
   fetchWatchlist,
   removeFromWatchlist,
+  startScoutAssignment,
 } from "../lib/api";
 
 const PLAYER_TABS = [
@@ -82,6 +84,7 @@ function ComingSoon({ label }: { label: string }) {
 
 function PlayerProfile() {
   const { id } = Route.useParams();
+  const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: ["player", id],
     queryFn: () => fetchPlayer(id),
@@ -103,6 +106,21 @@ function PlayerProfile() {
   const navigate = useNavigate({ from: Route.fullPath });
   const activeTab: PlayerTab = search.tab ?? "overview";
   const watchlistQuery = useQuery({ queryKey: ["watchlist"], queryFn: fetchWatchlist });
+  const scoutsQuery = useQuery({ queryKey: ["scouts"], queryFn: fetchScouts });
+  const assignmentMutation = useMutation({
+    mutationFn: (scoutId: number) =>
+      startScoutAssignment(String(scoutId), {
+        kind: "player",
+        targetPlayerId: Number(id),
+      }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["scouts"] }),
+        queryClient.invalidateQueries({ queryKey: ["player-reports", id] }),
+        queryClient.invalidateQueries({ queryKey: ["player", id] }),
+      ]);
+    },
+  });
 
   if (query.isPending) {
     return (
@@ -206,13 +224,12 @@ function PlayerProfile() {
                   endpoint, which is scoped by server-side
                   MANAGED_CLUB_ID — so changing the env var now reroutes
                   who this form appears for. */}
-              {meQuery.data?.clubId !== undefined &&
-                player.club?.id === meQuery.data.clubId && (
-                  <ExtendContractForm
-                    playerId={player.id}
-                    currentRolePromise={contractQuery.data.contract.rolePromise}
-                  />
-                )}
+              {meQuery.data?.clubId !== undefined && player.club?.id === meQuery.data.clubId && (
+                <ExtendContractForm
+                  playerId={player.id}
+                  currentRolePromise={contractQuery.data.contract.rolePromise}
+                />
+              )}
             </>
           ) : contractQuery.isSuccess ? (
             <p className="text-sm italic text-parchment-500">
@@ -228,6 +245,41 @@ function PlayerProfile() {
       label: "Reports",
       content: (
         <section className="space-y-4">
+          {player.club?.id !== meQuery.data?.clubId && scoutsQuery.data?.items.length ? (
+            <div className="border border-parchment-300 bg-parchment-100 p-4">
+              <h2 className="text-xs font-medium uppercase tracking-wide text-parchment-500">
+                Player Focus
+              </h2>
+              <p className="mt-1 max-w-prose text-sm text-parchment-700">
+                Assign one scout to deepen the evidence on this player. Their current assignment
+                will end when the new one begins.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {scoutsQuery.data.items.map((scout) => (
+                  <button
+                    key={scout.id}
+                    type="button"
+                    disabled={assignmentMutation.isPending}
+                    onClick={() => assignmentMutation.mutate(scout.id)}
+                    className="border border-moss-600 bg-parchment-50 px-3 py-2 text-left font-sans text-xs text-moss-800 hover:bg-moss-50 disabled:opacity-50"
+                  >
+                    <span className="block font-semibold" data-testid="player-facing">
+                      {scout.name}
+                    </span>
+                    <span className="block text-parchment-500">{scout.region}</span>
+                  </button>
+                ))}
+              </div>
+              {assignmentMutation.isSuccess && (
+                <p className="mt-3 text-sm text-moss-700">
+                  Assignment set. The next matchweek will produce a report.
+                </p>
+              )}
+              {assignmentMutation.isError && (
+                <p className="mt-3 text-sm text-semantic-error">Could not assign that scout.</p>
+              )}
+            </div>
+          ) : null}
           {reportsQuery.isPending && <p className="text-parchment-600">Loading reports…</p>}
           {reportsQuery.isError && (
             <p className="text-semantic-error">Could not load scout reports.</p>
@@ -315,9 +367,7 @@ function PlayerProfile() {
         playerId={player.id}
         playerClubId={player.club?.id ?? null}
         myClubId={meQuery.data?.clubId}
-        watchedIds={
-          (watchlistQuery.data?.items ?? []).map((i) => i.player_id)
-        }
+        watchedIds={(watchlistQuery.data?.items ?? []).map((i) => i.player_id)}
       />
 
       <section className="mt-8">
@@ -394,9 +444,7 @@ function RivalActionRow({
             {addMutation.isPending ? "Adding…" : "Watch"}
           </button>
         )}
-        <span className="text-xs italic text-parchment-500">
-          Currently at a rival club.
-        </span>
+        <span className="text-xs italic text-parchment-500">Currently at a rival club.</span>
       </div>
       {err && <p className="mt-2 text-sm text-semantic-error">{err.message}</p>}
     </section>

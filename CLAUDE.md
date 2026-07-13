@@ -53,12 +53,13 @@ The **Rendering Boundary** (TDD §6) is the most load-bearing decision in the co
 | Domain | Pure business types and functions. No framework imports. `HiddenPlayer` lives here. | stdlib only |
 | Application | Use cases, commands, queries. Orchestrates domain + repositories. Returns `HiddenPlayer` internally. | Domain, repo interfaces |
 | Infrastructure | Drizzle schemas, repository impls, AWS SDK clients, sim service client. | Application, Domain, Drizzle |
-| **Rendering** | Prose generation, badge translation, certainty masking. **The only module allowed to read hidden fields.** | Domain (read-only), narrative templates |
+| **Rendering** | Prose generation, badge translation, certainty masking. **The only layer allowed to turn hidden state into public data.** | Domain (read-only), narrative templates |
+| **Simulation compiler** | Server-private projection of hidden state into `SimPlayer`. Never exported to routes or web. | Domain (read-only), sim types |
 | Interface | Hono routes, Zod schemas, auth middleware. Imports only `RenderedPlayer` types. | Application, Rendering |
 
 ### Monorepo packages
 - `@rpgfc/shared` — types, Zod schemas, constants. Imported by both web and server. `HiddenPlayer` lives here but is **not re-exported** from the public barrel.
-- `@rpgfc/server` — Hono backend, Drizzle schemas, services, rendering boundary, sim interface + stub.
+- `@rpgfc/server` — Hono backend, Drizzle schemas, services, rendering boundary, protected sim compiler, and causal engine.
 - `@rpgfc/web` — Vite + React SPA, components, pages. Imports only `RenderedPlayer` and friends via `hc<AppType>`.
 - `@rpgfc/infra` — AWS CDK stacks (NetworkStack, DatabaseStack, ServiceStack, PipelineStack).
 
@@ -70,21 +71,24 @@ rpgfc/
 ├── tsconfig.base.json            # strict, noImplicitAny, noUncheckedIndexedAccess
 ├── .eslintrc.cjs                 # hosts custom rpgfc rules
 ├── .prettierrc
-├── Makefile                      # thin wrapper over pnpm scripts
+├── justfile                      # primary task runner — run `just` for the recipe list
+├── Makefile                      # legacy thin wrapper; prefer `just`
 ├── docker/{Dockerfile,entrypoint.sh}
 ├── docker-compose.yml            # disposable local Postgres
 ├── .github/workflows/{ci.yml,deploy.yml}
 ├── docs/                         # PRD, TDD, Style Guide, stories
 ├── packages/
 │   ├── shared/src/{types,schemas,constants}
-│   ├── server/src/{index.ts,env.ts,db,domain,application,rendering,routes,sim,test}
+│   ├── server/src/{index.ts,dev-server.ts,env.ts,db,application,rendering,routes,sim,sim-harness,scripts,test}
 │   ├── web/src/{main.tsx,routes,components/{ui,features},hooks,lib,test}
 │   └── infra/{bin,lib}
 ├── packages/eslint-plugin-rpgfc/ # no-numbers-in-player-facing, no-hidden-in-routes
 └── tests/
     ├── doctrine/                 # Playwright no-numbers suite
     ├── fixtures/eslint/          # deliberate violations for rule tests
-    └── docker/                   # shell scripts that boot the image in CI
+    ├── docker/                   # shell scripts that boot the image in CI
+    ├── playtest/                 # ad-hoc tsx-driven Playwright tours (screenshots + text snapshots, not CI)
+    └── season-sim/               # markdown reports written by `pnpm season-sim`
 ```
 
 ---
@@ -189,12 +193,12 @@ export type BadgeCategory =
 ```
 
 ### Package-boundary enforcement
-- `HiddenPlayer` lives in `@rpgfc/shared` so the server's `rendering/` module can import it, but is **not re-exported** from the package barrel.
+- `HiddenPlayer` lives in `@rpgfc/shared` so the server's `rendering/` module and protected simulation compiler can import it, but is **not re-exported** from the package barrel.
 - ESLint `no-restricted-imports`: `@rpgfc/web` cannot import any path matching `*/hidden*` in `@rpgfc/shared`.
 - A stricter `tsconfig` for web compiles with hidden types marked `unknown`; any destructure of a hidden field is a compile error.
 
 ### The render function lives alone
-- `packages/server/src/rendering/player.ts` exposes exactly one function: `renderPlayer(hidden, ctx): RenderedPlayer`. It is **the only code in the repo allowed to read `hiddenAttrs`.**
+- `packages/server/src/rendering/player.ts` is the only public projection of hidden player state. The narrowly scoped compiler under `packages/server/src/sim/` may read hidden fields only to construct server-private `SimPlayer` inputs; neither hidden nor sim inputs may reach routes or web.
 - The custom ESLint rule **`no-hidden-in-routes`** forbids any file under `packages/server/src/routes/**` from importing `../application/**` or any path matching `*/hidden*`. Routes may only call into `../rendering/` public functions.
 - By the time data reaches a Hono handler, it is already `RenderedPlayer`. The route's only job: validate with Zod, call the service, return JSON.
 
@@ -240,6 +244,9 @@ The real match sim will be a separate Python HTTP service with its own TDD. v1 s
 - `packages/server/src/sim/interface.ts` — `SimEngine` TS interface (`simulateMatch`, `simulateTrainingWeek`, `estimateValueBand`). `ValueBand = "Minimal" | "Modest" | "Notable" | "Significant" | "Elite"` — **a band, not a number**.
 - `packages/server/src/sim/stub.ts` — seeded PRNG (`hash(runId, weekNumber, homeId, awayId)`), win-probability from badge counts, truncated-Poisson goals, narrow normal training updates. Tested and shipped as a first-class module.
 - `packages/server/src/sim/pythonClient.ts` — scaffold that throws on every call in v1. Flipping `SIM_ENGINE=python` is the only change needed later.
+
+### Season sim harness (distinct from the sim stub)
+`packages/server/src/sim-harness/` is a balance-tuning tool, not part of the served app: ten persona strategies (`personas.ts`, `strategies/*.json`) each manage a club through a full 18-match-week season, calling the same application-layer functions the HTTP routes use. `pnpm season-sim` (or `just sim`) runs it, writes `saves/post-season.db`, and emits an analytical markdown report to `tests/season-sim/reports/`. Browse the finished season with `pnpm dev:post-season` (`MANAGED_CLUB_ID=N` picks the club), or do both in one step with `just play club=N`.
 
 ---
 
@@ -354,9 +361,26 @@ docker compose up -d postgres
 # set DATABASE_URL=postgres://rpgfc:rpgfc@localhost:5432/rpgfc in .env.local
 ```
 
-**Make targets:** `dev`, `test`, `test-pg`, `doctrine`, `lint`, `db-reset`, `build`, `docker`. These are thin wrappers over pnpm scripts.
+**Task runner is `just`** (the Makefile is a legacy wrapper). Run `just` alone to list all recipes. The daily ones:
 
-**Env vars (`.env.local`, gitignored):** `DATABASE_URL`, `NODE_ENV`, `PORT=8787`, `LOG_LEVEL=debug`, `SIM_ENGINE=stub`, `AUTH_MODE=dev`. Cognito, S3, and Python sim vars are unset in local.
+| Recipe | What it does |
+|---|---|
+| `just dev` | Vite (:5173) + Hono (:8787), SQLite at `./saves/dev.db` |
+| `just sim` | Full season simulation → `saves/post-season.db` + markdown report |
+| `just play club=7` | Sim, then browse the finished season managing club 7 |
+| `just test` / `just test-pg` | Vitest workspace-wide / server tests against compose Postgres (boots it first) |
+| `just doctrine` | Playwright no-numbers gate (builds web + server first) |
+| `just ci` | Mirror the CI matrix locally — run before pushing anything non-trivial |
+| `just gate` | The four doctrine gates only (typecheck, lint, doctrine) |
+| `just lint-fixtures` | ESLint against the deliberate violations — MUST exit non-zero |
+| `just pg-up` / `pg-down` / `pg-nuke` | Disposable Postgres lifecycle |
+| `just db-reset` / `just db-generate` | Wipe the dev save / regenerate migrations for both dialects |
+
+**Single test:** `pnpm --filter @rpgfc/server exec vitest run src/test/<file>.test.ts` (same shape for `@rpgfc/web`; add `-t "test name"` to filter within a file).
+
+**Other entry points:** `pnpm season-report --db <save.db>` (or `just report db=…`) renders the standing post-run season report — final tables with tactics, leading scorers, league health, cross-season comparison — into `tests/playtest/results/`; `pnpm gen-art` regenerates the trading-card player art (`packages/server/src/scripts/generate-player-art.ts`) — GPT Image 2 by default (`OPENAI_API_KEY`), `--provider gemini` retained for comparison, `--hero match-art|ceremony-art|all` regenerates the 16:7 hero panels; `tests/playtest/*.ts` are ad-hoc Playwright tours run directly with `tsx` against a live dev server (`PLAYTEST_BASE`, default :5173).
+
+**Env vars (`.env.local`, gitignored):** `DATABASE_URL`, `NODE_ENV`, `PORT=8787`, `LOG_LEVEL=debug`, `SIM_ENGINE=stub`, `AUTH_MODE=dev`. `MANAGED_CLUB_ID` selects the managed club for `dev:post-season`. Cognito, S3, and Python sim vars are unset in local.
 
 ---
 
@@ -398,16 +422,19 @@ Load-bearing architectural rules:
 
 Stories live in `docs/stories/`. Each has acceptance criteria numbered `AC-NN` that must all pass before the story ships.
 
-- **Story 00 — Walking Skeleton (`RPGFC-00`):** stands up the entire stack and lands all four doctrine gates before any feature exists. No player model beyond empty type stubs. No badges. No auth beyond a dev middleware. AC-01 to AC-21. See `docs/stories/RPG_FC_Story_00_Walking_Skeleton.docx`.
+- **Story 00 — Walking Skeleton** (`RPG_FC_Story_00_Walking_Skeleton.docx`) — **shipped.** Stood up the entire stack and all four doctrine gates.
+- **Stories 01–08** (`STORY_01_Player_Identity.md` … `STORY_08_Transfer_Market_v2.md`) — markdown specs: player identity, navigation, scouting, transfers, tactics/squad, match engine, season/saves, transfer market v2.
+- **Stories 09–12** (`STORY_09_Ten_Team_Foundation.md` … `STORY_12_Season_Pressure.md`) — the "Play Readiness" phase: ten-team league contract, truthful knowledge boundary, causal match core, season pressure (availability/rotation/familiarity). Each carries an **audit table marking ACs Partial/Open** — read it before assuming an AC is done; the remaining gaps are the story's authoritative TODO list.
+- `RPG_FC_Fix_Spec_01_Player_Profile.docx` — fix spec for the player profile page.
 
-**The walking-skeleton discipline**: if you find yourself writing a Player model, seeding badges, or implementing scout logic inside Story 00, **stop** — those belong to Story 01+. Story 00 is done when adding one line of feature code would put it out of scope.
+Substantial work has shipped beyond the written specs (finance v2, AI bidding, season sim harness, player card modals, Best XI, match ratings, season archive) — check `git log` before assuming a feature doesn't exist yet. Before starting a story-numbered task, read its spec end-to-end; the ACs are the definition of done.
 
 ---
 
 ## 16. Working agreements for Claude Code
 
 1. **Always consult the three design docs before making non-trivial decisions.** PRD for product behavior, TDD for architecture, Style Guide for anything visual. The docs win if this file drifts.
-2. **Never weaken the rendering boundary.** If a task seems to require it, stop and surface the conflict to the user.
+2. **Never weaken the public rendering boundary.** Hidden state may become public only through rendering. The protected simulation compiler may consume it only for server-private `SimPlayer` inputs.
 3. **Follow red/green TDD ordering** for every AC-numbered test. Write the test first, run it, observe the failure, implement, run again, observe the pass. Paste the red output into the PR description.
 4. **Respect dual-dialect discipline.** Every schema change produces migrations for both dialects in the same PR. Run `make test-pg` locally before assuming a schema works in prod.
 5. **Don't introduce new dependencies without justification.** The stack is deliberately conventional. A new library needs a paragraph explaining why the existing stack can't do the job.

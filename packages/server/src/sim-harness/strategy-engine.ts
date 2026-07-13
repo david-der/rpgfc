@@ -156,17 +156,10 @@ function offeredRole(strategy: ClubStrategy, l: ListingSnapshot): PlayingTimeRol
  * Score a candidate so different clubs targeting the same player rotate
  * through the top picks rather than all converging on the single best.
  */
-function diversityScore(
-  strategy: ClubStrategy,
-  ctx: PersonaContext,
-  l: ListingSnapshot,
-): number {
+function diversityScore(strategy: ClubStrategy, ctx: PersonaContext, l: ListingSnapshot): number {
   // Stable per (club, listing) hash — keeps re-bid attempts on the same
   // player consistent, and spreads top picks across clubs.
-  const h =
-    (l.playerId * 2654435761) ^
-    (ctx.club.clubId * 40503) ^
-    (strategy.name.length * 7919);
+  const h = (l.playerId * 2654435761) ^ (ctx.club.clubId * 40503) ^ (strategy.name.length * 7919);
   return h >>> 0;
 }
 
@@ -277,7 +270,7 @@ function extensionActions(strategy: ClubStrategy, ctx: PersonaContext): Action[]
     const attempts = ctx.extensionRejections.get(p.playerId) ?? 0;
     if (attempts >= 2) continue;
     // Step wage up after a rejection.
-    const mult = strategy.extendWageMultiplier + attempts * 0.10;
+    const mult = strategy.extendWageMultiplier + attempts * 0.1;
     const wageCents = Math.round(Math.max(p.weeklyWageCents, 100_000) * mult);
     out.push({
       kind: "extend",
@@ -290,10 +283,7 @@ function extensionActions(strategy: ClubStrategy, ctx: PersonaContext): Action[]
   return out;
 }
 
-export function decideForStrategy(
-  strategyIn: ClubStrategy,
-  ctx: PersonaContext,
-): Action[] {
+export function decideForStrategy(strategyIn: ClubStrategy, ctx: PersonaContext): Action[] {
   const actions: Action[] = [];
 
   // Emergency overlay: if the club is below the roster floor, patch

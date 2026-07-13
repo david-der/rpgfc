@@ -37,10 +37,7 @@ export function SlotRow({
   onChange,
 }: SlotRowProps) {
   return (
-    <div
-      data-slot={slot}
-      className="flex items-center gap-4 border-b border-parchment-200 py-3"
-    >
+    <div data-slot={slot} className="flex items-center gap-4 border-b border-parchment-200 py-3">
       <div className="w-14 flex-none font-mono text-xs font-medium uppercase tracking-wide text-parchment-500">
         {slotLabel}
       </div>
@@ -66,10 +63,7 @@ export function SlotRow({
       <div className="w-40 flex-none text-right">
         {pinnedPlayerName ? (
           <div>
-            <span
-              data-testid="player-facing"
-              className="font-serif text-sm text-parchment-900"
-            >
+            <span data-testid="player-facing" className="font-serif text-sm text-parchment-900">
               {pinnedPlayerName}
             </span>
             {pinnedPositionLabel && (

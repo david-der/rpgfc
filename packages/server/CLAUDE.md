@@ -14,10 +14,12 @@ routes/  →  rendering/  →  application/  →  domain/ + infrastructure/
   ESLint rule refuses any import under this path from `../application/**`
   or any path matching `*/hidden*` (including `@rpgfc/shared/types/hidden`).
   Routes may only import from `../rendering/` public exports and Zod schemas.
-- **`rendering/**`** is the ONLY subtree allowed to read `HiddenPlayer.hiddenAttrs`.
-  Import via the deliberate side-door: `@rpgfc/shared/types/hidden`. Produce
-  `RenderedPlayer` values (and the other `Rendered*` shapes once Story 01+
-  adds them).
+- **`rendering/**`** is the only subtree allowed to turn hidden state into
+  public data. Import through `@rpgfc/shared/types/hidden` and produce only
+  `Rendered*` values.
+- **`sim/compile-player.ts`** is the one server-private exception allowed to
+  read hidden player state. It may produce only `SimPlayer` inputs; neither
+  hidden values nor simulation inputs may be exported through routes or web.
 - **`application/**`** returns `HiddenPlayer` internally. It is invisible to
   routes. If you catch yourself wanting to call an application service from
   a route, you are re-litigating the rendering boundary — stop and ask.

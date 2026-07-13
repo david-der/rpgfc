@@ -29,13 +29,7 @@ import {
 
 type Face = "front" | "back";
 
-export function PlayerModal({
-  playerId,
-  onClose,
-}: {
-  playerId: number;
-  onClose: () => void;
-}) {
+export function PlayerModal({ playerId, onClose }: { playerId: number; onClose: () => void }) {
   const [face, setFace] = useState<Face>("front");
   const id = String(playerId);
 
@@ -146,8 +140,9 @@ function signatureBeat(recent: RecentMatch[]): string {
   if (recent.length === 0) return "No recent matches.";
   const goals = recent.reduce((s, m) => s + m.goals, 0);
   const assists = recent.reduce((s, m) => s + m.assists, 0);
-  const totalRating = recent.reduce((s, m) => s + m.ratingX10, 0);
-  const avgRating = totalRating / recent.length;
+  const strongPerformances = recent.filter(
+    (match) => match.tier === "Excellent" || match.tier === "Good",
+  ).length;
   // Unbeaten streak: scan newest-first until a loss.
   let unbeaten = 0;
   for (const m of recent) {
@@ -163,8 +158,8 @@ function signatureBeat(recent: RecentMatch[]): string {
   if (unbeaten >= 3) {
     return `Unbeaten in his last ${unbeaten} starts.`;
   }
-  if (avgRating >= 72) {
-    return `Averaging ${(avgRating / 10).toFixed(1)} across his last ${recent.length}.`;
+  if (strongPerformances >= 3) {
+    return "Consistently among the stronger performers lately.";
   }
   return "A quiet run of form.";
 }
@@ -228,14 +223,8 @@ function FrontFace({
         <div className="grid grid-cols-2 gap-3 border-t border-parchment-300 pt-4 text-xs sm:grid-cols-4">
           <Stat label="Age" value={String(player.age)} allowlist="age" />
           <Stat label="Foot" value={player.preferredFoot} />
-          <Stat
-            label="Career"
-            value={<TierPill tier={player.experience} />}
-          />
-          <Stat
-            label="Wage"
-            value={contract?.wageTier ?? "—"}
-          />
+          <Stat label="Career" value={<TierPill tier={player.experience} />} />
+          <Stat label="Wage" value={contract?.wageTier ?? "—"} />
         </div>
         {seasonsLeft !== null && (
           <div className="text-xs uppercase tracking-wide text-parchment-500">
@@ -253,9 +242,7 @@ function FrontFace({
           </div>
         )}
         {contract === null && (
-          <div className="text-xs italic text-parchment-500">
-            Free agent — no contract on file.
-          </div>
+          <div className="text-xs italic text-parchment-500">Free agent — no contract on file.</div>
         )}
 
         {player.promiseMood && player.promiseMoodLabel && (
@@ -303,10 +290,10 @@ function FrontFace({
                     {m.homeAway === "home" ? "vs" : "@"} {abbreviate(m.opponentClubName)}
                   </span>
                   <span
-                    data-testid={`modal-last5-rating-${i}-allowlist-number`}
-                    className={`mt-0.5 inline-flex h-7 min-w-[2.25rem] items-center justify-center border px-1.5 font-mono text-xs font-semibold tabular-nums ${resultToneBg(m.result)}`}
+                    data-testid="player-facing"
+                    className={`mt-0.5 inline-flex h-7 min-w-[4.5rem] items-center justify-center border px-1.5 font-sans text-[10px] font-semibold uppercase tracking-wide ${resultToneBg(m.result)}`}
                   >
-                    {(m.ratingX10 / 10).toFixed(1)}
+                    {m.tier}
                   </span>
                 </div>
               ))}
@@ -344,19 +331,13 @@ function abbreviate(name: string): string {
   return name.slice(0, 3).toUpperCase();
 }
 
-function RoleFit({
-  player,
-}: {
-  player: NonNullable<Awaited<ReturnType<typeof fetchPlayer>>>;
-}) {
+function RoleFit({ player }: { player: NonNullable<Awaited<ReturnType<typeof fetchPlayer>>> }) {
   // Map rolePromise (a playing-time tier) to the SquadRole we'd expect.
   // A mismatch surfaces as "Playing out of role".
   const promise = player.rolePromise;
   const role = player.squadRole;
   if (!promise || !role) {
-    return (
-      <p className="text-xs italic text-parchment-500">Role not yet set.</p>
-    );
+    return <p className="text-xs italic text-parchment-500">Role not yet set.</p>;
   }
   const expected: Record<string, string> = {
     "Star Player": "Starter",
@@ -369,8 +350,7 @@ function RoleFit({
   if (want && want !== role) {
     return (
       <p className="text-xs italic text-clay-700">
-        Playing out of role:{" "}
-        <span className="font-semibold not-italic">{promise}</span> →{" "}
+        Playing out of role: <span className="font-semibold not-italic">{promise}</span> →{" "}
         <span className="font-semibold not-italic">{role}</span>
       </p>
     );
@@ -392,9 +372,7 @@ function Stat({
       <span className="text-[10px] uppercase tracking-wide text-parchment-500">{label}</span>
       <span
         className="mt-0.5 font-mono text-sm tabular-nums text-parchment-900"
-        {...(allowlist
-          ? { "data-testid": `modal-${allowlist}-allowlist-number` }
-          : {})}
+        {...(allowlist ? { "data-testid": `modal-${allowlist}-allowlist-number` } : {})}
       >
         {value}
       </span>
@@ -406,13 +384,7 @@ function Stat({
 
 type HistorySeason = Awaited<ReturnType<typeof fetchPlayerHistory>>["seasons"][number];
 
-function BackFace({
-  history,
-  loading,
-}: {
-  history: HistorySeason[];
-  loading: boolean;
-}) {
+function BackFace({ history, loading }: { history: HistorySeason[]; loading: boolean }) {
   if (loading) {
     return <div className="p-10 text-center text-parchment-500">Loading history…</div>;
   }
@@ -443,11 +415,7 @@ function BackFace({
           <StatBlock label="Goals" value={totalGoals} allowlist="modal-total-goals" accent />
           <StatBlock label="Assists" value={totalAssists} allowlist="modal-total-assists" />
           <StatBlock label="Seasons" value={history.length} allowlist="modal-total-seasons" />
-          <StatBlock
-            label="Goals / season"
-            value={avgGoals}
-            allowlist="modal-avg-goals"
-          />
+          <StatBlock label="Goals / season" value={avgGoals} allowlist="modal-avg-goals" />
         </div>
         <div className="border-t border-parchment-300 bg-parchment-50 px-4 py-2 text-xs text-parchment-500">
           Total minutes:{" "}
@@ -554,9 +522,7 @@ function StatBlock({
       >
         {value}
       </span>
-      <span className="mt-1 text-[10px] uppercase tracking-wider text-parchment-500">
-        {label}
-      </span>
+      <span className="mt-1 text-[10px] uppercase tracking-wider text-parchment-500">{label}</span>
     </div>
   );
 }

@@ -10,22 +10,12 @@ import type { DbClient } from "../../db/client.js";
 import { computeLeagueTable } from "../../rendering/league-table.js";
 import { generatePlayer } from "../generation/generate-player.js";
 import { mulberry32 } from "../generation/rng.js";
-import {
-  enforceMinimumRosterPostgres,
-  enforceMinimumRosterSqlite,
-} from "./enforce-roster.js";
+import { enforceMinimumRosterPostgres, enforceMinimumRosterSqlite } from "./enforce-roster.js";
 import { generateFullSeason } from "./schedule.js";
+import { fixtureSeed } from "./seed-value.js";
 
 const YOUTH_INTAKE_AGE = 17;
 const YOUTH_INTAKE_PER_CLUB = 3;
-
-function hashSeed(matchday: number, homeId: number, awayId: number): number {
-  let h = 31;
-  h = (h * 73856093) ^ matchday;
-  h = (h * 19349663) ^ homeId;
-  h = (h * 83492791) ^ awayId;
-  return h >>> 0;
-}
 
 export async function endSeason(
   client: DbClient,
@@ -78,13 +68,22 @@ export async function endSeason(
       .all()
       .map((r) => r.id);
   } else {
-    const res = await client.pool.query<{ id: number }>(
-      `SELECT id FROM clubs ORDER BY id`,
-    );
+    const res = await client.pool.query<{ id: number }>(`SELECT id FROM clubs ORDER BY id`);
     clubIds = res.rows.map((r) => r.id);
   }
 
   const schedule = generateFullSeason(clubIds);
+  let worldSeed = 42;
+  if (client.dialect === "sqlite") {
+    worldSeed =
+      client.sqlite.prepare<[], { seed: number }>(`SELECT seed FROM runs ORDER BY id LIMIT 1`).get()
+        ?.seed ?? 42;
+  } else {
+    const seedResult = await client.pool.query<{ seed: number }>(
+      `SELECT seed FROM runs ORDER BY id LIMIT 1`,
+    );
+    worldSeed = seedResult.rows[0]?.seed ?? 42;
+  }
 
   const RETIREMENT_AGE = 38;
 
@@ -103,9 +102,10 @@ export async function endSeason(
       // Retire anyone past the retirement cutoff: they vacate their
       // club, their contract ends, and they leave the squad + market.
       const retired = client.sqlite
-        .prepare<[number], { id: number }>(
-          `SELECT id FROM players WHERE age >= ? AND club_id IS NOT NULL`,
-        )
+        .prepare<
+          [number],
+          { id: number }
+        >(`SELECT id FROM players WHERE age >= ? AND club_id IS NOT NULL`)
         .all(RETIREMENT_AGE);
       for (const { id } of retired) {
         client.sqlite.prepare(`DELETE FROM contracts WHERE player_id = ?`).run(id);
@@ -129,21 +129,13 @@ export async function endSeason(
         >(`SELECT player_id FROM contracts WHERE seasons_remaining <= 0`)
         .all();
       for (const { player_id } of expired) {
-        client.sqlite
-          .prepare(`UPDATE players SET club_id = NULL WHERE id = ?`)
-          .run(player_id);
-        client.sqlite
-          .prepare(`DELETE FROM squad_entries WHERE player_id = ?`)
-          .run(player_id);
+        client.sqlite.prepare(`UPDATE players SET club_id = NULL WHERE id = ?`).run(player_id);
+        client.sqlite.prepare(`DELETE FROM squad_entries WHERE player_id = ?`).run(player_id);
         // A free agent isn't on anyone's market — drop any stale listing
         // row so the Transfers tab doesn't expose an unbuyable player.
-        client.sqlite
-          .prepare(`DELETE FROM listing WHERE player_id = ?`)
-          .run(player_id);
+        client.sqlite.prepare(`DELETE FROM listing WHERE player_id = ?`).run(player_id);
       }
-      client.sqlite
-        .prepare(`DELETE FROM contracts WHERE seasons_remaining <= 0`)
-        .run();
+      client.sqlite.prepare(`DELETE FROM contracts WHERE seasons_remaining <= 0`).run();
 
       // Youth intake: every club gets a fresh crop of 17-year-olds on
       // modest starter contracts. Keeps the pipeline full and the
@@ -181,9 +173,10 @@ export async function endSeason(
          VALUES (?, ?, ?, ?, ?)`,
       );
       const allClubs = client.sqlite
-        .prepare<[], { id: number; nationality: string }>(
-          `SELECT id, nationality FROM clubs ORDER BY id`,
-        )
+        .prepare<
+          [],
+          { id: number; nationality: string }
+        >(`SELECT id, nationality FROM clubs ORDER BY id`)
         .all();
       for (const club of allClubs) {
         for (let i = 0; i < YOUTH_INTAKE_PER_CLUB; i++) {
@@ -195,22 +188,44 @@ export async function endSeason(
             overrideAge: YOUTH_INTAKE_AGE,
           });
           const info = insertYouth.run(
-            runId, club.id, np.name, np.dob, np.age, np.nationality,
-            np.preferredFoot, np.archetypeId,
-            JSON.stringify(np.hiddenAttrs), JSON.stringify(np.mentalTraits),
-            np.experienceYears, JSON.stringify(np.narrativeSeed),
-            JSON.stringify(np.preferredPositions), now,
+            runId,
+            club.id,
+            np.name,
+            np.dob,
+            np.age,
+            np.nationality,
+            np.preferredFoot,
+            np.archetypeId,
+            JSON.stringify(np.hiddenAttrs),
+            JSON.stringify(np.mentalTraits),
+            np.experienceYears,
+            JSON.stringify(np.narrativeSeed),
+            JSON.stringify(np.preferredPositions),
+            now,
           );
           const pid = Number(info.lastInsertRowid);
           for (const key of np.badgeKeys) {
             insertBadge.run(pid, key, null, now, "generation");
           }
           // Modest starter: $5K/wk, 3-year deal, Rotation.
-          insertContract.run(pid, club.id, 500_000, 0, 3, "Rotation",
-            JSON.stringify([500_000, 550_000, 600_000]), now);
+          insertContract.run(
+            pid,
+            club.id,
+            500_000,
+            0,
+            3,
+            "Rotation",
+            JSON.stringify([500_000, 550_000, 600_000]),
+            now,
+          );
           insertSquad.run(club.id, pid, "Rotation", now);
-          insertPreferences.run(pid, 300_000, "Rotation",
-            JSON.stringify([np.nationality]), JSON.stringify([]));
+          insertPreferences.run(
+            pid,
+            300_000,
+            "Rotation",
+            JSON.stringify([np.nationality]),
+            JSON.stringify([]),
+          );
         }
       }
 
@@ -224,7 +239,13 @@ export async function endSeason(
       // Generate new season's fixtures.
       for (const md of schedule) {
         for (const fx of md.fixtures) {
-          const seed = hashSeed(md.matchday, fx.homeClubId, fx.awayClubId);
+          const seed = fixtureSeed(
+            worldSeed,
+            nextSeason,
+            md.matchday,
+            fx.homeClubId,
+            fx.awayClubId,
+          );
           client.sqlite
             .prepare(
               `INSERT INTO matches
@@ -274,7 +295,13 @@ export async function endSeason(
 
       for (const md of schedule) {
         for (const fx of md.fixtures) {
-          const seed = hashSeed(md.matchday, fx.homeClubId, fx.awayClubId);
+          const seed = fixtureSeed(
+            worldSeed,
+            nextSeason,
+            md.matchday,
+            fx.homeClubId,
+            fx.awayClubId,
+          );
           await conn.query(
             `INSERT INTO matches
                (matchday, home_club_id, away_club_id, state, seed, season)

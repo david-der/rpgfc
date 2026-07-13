@@ -8,7 +8,14 @@
 // Routes never import from this directory directly. The rendering layer's
 // match-response module is the only bridge between routes and the engine.
 
-import type { FormTier } from "@rpgfc/shared";
+import type {
+  Formation,
+  FormTier,
+  MentalTraits,
+  NaturalGifts,
+  PlayingStyle,
+  TeamInstruction,
+} from "@rpgfc/shared";
 
 export type PositionFamily = "gk" | "defender" | "midfielder" | "forward";
 
@@ -27,6 +34,12 @@ export interface SimPlayer {
   /** Archetype's primaryRole (e.g. "Goalkeeper", "Center-Back",
    *  "Striker"). Drives the position-aware match rating formula. */
   primaryRole: string;
+  /** Private simulator inputs. These never cross the rendering boundary. */
+  gifts?: NaturalGifts;
+  traits?: MentalTraits;
+  badgeKeys?: string[];
+  fatigue?: number;
+  slot?: string;
 }
 
 export interface SimSide {
@@ -35,6 +48,20 @@ export interface SimSide {
    *  slots before reaching the engine, so this array is always
    *  exactly 11. */
   starters: SimPlayer[];
+  bench?: SimPlayer[];
+  formation?: Formation;
+  playingStyle?: PlayingStyle;
+  instructions?: TeamInstruction[];
+  /** Private training-ground familiarity, 0..100. Public surfaces receive
+   *  only the qualitative tier. */
+  familiarity?: number;
+}
+
+export type SimPressureContext = "Normal" | "Contested" | "RunIn";
+
+export interface SimMatchContext {
+  season: number;
+  pressure: SimPressureContext;
 }
 
 export interface SimMatchInput {
@@ -42,8 +69,42 @@ export interface SimMatchInput {
   matchday: number;
   /** Per-match seed; the stub builds its mulberry32 from it. */
   seed: number;
+  context?: SimMatchContext;
   home: SimSide;
   away: SimSide;
+}
+
+export type SimEventKind =
+  | "Turnover"
+  | "Chance"
+  | "Shot"
+  | "Save"
+  | "Goal"
+  | "Foul"
+  | "Card"
+  | "Injury"
+  | "Substitution";
+
+export interface SimEvent {
+  sequence: number;
+  minute: number;
+  kind: SimEventKind;
+  phase: "build_up" | "transition" | "final_third" | "stoppage";
+  clubId: number | null;
+  primaryPlayerId: number | null;
+  secondaryPlayerId: number | null;
+  outcome: string | null;
+  /** Stable semantic cause codes. Raw gifts and modifiers are never persisted. */
+  evidence: string[];
+}
+
+export interface SimPlayerUpdate {
+  playerId: number;
+  clubId: number;
+  fatigueDelta: number;
+  injuryMatches: number;
+  yellowCards: number;
+  redCard: boolean;
 }
 
 export interface SimPerformance {
@@ -82,6 +143,10 @@ export interface SimPerformance {
   /** Position-aware "media consensus" rating, INTEGER × 10
    *  (60 = 6.0, 100 = 10.0). Clamped to [40, 100]. */
   ratingX10: number;
+  started?: boolean;
+  enteredMinute?: number | null;
+  leftMinute?: number | null;
+  positionSlot?: string | null;
 }
 
 export interface SimMatchResult {
@@ -89,6 +154,8 @@ export interface SimMatchResult {
   homeGoals: number;
   awayGoals: number;
   performances: SimPerformance[];
+  events: SimEvent[];
+  playerUpdates: SimPlayerUpdate[];
 }
 
 export interface SimEngine {

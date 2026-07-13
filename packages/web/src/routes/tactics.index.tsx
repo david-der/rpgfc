@@ -9,12 +9,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
-import type {
-  Formation,
-  PitchSlot,
-  PlayingStyle,
-  TeamInstruction,
-} from "@rpgfc/shared";
+import type { Formation, PitchSlot, PlayingStyle, TeamInstruction } from "@rpgfc/shared";
 import {
   FORMATIONS,
   FORMATION_SLOTS,
@@ -26,12 +21,7 @@ import {
 import { InstructionToggleList } from "../components/ui/InstructionToggleList";
 import { PitchDiagram, type PitchSlotData } from "../components/ui/PitchDiagram";
 import { SectionHeader } from "../components/ui/SectionHeader";
-import {
-  fetchSquad,
-  fetchTactics,
-  setTacticsAssignment,
-  updateTactics,
-} from "../lib/api";
+import { fetchSquad, fetchTactics, setTacticsAssignment, updateTactics } from "../lib/api";
 
 export const Route = createFileRoute("/tactics/")({
   component: TacticsEditor,
@@ -100,9 +90,7 @@ function TacticsEditor() {
   // the diagram updates immediately when the user changes formation in
   // the dropdown — before saving. Look up any existing assignment by
   // slot key from the server data.
-  const assignmentMap = new Map(
-    tactics.assignments.map((a) => [a.slot, a]),
-  );
+  const assignmentMap = new Map(tactics.assignments.map((a) => [a.slot, a]));
   const pitchSlots: PitchSlotData[] = FORMATION_SLOTS[formation].map((slot) => {
     const existing = assignmentMap.get(slot);
     return {
@@ -122,15 +110,23 @@ function TacticsEditor() {
     <div className="mx-auto max-w-6xl px-6 py-10">
       <SectionHeader eyebrow={formation} title="Tactics" />
 
+      <div className="mt-3 flex items-center gap-2 text-xs uppercase tracking-wide text-parchment-500">
+        Familiarity
+        <span
+          data-testid="player-facing"
+          className="border border-parchment-400 bg-parchment-100 px-2 py-0.5 font-medium text-parchment-800"
+        >
+          {tactics.familiarity}
+        </span>
+      </div>
+
       <div className="mt-8 grid gap-8 md:grid-cols-[1fr_280px]">
         {/* Left: pitch diagram */}
         <section>
           <PitchDiagram
             formation={formation}
             assignments={pitchSlots}
-            onSlotClick={(slot) =>
-              setActiveSlot(activeSlot === slot ? null : slot)
-            }
+            onSlotClick={(slot) => setActiveSlot(activeSlot === slot ? null : slot)}
           />
 
           {activeSlot && (
@@ -141,9 +137,7 @@ function TacticsEditor() {
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() =>
-                    assignMutation.mutate({ slot: activeSlot, playerId: null })
-                  }
+                  onClick={() => assignMutation.mutate({ slot: activeSlot, playerId: null })}
                   className="border border-parchment-400 bg-parchment-50 px-3 py-1 font-sans text-xs text-parchment-700 hover:border-parchment-700"
                 >
                   Clear
@@ -189,7 +183,9 @@ function TacticsEditor() {
               onChange={(e) => setFormation(e.target.value as Formation)}
             >
               {FORMATIONS.map((f) => (
-                <option key={f} value={f}>{f}</option>
+                <option key={f} value={f}>
+                  {f}
+                </option>
               ))}
             </select>
           </label>
@@ -203,7 +199,9 @@ function TacticsEditor() {
               onChange={(e) => setPlayingStyle(e.target.value as PlayingStyle)}
             >
               {PLAYING_STYLES.map((s) => (
-                <option key={s} value={s}>{s}</option>
+                <option key={s} value={s}>
+                  {s}
+                </option>
               ))}
             </select>
           </label>

@@ -100,6 +100,37 @@ async function loadBadgeKeys(client: DbClient, playerId: number): Promise<string
   return res.rows.map((r) => r.badge_key);
 }
 
+async function loadBadgeKeysForPlayers(
+  client: DbClient,
+  playerIds: number[],
+): Promise<Map<number, string[]>> {
+  const byPlayer = new Map<number, string[]>();
+  for (const id of playerIds) byPlayer.set(id, []);
+  if (playerIds.length === 0) return byPlayer;
+
+  if (client.dialect === "sqlite") {
+    const placeholders = playerIds.map(() => "?").join(",");
+    const rows = client.sqlite
+      .prepare<number[], { player_id: number; badge_key: string }>(
+        `SELECT player_id, badge_key FROM player_badges
+         WHERE player_id IN (${placeholders})
+         ORDER BY player_id, id`,
+      )
+      .all(...playerIds);
+    for (const row of rows) byPlayer.get(row.player_id)?.push(row.badge_key);
+    return byPlayer;
+  }
+
+  const result = await client.pool.query<{ player_id: number; badge_key: string }>(
+    `SELECT player_id, badge_key FROM player_badges
+     WHERE player_id = ANY($1::int[])
+     ORDER BY player_id, id`,
+    [playerIds],
+  );
+  for (const row of result.rows) byPlayer.get(row.player_id)?.push(row.badge_key);
+  return byPlayer;
+}
+
 // ── public API ────────────────────────────────────────────────────────────
 
 export async function getPlayerById(client: DbClient, id: number): Promise<HiddenPlayer | null> {
@@ -149,95 +180,101 @@ export interface ListResult {
   nextCursor: number | null;
 }
 
-// Set of listed player ids (cached per call, populated lazily).
-async function loadListedPlayerIds(client: DbClient): Promise<Set<number>> {
-  if (client.dialect === "sqlite") {
-    const rows = client.sqlite
-      .prepare<[], { player_id: number }>(`SELECT player_id FROM listing`)
-      .all();
-    return new Set(rows.map((r) => r.player_id));
-  }
-  const res = await client.pool.query<{ player_id: number }>(
-    `SELECT player_id FROM listing`,
-  );
-  return new Set(res.rows.map((r) => r.player_id));
+function archetypeIdsForPosition(position: string): string[] {
+  const target = position.toUpperCase();
+  return Object.entries(ARCHETYPE_BY_ID)
+    .filter(([, archetype]) => archetype.positionLabel.toUpperCase() === target)
+    .map(([id]) => id);
 }
 
 export async function listPlayers(client: DbClient, query: ListQuery): Promise<ListResult> {
-  const limit = Math.min(Math.max(query.limit, 1), 100);
-  const listedIds = query.onMarket ? await loadListedPlayerIds(client) : null;
+  const limit = Math.min(Math.max(query.limit, 1), 250);
+  const positionArchetypes = query.position ? archetypeIdsForPosition(query.position) : [];
 
   if (client.dialect === "sqlite") {
+    const conditions = ["p.id > ?"];
+    const params: Array<string | number> = [query.cursor ?? 0];
+    if (query.clubId !== undefined) {
+      conditions.push("p.club_id = ?");
+      params.push(query.clubId);
+    }
+    if (query.search) {
+      conditions.push("LOWER(p.name) LIKE ?");
+      params.push(`%${query.search.toLowerCase()}%`);
+    }
+    if (query.onMarket) {
+      conditions.push("EXISTS (SELECT 1 FROM listing l WHERE l.player_id = p.id)");
+    }
+    if (query.position) {
+      if (positionArchetypes.length === 0) return { items: [], nextCursor: null };
+      conditions.push(`p.archetype_id IN (${positionArchetypes.map(() => "?").join(",")})`);
+      params.push(...positionArchetypes);
+    }
+    params.push(limit + 1);
+
     const rows = client.sqlite
-      .prepare<[number, number], PlayerRow>(
-        `SELECT id, run_id, club_id, name, dob, age, nationality, preferred_foot,
-                archetype_id, hidden_attrs_json, mental_traits_json,
-                experience_years, narrative_seed_json, preferred_positions_json
-         FROM players
-         WHERE id > ?
-         ORDER BY id ASC
+      .prepare(
+        `SELECT p.id, p.run_id, p.club_id, p.name, p.dob, p.age, p.nationality,
+                p.preferred_foot, p.archetype_id, p.hidden_attrs_json,
+                p.mental_traits_json, p.experience_years, p.narrative_seed_json,
+                p.preferred_positions_json
+         FROM players p
+         WHERE ${conditions.join(" AND ")}
+         ORDER BY p.id ASC
          LIMIT ?`,
       )
-      .all(query.cursor ?? 0, limit);
+      .all(...params) as PlayerRow[];
 
-    let filtered = rows;
-    if (query.clubId !== undefined) filtered = filtered.filter((r) => r.club_id === query.clubId);
-    if (query.search) {
-      const q = query.search.toLowerCase();
-      filtered = filtered.filter((r) => r.name.toLowerCase().includes(q));
-    }
-    if (listedIds) filtered = filtered.filter((r) => listedIds.has(r.id));
-    if (query.position) {
-      const pos = query.position.toUpperCase();
-      filtered = filtered.filter((r) => {
-        const arch = ARCHETYPE_BY_ID[r.archetype_id];
-        return arch?.positionLabel?.toUpperCase() === pos;
-      });
-    }
-
-    const items = filtered.map(rowToHidden);
-    for (const item of items) {
-      item.badgeKeys = await loadBadgeKeys(client, item.id);
-    }
+    const hasMore = rows.length > limit;
+    const pageRows = rows.slice(0, limit);
+    const items = pageRows.map(rowToHidden);
+    const badgeMap = await loadBadgeKeysForPlayers(
+      client,
+      items.map((item) => item.id),
+    );
+    for (const item of items) item.badgeKeys = badgeMap.get(item.id) ?? [];
     const last = items[items.length - 1];
-    const nextCursor = items.length === limit && last ? last.id : null;
+    const nextCursor = hasMore && last ? last.id : null;
     return { items, nextCursor };
   }
 
-  const params: unknown[] = [query.cursor ?? 0, limit];
+  const params: unknown[] = [query.cursor ?? 0];
+  const conditions = ["p.id > $1"];
   let sql = `
-    SELECT id, run_id, club_id, name, dob, age, nationality, preferred_foot,
-           archetype_id, hidden_attrs_json, mental_traits_json,
-           experience_years, narrative_seed_json, preferred_positions_json
-    FROM players
-    WHERE id > $1`;
+    SELECT p.id, p.run_id, p.club_id, p.name, p.dob, p.age, p.nationality,
+           p.preferred_foot, p.archetype_id, p.hidden_attrs_json,
+           p.mental_traits_json, p.experience_years, p.narrative_seed_json,
+           p.preferred_positions_json
+    FROM players p`;
   if (query.clubId !== undefined) {
-    sql += ` AND club_id = $${params.length + 1}`;
     params.push(query.clubId);
+    conditions.push(`p.club_id = $${params.length}`);
   }
-  sql += ` ORDER BY id ASC LIMIT $2`;
+  if (query.search) {
+    params.push(`%${query.search.toLowerCase()}%`);
+    conditions.push(`LOWER(p.name) LIKE $${params.length}`);
+  }
+  if (query.onMarket) {
+    conditions.push(`EXISTS (SELECT 1 FROM listing l WHERE l.player_id = p.id)`);
+  }
+  if (query.position) {
+    if (positionArchetypes.length === 0) return { items: [], nextCursor: null };
+    params.push(positionArchetypes);
+    conditions.push(`p.archetype_id = ANY($${params.length}::text[])`);
+  }
+  params.push(limit + 1);
+  sql += ` WHERE ${conditions.join(" AND ")} ORDER BY p.id ASC LIMIT $${params.length}`;
   const res = await client.pool.query<PlayerRow>(sql, params);
 
-  let rows = res.rows;
-  if (query.search) {
-    const q = query.search.toLowerCase();
-    rows = rows.filter((r) => r.name.toLowerCase().includes(q));
-  }
-  if (listedIds) rows = rows.filter((r) => listedIds.has(r.id));
-  if (query.position) {
-    const pos = query.position.toUpperCase();
-    rows = rows.filter((r) => {
-      const arch = ARCHETYPE_BY_ID[r.archetype_id];
-      return arch?.positionLabel?.toUpperCase() === pos;
-    });
-  }
-
-  const items = rows.map(rowToHidden);
-  for (const item of items) {
-    item.badgeKeys = await loadBadgeKeys(client, item.id);
-  }
+  const hasMore = res.rows.length > limit;
+  const items = res.rows.slice(0, limit).map(rowToHidden);
+  const badgeMap = await loadBadgeKeysForPlayers(
+    client,
+    items.map((item) => item.id),
+  );
+  for (const item of items) item.badgeKeys = badgeMap.get(item.id) ?? [];
   const last = items[items.length - 1];
-  const nextCursor = items.length === limit && last ? last.id : null;
+  const nextCursor = hasMore && last ? last.id : null;
   return { items, nextCursor };
 }
 

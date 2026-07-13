@@ -28,7 +28,9 @@ function readStrategySnapshot(): Record<string, unknown> {
   const here = dirname(fileURLToPath(import.meta.url));
   const dir = resolve(here, "strategies");
   const out: Record<string, unknown> = {};
-  for (const f of readdirSync(dir).filter((x) => x.endsWith(".json")).sort()) {
+  for (const f of readdirSync(dir)
+    .filter((x) => x.endsWith(".json"))
+    .sort()) {
     out[f] = JSON.parse(readFileSync(join(dir, f), "utf8"));
   }
   return out;
@@ -63,7 +65,9 @@ export function renderCrossIterationSummary(records: IterationRecord[]): string 
   // Headline table.
   lines.push("## Headline metrics");
   lines.push("");
-  lines.push("| Iter | Notes | Signed | Clubs ≥1 | Attempts | Reject% | Ext ✓ | Ext ✗ | Champion (pts) | Spread | In red |");
+  lines.push(
+    "| Iter | Notes | Signed | Clubs ≥1 | Attempts | Reject% | Ext ✓ | Ext ✗ | Champion (pts) | Spread | In red |",
+  );
   lines.push("|---|---|---|---|---|---|---|---|---|---|---|");
   for (const r of records) {
     const rejectPct =
@@ -83,9 +87,7 @@ export function renderCrossIterationSummary(records: IterationRecord[]): string 
     lines.push("## What moved");
     lines.push("");
     const movement = (label: string, a: number, b: number) =>
-      lines.push(
-        `- ${label}: ${a} → ${b} (${b - a >= 0 ? "+" : ""}${b - a})`,
-      );
+      lines.push(`- ${label}: ${a} → ${b} (${b - a >= 0 ? "+" : ""}${b - a})`);
     movement("Signed", first.stats.totalSigned, last.stats.totalSigned);
     movement(
       "Clubs with ≥1 signing",

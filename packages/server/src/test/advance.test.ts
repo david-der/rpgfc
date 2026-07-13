@@ -43,10 +43,7 @@ describe("advanceMatchday — Story 06", () => {
     if (db.dialect !== "sqlite") return;
 
     const before = db.sqlite
-      .prepare<
-        [],
-        { n: number }
-      >(`SELECT COUNT(*) AS n FROM matches WHERE state = 'Played'`)
+      .prepare<[], { n: number }>(`SELECT COUNT(*) AS n FROM matches WHERE state = 'Played'`)
       .get();
     expect(before?.n).toBe(0);
 
@@ -100,10 +97,7 @@ describe("advanceMatchday — Story 06", () => {
   it("at the end of the half-season every fixture is Played", () => {
     if (db.dialect !== "sqlite") return;
     const row = db.sqlite
-      .prepare<
-        [],
-        { n: number }
-      >(`SELECT COUNT(*) AS n FROM matches WHERE state = 'Scheduled'`)
+      .prepare<[], { n: number }>(`SELECT COUNT(*) AS n FROM matches WHERE state = 'Scheduled'`)
       .get();
     expect(row?.n).toBe(0);
   });

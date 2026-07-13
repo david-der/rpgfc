@@ -13,12 +13,7 @@
 import { useState } from "react";
 
 import type { CurrencyTier, PlayingTimeRole } from "@rpgfc/shared";
-import {
-  CURRENCY_TIERS,
-  FEE_TIER_MIDPOINT_CENTS,
-  PLAYING_TIME_ROLES,
-  WAGE_TIER_MIDPOINT_CENTS,
-} from "@rpgfc/shared";
+import { CURRENCY_TIERS, FEE_TIER_MIDPOINT_CENTS, PLAYING_TIME_ROLES } from "@rpgfc/shared";
 
 export interface BidComposerValue {
   feeTier: CurrencyTier;
@@ -32,18 +27,17 @@ interface BidComposerProps {
   initialAskingTier?: CurrencyTier;
   onSubmit: (value: BidComposerValue) => void | Promise<void>;
   busy?: boolean;
-  /** Buyer cash reserve in cents. Enables the "will spend X%" preview. */
-  cashCents?: number;
-  /** Buyer current weekly wage bill in cents. Enables the wage impact. */
-  weeklyWageCents?: number;
+  /** Qualitative financial context keeps the preview useful without exposing raw sums. */
+  cashTier?: CurrencyTier;
+  wageBillTier?: CurrencyTier;
 }
 
 export function BidComposer({
   initialAskingTier = "Notable",
   onSubmit,
   busy,
-  cashCents,
-  weeklyWageCents,
+  cashTier,
+  wageBillTier,
 }: BidComposerProps) {
   const [feeTier, setFeeTier] = useState<CurrencyTier>(initialAskingTier);
   const [wageTier, setWageTier] = useState<CurrencyTier>("Modest");
@@ -57,22 +51,10 @@ export function BidComposer({
   const feeCents = FEE_TIER_MIDPOINT_CENTS[feeTier];
   const askingCents = FEE_TIER_MIDPOINT_CENTS[initialAskingTier];
   const ratio = feeCents / askingCents;
-  const stance: "Below" | "At" | "Above" =
-    ratio < 0.95 ? "Below" : ratio > 1.05 ? "Above" : "At";
+  const stance: "Below" | "At" | "Above" = ratio < 0.95 ? "Below" : ratio > 1.05 ? "Above" : "At";
   // Mirrors evaluateSellerProposal thresholds for a LISTED player.
   const likelihood: "Likely" | "Borderline" | "Unlikely" =
-    ratio >= 1.1 || ratio >= 0.9
-      ? "Likely"
-      : ratio >= 0.75
-        ? "Borderline"
-        : "Unlikely";
-  const wageBillAfter =
-    weeklyWageCents !== undefined
-      ? weeklyWageCents + WAGE_TIER_MIDPOINT_CENTS[wageTier]
-      : undefined;
-  const cashPct =
-    cashCents && cashCents > 0 ? Math.round((feeCents / cashCents) * 100) : null;
-  const insufficient = cashCents !== undefined && feeCents > cashCents;
+    ratio >= 1.1 || ratio >= 0.9 ? "Likely" : ratio >= 0.75 ? "Borderline" : "Unlikely";
 
   return (
     <form
@@ -157,26 +139,16 @@ export function BidComposer({
           >
             Seller: {likelihood.toLowerCase()}
           </span>
-          {cashPct !== null && (
-            <span
-              className={`border px-2 py-0.5 text-xs uppercase tracking-wide ${
-                insufficient
-                  ? "border-clay-600 text-clay-700 font-semibold"
-                  : cashPct >= 30
-                    ? "border-parchment-600 text-parchment-800"
-                    : "border-moss-600 text-moss-700"
-              }`}
-            >
-              {insufficient ? "Fee exceeds cash" : `${cashPct}% of cash`}
+          {cashTier && (
+            <span className="border border-parchment-600 px-2 py-0.5 text-xs uppercase tracking-wide text-parchment-800">
+              Reserve: {cashTier}
             </span>
           )}
         </div>
-        {weeklyWageCents !== undefined && wageBillAfter !== undefined && (
+        {wageBillTier && (
           <p className="mt-2 text-xs text-parchment-600">
-            Weekly wage bill after signing: {formatCents(wageBillAfter)}{" "}
-            <span className="text-parchment-400">
-              (was {formatCents(weeklyWageCents)})
-            </span>
+            Current wage commitment: <span className="font-medium">{wageBillTier}</span>. Proposed
+            wage: <span className="font-medium">{wageTier}</span>.
           </p>
         )}
       </div>
@@ -199,15 +171,6 @@ interface TierSelectProps {
   value: CurrencyTier;
   onChange: (v: CurrencyTier) => void;
   testId: string;
-}
-
-function formatCents(cents: number): string {
-  const sign = cents < 0 ? "-" : "";
-  const abs = Math.abs(cents);
-  if (abs >= 1_000_000_000_00) return `${sign}$${(abs / 1_000_000_000_00).toFixed(1)}B`;
-  if (abs >= 1_000_000_00) return `${sign}$${(abs / 1_000_000_00).toFixed(1)}M`;
-  if (abs >= 1_000_00) return `${sign}$${(abs / 1_000_00).toFixed(0)}K`;
-  return `${sign}$${(abs / 100).toFixed(0)}`;
 }
 
 function TierSelect({ label, value, onChange, testId }: TierSelectProps) {

@@ -7,7 +7,7 @@
   "preferCheapest": true,
   "rolePromise": "Rotation",
   "maxRolePromise": "Important Player",
-  "openingFeePctOfAsking": 1.00,
+  "openingFeePctOfAsking": 1.0,
   "openingWageMultiplier": 1.05,
   "ratchetMaxAttempts": 1,
   "ratchetStepPct": 0.0,

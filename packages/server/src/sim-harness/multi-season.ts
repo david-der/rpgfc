@@ -81,15 +81,18 @@ function diffClubMovement(
   return movement;
 }
 
-function snapshotWorld(db: DbClient): { retirements: number; ageDistribution: string; freeAgents: number } {
+function snapshotWorld(db: DbClient): {
+  retirements: number;
+  ageDistribution: string;
+  freeAgents: number;
+} {
   if (db.dialect !== "sqlite") {
     return { retirements: 0, ageDistribution: "", freeAgents: 0 };
   }
-  const freeAgents = db.sqlite
-    .prepare<[], { n: number }>(
-      `SELECT COUNT(*) AS n FROM players WHERE club_id IS NULL`,
-    )
-    .get()?.n ?? 0;
+  const freeAgents =
+    db.sqlite
+      .prepare<[], { n: number }>(`SELECT COUNT(*) AS n FROM players WHERE club_id IS NULL`)
+      .get()?.n ?? 0;
   const ageBuckets = db.sqlite
     .prepare<[], { bucket: string; n: number }>(
       `SELECT CASE
@@ -159,17 +162,15 @@ async function run(numSeasons: number): Promise<void> {
       // on the last iteration. Capture retirements via contracts delta.
       let retirements = 0;
       if (s < numSeasons - 1 && db.dialect === "sqlite") {
-        const retiredBefore = db.sqlite
-          .prepare<[], { n: number }>(
-            `SELECT COUNT(*) AS n FROM players WHERE age >= 38`,
-          )
-          .get()?.n ?? 0;
+        const retiredBefore =
+          db.sqlite
+            .prepare<[], { n: number }>(`SELECT COUNT(*) AS n FROM players WHERE age >= 38`)
+            .get()?.n ?? 0;
         await endSeason(db, 1);
-        const retiredAfter = db.sqlite
-          .prepare<[], { n: number }>(
-            `SELECT COUNT(*) AS n FROM players WHERE age >= 38`,
-          )
-          .get()?.n ?? 0;
+        const retiredAfter =
+          db.sqlite
+            .prepare<[], { n: number }>(`SELECT COUNT(*) AS n FROM players WHERE age >= 38`)
+            .get()?.n ?? 0;
         retirements = Math.max(0, retiredAfter - retiredBefore);
       }
 
@@ -198,7 +199,9 @@ async function run(numSeasons: number): Promise<void> {
       console.log(
         `   Season ${s} done — signed ${thisSeasonSigned}, champion ${stats.champion} (${stats.topPoints} pts), retired ${retirements}`,
       );
-      console.log(`   Clubs with 0 in: ${clubsMissingIn.length} · Clubs with 0 out: ${clubsMissingOut.length}`);
+      console.log(
+        `   Clubs with 0 in: ${clubsMissingIn.length} · Clubs with 0 out: ${clubsMissingOut.length}`,
+      );
     }
 
     // Write cross-season summary.
@@ -209,7 +212,9 @@ async function run(numSeasons: number): Promise<void> {
     lines.push("");
     lines.push("## Per-season headline");
     lines.push("");
-    lines.push("| Season | Champion | Pts | Spread | Retired | Free agents | Clubs 0-in | Clubs 0-out | Age distribution |");
+    lines.push(
+      "| Season | Champion | Pts | Spread | Retired | Free agents | Clubs 0-in | Clubs 0-out | Age distribution |",
+    );
     lines.push("|---|---|---|---|---|---|---|---|---|");
     for (const r of records) {
       lines.push(
@@ -241,7 +246,9 @@ async function run(numSeasons: number): Promise<void> {
     lines.push("## Champions timeline");
     lines.push("");
     for (const r of records) {
-      lines.push(`- Season ${r.season}: **${r.stats.champion}** (${r.stats.topPoints} pts), golden boot **${r.stats.goldenBoot}** (${r.stats.goldenBootGoals})`);
+      lines.push(
+        `- Season ${r.season}: **${r.stats.champion}** (${r.stats.topPoints} pts), golden boot **${r.stats.goldenBoot}** (${r.stats.goldenBootGoals})`,
+      );
     }
     lines.push("");
 

@@ -78,10 +78,7 @@ export async function seedSquadIfEmpty(client: DbClient): Promise<SquadSeedResul
 async function loadPlayers(client: DbClient): Promise<PlayerRow[]> {
   if (client.dialect === "sqlite") {
     return client.sqlite
-      .prepare<
-        [],
-        PlayerRow
-      >(`SELECT id, club_id, experience_years FROM players ORDER BY id`)
+      .prepare<[], PlayerRow>(`SELECT id, club_id, experience_years FROM players ORDER BY id`)
       .all();
   }
   const res = await client.pool.query<PlayerRow>(

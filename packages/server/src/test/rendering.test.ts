@@ -98,6 +98,126 @@ describe("AC-08 — rendering prose never contains digits", () => {
 });
 
 describe("AC-09 — certainty is driven by the knowledge snapshot", () => {
+  it("renders an unobserved external player neutrally without leaking badges", () => {
+    const w = world();
+    const playerWithBadges = w.clubs.flatMap((c) => c.players).find((p) => p.badgeKeys.length > 0);
+    expect(playerWithBadges).toBeDefined();
+    const hidden = asHiddenPlayer({ id: 1, ...playerWithBadges!, clubId: 2 });
+    const empty: PlayerKnowledge = { playerId: 1, all: [], best: new Map() };
+
+    const rendered = renderPlayer(
+      hidden,
+      { now: REFERENCE_DATE, knowledge: empty, viewerClubId: 1 },
+      deps,
+    );
+
+    expect(rendered.certainty).toBe("Unknown");
+    expect(rendered.badges).toEqual([]);
+    expect(rendered.prose.identity).toContain("defining qualities remain unclear");
+  });
+
+  it("renders the scout's observed gift wording even when it contradicts hidden truth", () => {
+    const w = world();
+    const hidden = asHiddenPlayer({
+      id: 1,
+      ...w.clubs[0]!.players[0]!,
+      clubId: 2,
+      hiddenAttrs: {
+        pace: 100,
+        finishing: 0,
+        composure: 0,
+        aerial: 0,
+        tackling: 0,
+        passing: 0,
+        vision: 0,
+        stamina: 0,
+        strength: 0,
+        reflexes: 0,
+      },
+    });
+    const observed = snapshotAtTier(1, "Confident");
+    observed.all = [];
+    observed.best = new Map();
+    const fact: FactObservation = {
+      factType: "natural_gift_tier",
+      factKey: "passing",
+      factValueTier: "otherworldly",
+      certainty: "Confident",
+      observedAt: REFERENCE_DATE.toISOString(),
+      sourceScoutId: 1,
+    };
+    observed.all.push(fact);
+    observed.best.set("natural_gift_tier:passing", fact);
+
+    const rendered = renderPlayer(
+      hidden,
+      { now: REFERENCE_DATE, knowledge: observed, viewerClubId: 1 },
+      deps,
+    );
+
+    expect(rendered.certainty).toBe("Confident");
+    expect(rendered.prose.identity).toContain("otherworldly distribution");
+    expect(rendered.prose.identity).not.toContain("pace");
+  });
+
+  it("renders observed-present badges without checking hidden truth and omits observed-absent badges", () => {
+    const w = world();
+    const hidden = asHiddenPlayer({
+      id: 1,
+      ...w.clubs[0]!.players[0]!,
+      clubId: 2,
+      badgeKeys: [],
+    });
+    const knowledge: PlayerKnowledge = { playerId: 1, all: [], best: new Map() };
+    const present: FactObservation = {
+      factType: "badge_presence",
+      factKey: "clutch_finisher",
+      factValueTier: "present",
+      certainty: "Likely",
+      observedAt: REFERENCE_DATE.toISOString(),
+      sourceScoutId: 1,
+    };
+    const absent: FactObservation = {
+      factType: "badge_presence",
+      factKey: "press_resistant",
+      factValueTier: "absent",
+      certainty: "Certain",
+      observedAt: REFERENCE_DATE.toISOString(),
+      sourceScoutId: 1,
+    };
+    knowledge.all.push(present, absent);
+    knowledge.best.set("badge_presence:clutch_finisher", present);
+    knowledge.best.set("badge_presence:press_resistant", absent);
+
+    const rendered = renderPlayer(
+      hidden,
+      { now: REFERENCE_DATE, knowledge, viewerClubId: 1 },
+      deps,
+    );
+
+    expect(rendered.badges.map((badge) => badge.key)).toEqual(["clutch_finisher"]);
+    expect(rendered.badges[0]?.certainty).toBe("Likely");
+  });
+
+  it("gives the managed club a detailed Certain projection", () => {
+    const w = world();
+    const playerWithBadges = w.clubs.flatMap((c) => c.players).find((p) => p.badgeKeys.length > 0);
+    expect(playerWithBadges).toBeDefined();
+    const hidden = asHiddenPlayer({ id: 1, ...playerWithBadges!, clubId: 1 });
+    const empty: PlayerKnowledge = { playerId: 1, all: [], best: new Map() };
+
+    const rendered = renderPlayer(
+      hidden,
+      { now: REFERENCE_DATE, knowledge: empty, viewerClubId: 1 },
+      deps,
+    );
+
+    expect(rendered.certainty).toBe("Certain");
+    expect(rendered.badges.map((badge) => badge.key)).toEqual(hidden.badgeKeys);
+    expect(rendered.badges.every((badge) => badge.certainty === "Certain")).toBe(true);
+    expect(rendered.prose.identity).not.toContain("defining qualities remain unclear");
+  });
+
   it("an empty snapshot yields Unknown", () => {
     const w = world();
     const hidden = asHiddenPlayer({ id: 1, ...w.clubs[0]!.players[0]! });

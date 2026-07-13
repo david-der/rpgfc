@@ -1,25 +1,26 @@
 import type { BadgeRef, CertaintyTier } from "@rpgfc/shared";
 import { BADGE_BY_KEY } from "@rpgfc/shared";
 
-// Walk the player's badge keys and produce BadgeRef[] for the UI.
-//
-// Story 01 does not yet support per-badge certainty (every badge on the
-// player inherits the global certainty tier). Story 02+ introduces a badge
-// knowledge graph and per-badge confidence.
+// Resolve presentation-ready badge refs from the viewer's observed badge
+// facts. The caller deliberately does not pass the player's hidden badge
+// list for an external player.
 
-export interface PlayerBadgeSnapshot {
+export interface ObservedBadgeSnapshot {
   name: string;
-  badgeKeys: string[];
+  badges: Array<{ key: string; certainty: CertaintyTier }>;
 }
 
 function substituteName(template: string, name: string): string {
   return template.replace(/\{name\}/g, name);
 }
 
-export function resolveBadges(snapshot: PlayerBadgeSnapshot, certainty: CertaintyTier): BadgeRef[] {
+export function resolveBadges(snapshot: ObservedBadgeSnapshot): BadgeRef[] {
   const refs: BadgeRef[] = [];
-  for (const key of snapshot.badgeKeys) {
-    const def = BADGE_BY_KEY[key];
+  const seen = new Set<string>();
+  for (const observed of snapshot.badges) {
+    if (seen.has(observed.key)) continue;
+    seen.add(observed.key);
+    const def = BADGE_BY_KEY[observed.key];
     if (!def) continue; // silently skip unknown badges
 
     // For tiered badges, Story 01 treats every award as tier 1 until the
@@ -38,7 +39,7 @@ export function resolveBadges(snapshot: PlayerBadgeSnapshot, certainty: Certaint
       category: def.category,
       tier,
       prose,
-      certainty,
+      certainty: observed.certainty,
     });
   }
   return refs;

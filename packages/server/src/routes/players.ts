@@ -12,6 +12,8 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
 
+import type { FormTier } from "@rpgfc/shared";
+
 import type { DbClient } from "../db/client.js";
 import {
   getContractForPlayer,
@@ -25,6 +27,7 @@ import type { RenderContext } from "../rendering/index.js";
 
 export interface PlayersRouteDeps {
   db: DbClient;
+  userClubId: number;
   /** Whether dev-only endpoints are mounted. Reads env.AUTH_MODE === "dev". */
   devEndpointsEnabled: boolean;
   /** Clock for age math. Injected so tests can pin it. */
@@ -34,9 +37,12 @@ export interface PlayersRouteDeps {
 const listQuery = z.object({
   clubId: z.coerce.number().int().positive().optional(),
   cursor: z.coerce.number().int().nonnegative().optional(),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
+  limit: z.coerce.number().int().min(1).max(250).default(20),
   search: z.string().optional(),
-  onMarket: z.enum(["true", "false"]).transform((v) => v === "true").optional(),
+  onMarket: z
+    .enum(["true", "false"])
+    .transform((v) => v === "true")
+    .optional(),
   position: z.string().optional(),
 });
 
@@ -54,10 +60,7 @@ interface HistorySeasonRow {
   redCards: number;
 }
 
-async function loadPlayerHistory(
-  client: DbClient,
-  playerId: number,
-): Promise<HistorySeasonRow[]> {
+async function loadPlayerHistory(client: DbClient, playerId: number): Promise<HistorySeasonRow[]> {
   // Aggregates every played match this player appeared in, grouped by
   // (season, club_id) so a transferred player's seasons split across
   // clubs read correctly. No hidden-attr reads — just match facts.
@@ -152,15 +155,12 @@ interface RecentMatchRow {
   opponentClubName: string;
   homeAway: "home" | "away";
   result: "W" | "D" | "L";
-  ratingX10: number;
+  tier: FormTier;
   goals: number;
   assists: number;
 }
 
-async function loadRecentMatches(
-  client: DbClient,
-  playerId: number,
-): Promise<RecentMatchRow[]> {
+async function loadRecentMatches(client: DbClient, playerId: number): Promise<RecentMatchRow[]> {
   if (client.dialect === "sqlite") {
     const rows = client.sqlite
       .prepare<
@@ -174,7 +174,7 @@ async function loadRecentMatches(
           away_goals: number;
           home_name: string;
           away_name: string;
-          rating_x10: number;
+          tier: string;
           goals: number;
           assists: number;
         }
@@ -187,7 +187,7 @@ async function loadRecentMatches(
                 m.away_goals AS away_goals,
                 hc.name AS home_name,
                 ac.name AS away_name,
-                pmp.rating_x10 AS rating_x10,
+                pmp.tier AS tier,
                 pmp.goals AS goals,
                 pmp.assists AS assists
          FROM player_match_performance pmp
@@ -210,7 +210,7 @@ async function loadRecentMatches(
     away_goals: number;
     home_name: string;
     away_name: string;
-    rating_x10: number;
+    tier: string;
     goals: number;
     assists: number;
   }>(
@@ -222,7 +222,7 @@ async function loadRecentMatches(
             m.away_goals AS away_goals,
             hc.name AS home_name,
             ac.name AS away_name,
-            pmp.rating_x10 AS rating_x10,
+            pmp.tier AS tier,
             pmp.goals AS goals,
             pmp.assists AS assists
      FROM player_match_performance pmp
@@ -246,7 +246,7 @@ function toRecentRow(r: {
   away_goals: number;
   home_name: string;
   away_name: string;
-  rating_x10: number;
+  tier: string;
   goals: number;
   assists: number;
 }): RecentMatchRow {
@@ -260,7 +260,7 @@ function toRecentRow(r: {
     opponentClubName,
     homeAway: isHome ? "home" : "away",
     result,
-    ratingX10: r.rating_x10,
+    tier: r.tier as FormTier,
     goals: r.goals,
     assists: r.assists,
   };
@@ -276,13 +276,13 @@ export function createPlayersRoute(deps: PlayersRouteDeps) {
   const app = new Hono()
     .get("/", zValidator("query", listQuery), async (c) => {
       const q = c.req.valid("query");
-      const ctx: RenderContext = { now: deps.now() };
+      const ctx: RenderContext = { now: deps.now(), viewerClubId: deps.userClubId };
       const page = await renderPlayersPage(deps.db, q, ctx);
       return c.json(page);
     })
     .get("/:id", zValidator("param", idParam), async (c) => {
       const { id } = c.req.valid("param");
-      const ctx: RenderContext = { now: deps.now() };
+      const ctx: RenderContext = { now: deps.now(), viewerClubId: deps.userClubId };
       const rendered = await renderPlayerById(deps.db, id, ctx);
       if (!rendered) {
         return c.json({ error: { code: "not_found", message: "Player not found" } }, 404);

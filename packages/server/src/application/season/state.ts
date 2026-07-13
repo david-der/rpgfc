@@ -17,9 +17,7 @@ export async function loadSeasonState(client: DbClient): Promise<SeasonState> {
   if (client.dialect === "sqlite") {
     row =
       client.sqlite
-        .prepare<[], SaveStateRow>(
-          `SELECT season, next_match_week FROM save_state WHERE id = 1`,
-        )
+        .prepare<[], SaveStateRow>(`SELECT season, next_match_week FROM save_state WHERE id = 1`)
         .get() ?? null;
   } else {
     const res = await client.pool.query<SaveStateRow>(

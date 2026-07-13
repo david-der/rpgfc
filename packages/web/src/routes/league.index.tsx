@@ -115,75 +115,75 @@ function TableTab() {
           {rows.map((row, idx) => {
             const mine = row.clubId === myClubId;
             return (
-            <tr
-              key={row.clubId}
-              className={`border-b border-parchment-200 last:border-b-0 hover:bg-parchment-100 ${mine ? "bg-parchment-100 font-medium border-l-2 border-l-moss-500" : ""}`}
-            >
-              <td
-                data-testid="league-table-allowlist-number"
-                className="px-3 py-2 text-parchment-500"
+              <tr
+                key={row.clubId}
+                className={`border-b border-parchment-200 last:border-b-0 hover:bg-parchment-100 ${mine ? "bg-parchment-100 font-medium border-l-2 border-l-moss-500" : ""}`}
               >
-                {idx + 1}
-              </td>
-              <td className="px-4 py-2 font-sans">
-                <Link
-                  to="/league/clubs/$clubId"
-                  params={{ clubId: String(row.clubId) }}
-                  className="text-parchment-900 hover:text-moss-700"
+                <td
+                  data-testid="league-table-allowlist-number"
+                  className="px-3 py-2 text-parchment-500"
                 >
-                  {row.clubName}
-                </Link>
-                {row.lastSeasonPosition !== null && (
-                  <span
-                    data-testid="league-last-season-allowlist-number"
-                    className="ml-2 font-mono text-xs tabular-nums text-parchment-500"
-                    title="Finish last season"
+                  {idx + 1}
+                </td>
+                <td className="px-4 py-2 font-sans">
+                  <Link
+                    to="/league/clubs/$clubId"
+                    params={{ clubId: String(row.clubId) }}
+                    className="text-parchment-900 hover:text-moss-700"
                   >
-                    ({row.lastSeasonPosition}
-                    {ordinalSuffix(row.lastSeasonPosition)})
-                  </span>
-                )}
-              </td>
-              <td data-testid="league-table-allowlist-number" className="px-2 py-2">
-                {row.played}
-              </td>
-              <td data-testid="league-table-allowlist-number" className="px-2 py-2">
-                {row.won}
-              </td>
-              <td data-testid="league-table-allowlist-number" className="px-2 py-2">
-                {row.drawn}
-              </td>
-              <td data-testid="league-table-allowlist-number" className="px-2 py-2">
-                {row.lost}
-              </td>
-              <td data-testid="league-table-allowlist-number" className="px-2 py-2">
-                {row.goalsFor}
-              </td>
-              <td data-testid="league-table-allowlist-number" className="px-2 py-2">
-                {row.goalsAgainst}
-              </td>
-              <td data-testid="league-table-allowlist-number" className="px-2 py-2">
-                {row.goalDifference > 0 ? `+${row.goalDifference}` : row.goalDifference}
-              </td>
-              <td className="px-3 py-2">
-                {row.recentForm.length > 0 ? (
-                  <div className="flex items-center gap-1">
-                    {row.recentForm.map((r, i) => (
-                      <ResultPill key={i} result={r} />
-                    ))}
-                  </div>
-                ) : (
-                  <span className="text-xs text-parchment-400">—</span>
-                )}
-              </td>
-              <td
-                data-testid="league-table-allowlist-number"
-                className="px-2 py-2 font-semibold text-parchment-900"
-              >
-                {row.points}
-              </td>
-            </tr>
-          );
+                    {row.clubName}
+                  </Link>
+                  {row.lastSeasonPosition !== null && (
+                    <span
+                      data-testid="league-last-season-allowlist-number"
+                      className="ml-2 font-mono text-xs tabular-nums text-parchment-500"
+                      title="Finish last season"
+                    >
+                      ({row.lastSeasonPosition}
+                      {ordinalSuffix(row.lastSeasonPosition)})
+                    </span>
+                  )}
+                </td>
+                <td data-testid="league-table-allowlist-number" className="px-2 py-2">
+                  {row.played}
+                </td>
+                <td data-testid="league-table-allowlist-number" className="px-2 py-2">
+                  {row.won}
+                </td>
+                <td data-testid="league-table-allowlist-number" className="px-2 py-2">
+                  {row.drawn}
+                </td>
+                <td data-testid="league-table-allowlist-number" className="px-2 py-2">
+                  {row.lost}
+                </td>
+                <td data-testid="league-table-allowlist-number" className="px-2 py-2">
+                  {row.goalsFor}
+                </td>
+                <td data-testid="league-table-allowlist-number" className="px-2 py-2">
+                  {row.goalsAgainst}
+                </td>
+                <td data-testid="league-table-allowlist-number" className="px-2 py-2">
+                  {row.goalDifference > 0 ? `+${row.goalDifference}` : row.goalDifference}
+                </td>
+                <td className="px-3 py-2">
+                  {row.recentForm.length > 0 ? (
+                    <div className="flex items-center gap-1">
+                      {row.recentForm.map((r, i) => (
+                        <ResultPill key={i} result={r} />
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-parchment-400">—</span>
+                  )}
+                </td>
+                <td
+                  data-testid="league-table-allowlist-number"
+                  className="px-2 py-2 font-semibold text-parchment-900"
+                >
+                  {row.points}
+                </td>
+              </tr>
+            );
           })}
         </tbody>
       </table>

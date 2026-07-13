@@ -124,11 +124,11 @@ function TransfersPlayer() {
           <BidComposer
             initialAskingTier={listing?.askingTier ?? "Notable"}
             busy={submitMutation.isPending}
-            {...(financesQuery.data?.cashCents !== undefined
-              ? { cashCents: financesQuery.data.cashCents }
+            {...(financesQuery.data?.cashTier !== undefined
+              ? { cashTier: financesQuery.data.cashTier }
               : {})}
-            {...(financesQuery.data?.wageBillCents !== undefined
-              ? { weeklyWageCents: financesQuery.data.wageBillCents }
+            {...(financesQuery.data?.wageBillTier !== undefined
+              ? { wageBillTier: financesQuery.data.wageBillTier }
               : {})}
             onSubmit={async (value) => {
               await submitMutation.mutateAsync(value);

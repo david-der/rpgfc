@@ -9,6 +9,7 @@ import type {
   Harmony,
   PlayingTimeRole,
   PromiseMood,
+  RenderedAvailability,
   RenderedSquad,
   RenderedSquadEntry,
   SquadRole,
@@ -38,10 +39,14 @@ interface PlayerJoinRow {
   weekly_wage_cents: number | null;
   seasons_remaining: number | null;
   form_tier: string | null;
+  fatigue_load: number;
+  injury_matches_remaining: number;
+  suspension_matches_remaining: number;
+  promise_event_mood: string | null;
 }
 
-interface RatingRow {
-  rating_x10: number;
+interface RecentFormRow {
+  tier: string;
   matchday: number;
 }
 
@@ -56,20 +61,24 @@ function parseSquadRole(raw: string): SquadRole {
 
 function parseRolePromise(raw: string | null): PlayingTimeRole | null {
   if (!raw) return null;
-  return (PLAYING_TIME_ROLES as readonly string[]).includes(raw)
-    ? (raw as PlayingTimeRole)
-    : null;
+  return (PLAYING_TIME_ROLES as readonly string[]).includes(raw) ? (raw as PlayingTimeRole) : null;
 }
 
-async function loadSquadJoin(
-  client: DbClient,
-  clubId: number,
-): Promise<PlayerJoinRow[]> {
+async function loadSquadJoin(client: DbClient, clubId: number): Promise<PlayerJoinRow[]> {
   if (client.dialect === "sqlite") {
     return client.sqlite
       .prepare<[number], PlayerJoinRow>(
         `SELECT p.id, p.name, p.archetype_id, p.age, s.role, c.role_promise,
                 c.weekly_wage_cents, c.seasons_remaining,
+                COALESCE(pc.fatigue_load, 0) AS fatigue_load,
+                COALESCE(pc.injury_matches_remaining, 0) AS injury_matches_remaining,
+                COALESCE(pd.suspension_matches_remaining, 0) AS suspension_matches_remaining,
+                (SELECT pre.mood FROM player_relationship_events pre
+                 WHERE pre.player_id = p.id
+                   AND pre.club_id = s.club_id
+                   AND pre.season = COALESCE((SELECT season FROM save_state WHERE id = 1), 0)
+                   AND pre.event_type = 'playing_time_promise_broken'
+                 ORDER BY pre.match_week DESC, pre.id DESC LIMIT 1) AS promise_event_mood,
                 (SELECT pmp.tier FROM player_match_performance pmp
                  JOIN matches m ON m.id = pmp.match_id
                  WHERE pmp.player_id = p.id AND m.state = 'Played'
@@ -77,6 +86,11 @@ async function loadSquadJoin(
          FROM squad_entries s
          JOIN players p ON p.id = s.player_id
          LEFT JOIN contracts c ON c.player_id = s.player_id
+         LEFT JOIN player_condition pc ON pc.player_id = s.player_id
+         LEFT JOIN player_discipline pd
+           ON pd.player_id = s.player_id
+          AND pd.competition_key = 'league'
+          AND pd.season = COALESCE((SELECT season FROM save_state WHERE id = 1), 0)
          WHERE s.club_id = ?
          ORDER BY p.id`,
       )
@@ -85,6 +99,15 @@ async function loadSquadJoin(
   const res = await client.pool.query<PlayerJoinRow>(
     `SELECT p.id, p.name, p.archetype_id, p.age, s.role, c.role_promise,
             c.weekly_wage_cents, c.seasons_remaining,
+            COALESCE(pc.fatigue_load, 0) AS fatigue_load,
+            COALESCE(pc.injury_matches_remaining, 0) AS injury_matches_remaining,
+            COALESCE(pd.suspension_matches_remaining, 0) AS suspension_matches_remaining,
+            (SELECT pre.mood FROM player_relationship_events pre
+             WHERE pre.player_id = p.id
+               AND pre.club_id = s.club_id
+               AND pre.season = COALESCE((SELECT season FROM save_state WHERE id = 1), 0)
+               AND pre.event_type = 'playing_time_promise_broken'
+             ORDER BY pre.match_week DESC, pre.id DESC LIMIT 1) AS promise_event_mood,
             (SELECT pmp.tier FROM player_match_performance pmp
              JOIN matches m ON m.id = pmp.match_id
              WHERE pmp.player_id = p.id AND m.state = 'Played'
@@ -92,6 +115,11 @@ async function loadSquadJoin(
      FROM squad_entries s
      JOIN players p ON p.id = s.player_id
      LEFT JOIN contracts c ON c.player_id = s.player_id
+     LEFT JOIN player_condition pc ON pc.player_id = s.player_id
+     LEFT JOIN player_discipline pd
+       ON pd.player_id = s.player_id
+      AND pd.competition_key = 'league'
+      AND pd.season = COALESCE((SELECT season FROM save_state WHERE id = 1), 0)
      WHERE s.club_id = $1
      ORDER BY p.id`,
     [clubId],
@@ -103,46 +131,44 @@ async function loadClubRow(client: DbClient, clubId: number): Promise<ClubRow | 
   if (client.dialect === "sqlite") {
     return (
       client.sqlite
-        .prepare<
-          [number],
-          ClubRow
-        >(`SELECT id, name FROM clubs WHERE id = ?`)
+        .prepare<[number], ClubRow>(`SELECT id, name FROM clubs WHERE id = ?`)
         .get(clubId) ?? null
     );
   }
-  const res = await client.pool.query<ClubRow>(
-    `SELECT id, name FROM clubs WHERE id = $1`,
-    [clubId],
-  );
+  const res = await client.pool.query<ClubRow>(`SELECT id, name FROM clubs WHERE id = $1`, [
+    clubId,
+  ]);
   return res.rows[0] ?? null;
 }
 
-async function loadRecentRatings(
-  client: DbClient,
-  playerId: number,
-): Promise<RatingRow[]> {
+async function loadRecentForm(client: DbClient, playerId: number): Promise<FormTier[]> {
+  let rows: RecentFormRow[];
   if (client.dialect === "sqlite") {
-    return client.sqlite
-      .prepare<[number], RatingRow>(
-        `SELECT pmp.rating_x10 AS rating_x10, m.matchday AS matchday
+    rows = client.sqlite
+      .prepare<[number], RecentFormRow>(
+        `SELECT pmp.tier AS tier, m.matchday AS matchday
          FROM player_match_performance pmp
          JOIN matches m ON m.id = pmp.match_id
          WHERE pmp.player_id = ? AND m.state = 'Played'
-         ORDER BY m.matchday DESC, m.id DESC
+         ORDER BY m.season DESC, m.matchday DESC, m.id DESC
          LIMIT 5`,
       )
       .all(playerId);
+  } else {
+    const res = await client.pool.query<RecentFormRow>(
+      `SELECT pmp.tier AS tier, m.matchday AS matchday
+       FROM player_match_performance pmp
+       JOIN matches m ON m.id = pmp.match_id
+       WHERE pmp.player_id = $1 AND m.state = 'Played'
+       ORDER BY m.season DESC, m.matchday DESC, m.id DESC
+       LIMIT 5`,
+      [playerId],
+    );
+    rows = res.rows;
   }
-  const res = await client.pool.query<RatingRow>(
-    `SELECT pmp.rating_x10 AS rating_x10, m.matchday AS matchday
-     FROM player_match_performance pmp
-     JOIN matches m ON m.id = pmp.match_id
-     WHERE pmp.player_id = $1 AND m.state = 'Played'
-     ORDER BY m.matchday DESC, m.id DESC
-     LIMIT 5`,
-    [playerId],
-  );
-  return res.rows;
+  return rows
+    .map((row) => row.tier)
+    .filter((tier): tier is FormTier => (FORM_TIERS as readonly string[]).includes(tier));
 }
 
 async function loadMatchesSinceLastStart(
@@ -150,10 +176,7 @@ async function loadMatchesSinceLastStart(
   playerId: number,
   currentSeason: number,
 ): Promise<number | null> {
-  // Count played matchweeks since the player's most recent appearance
-  // (any row in player_match_performance) this season. Story ships
-  // without a "started" flag, so "started" ≈ "appeared in pmp" — every
-  // pmp row is a starter per the schema comment on 0005_matches.sql.
+  // Count played matchweeks since the player's most recent actual start.
   let lastMatchday: number | null = null;
   if (client.dialect === "sqlite") {
     const row = client.sqlite
@@ -161,7 +184,8 @@ async function loadMatchesSinceLastStart(
         `SELECT m.matchday AS matchday
          FROM player_match_performance pmp
          JOIN matches m ON m.id = pmp.match_id
-         WHERE pmp.player_id = ? AND m.state = 'Played' AND m.season = ?
+         WHERE pmp.player_id = ? AND pmp.started = 1
+           AND m.state = 'Played' AND m.season = ?
          ORDER BY m.matchday DESC, m.id DESC
          LIMIT 1`,
       )
@@ -172,7 +196,8 @@ async function loadMatchesSinceLastStart(
       `SELECT m.matchday AS matchday
        FROM player_match_performance pmp
        JOIN matches m ON m.id = pmp.match_id
-       WHERE pmp.player_id = $1 AND m.state = 'Played' AND m.season = $2
+       WHERE pmp.player_id = $1 AND pmp.started = 1
+         AND m.state = 'Played' AND m.season = $2
        ORDER BY m.matchday DESC, m.id DESC
        LIMIT 1`,
       [playerId, currentSeason],
@@ -207,8 +232,11 @@ async function loadMatchesSinceLastStart(
 function buildEntry(row: PlayerJoinRow): RenderedSquadEntry {
   const squadRole = parseSquadRole(row.role);
   const rolePromise = parseRolePromise(row.role_promise);
-  const mood: PromiseMood = moodFor(rolePromise, squadRole);
-  const label = moodLabel(mood);
+  const hasPlayingTimeEvent = row.promise_event_mood === "Disappointed";
+  const mood: PromiseMood = hasPlayingTimeEvent ? "Disappointed" : moodFor(rolePromise, squadRole);
+  const label = hasPlayingTimeEvent
+    ? "A promised place has gone unfulfilled. He remembers."
+    : moodLabel(mood, row.id);
   const archetype = ARCHETYPE_BY_ID[row.archetype_id];
   // Age 17 = this season's youth intake. endSeason only mints new
   // players at that age, so any 17-year-old on the roster is by
@@ -219,6 +247,7 @@ function buildEntry(row: PlayerJoinRow): RenderedSquadEntry {
     row.form_tier && (FORM_TIERS as readonly string[]).includes(row.form_tier)
       ? (row.form_tier as FormTier)
       : null;
+  const availability = renderAvailability(row);
   return {
     playerId: row.id,
     playerName: row.name,
@@ -234,9 +263,36 @@ function buildEntry(row: PlayerJoinRow): RenderedSquadEntry {
     wageTier,
     seasonsRemaining: row.seasons_remaining,
     formTier,
-    last5Ratings: [],
+    recentForm: [],
+    availability,
     matchesSinceLastStart: null,
   };
+}
+
+function renderAvailability(row: PlayerJoinRow): RenderedAvailability {
+  const condition =
+    row.fatigue_load <= 20
+      ? "Fresh"
+      : row.fatigue_load <= 55
+        ? "Ready"
+        : row.fatigue_load <= 80
+          ? "Heavy"
+          : "Spent";
+  if (row.injury_matches_remaining > 0) {
+    return { state: "Injured", condition, explanation: "Unavailable through injury." };
+  }
+  if (row.suspension_matches_remaining > 0) {
+    return { state: "Suspended", condition, explanation: "Serving a league suspension." };
+  }
+  const explanation =
+    condition === "Fresh"
+      ? "Fresh and available."
+      : condition === "Ready"
+        ? "Ready for selection."
+        : condition === "Heavy"
+          ? "Available, with a heavy workload."
+          : "Available, but badly in need of rest.";
+  return { state: "Available", condition, explanation };
 }
 
 export async function renderSquadForClub(
@@ -253,9 +309,7 @@ export async function renderSquadForClub(
   let currentSeason = 0;
   if (client.dialect === "sqlite") {
     const row = client.sqlite
-      .prepare<[], { season: number }>(
-        `SELECT season FROM save_state WHERE id = 1`,
-      )
+      .prepare<[], { season: number }>(`SELECT season FROM save_state WHERE id = 1`)
       .get();
     if (row) currentSeason = row.season;
   } else {
@@ -265,16 +319,16 @@ export async function renderSquadForClub(
     if (res.rows[0]) currentSeason = res.rows[0].season;
   }
 
-  // Enrich each entry with last-5 ratings + matches-since-last-start.
+  // Enrich each entry with recent qualitative form + matches-since-last-start.
   // Separate per-player queries are simple + dual-dialect portable;
   // the squad is capped at ~25 players so this is well under budget.
   await Promise.all(
     entries.map(async (entry) => {
-      const [ratings, since] = await Promise.all([
-        loadRecentRatings(client, entry.playerId),
+      const [recentForm, since] = await Promise.all([
+        loadRecentForm(client, entry.playerId),
         loadMatchesSinceLastStart(client, entry.playerId, currentSeason),
       ]);
-      entry.last5Ratings = ratings.map((r) => r.rating_x10);
+      entry.recentForm = recentForm;
       entry.matchesSinceLastStart = since;
     }),
   );
@@ -316,6 +370,7 @@ export interface PromiseMoodForPlayer {
 interface PlayerMoodRow {
   role: string | null;
   role_promise: string | null;
+  promise_event_mood: string | null;
 }
 
 export async function loadPromiseMoodForPlayer(
@@ -327,7 +382,13 @@ export async function loadPromiseMoodForPlayer(
     row =
       client.sqlite
         .prepare<[number], PlayerMoodRow>(
-          `SELECT s.role, c.role_promise
+          `SELECT s.role, c.role_promise,
+                  (SELECT pre.mood FROM player_relationship_events pre
+                   WHERE pre.player_id = p.id
+                     AND pre.club_id = s.club_id
+                     AND pre.season = COALESCE((SELECT season FROM save_state WHERE id = 1), 0)
+                     AND pre.event_type = 'playing_time_promise_broken'
+                   ORDER BY pre.match_week DESC, pre.id DESC LIMIT 1) AS promise_event_mood
            FROM players p
            LEFT JOIN squad_entries s ON s.player_id = p.id
            LEFT JOIN contracts c ON c.player_id = p.id
@@ -336,7 +397,13 @@ export async function loadPromiseMoodForPlayer(
         .get(playerId) ?? null;
   } else {
     const res = await client.pool.query<PlayerMoodRow>(
-      `SELECT s.role, c.role_promise
+      `SELECT s.role, c.role_promise,
+              (SELECT pre.mood FROM player_relationship_events pre
+               WHERE pre.player_id = p.id
+                 AND pre.club_id = s.club_id
+                 AND pre.season = COALESCE((SELECT season FROM save_state WHERE id = 1), 0)
+                 AND pre.event_type = 'playing_time_promise_broken'
+               ORDER BY pre.match_week DESC, pre.id DESC LIMIT 1) AS promise_event_mood
        FROM players p
        LEFT JOIN squad_entries s ON s.player_id = p.id
        LEFT JOIN contracts c ON c.player_id = p.id
@@ -365,11 +432,14 @@ export async function loadPromiseMoodForPlayer(
       promiseMoodLabel: null,
     };
   }
-  const mood = moodFor(rolePromise, squadRole);
+  const hasPlayingTimeEvent = row.promise_event_mood === "Disappointed";
+  const mood = hasPlayingTimeEvent ? "Disappointed" : moodFor(rolePromise, squadRole);
   return {
     squadRole,
     rolePromise,
     promiseMood: mood,
-    promiseMoodLabel: moodLabel(mood),
+    promiseMoodLabel: hasPlayingTimeEvent
+      ? "A promised place has gone unfulfilled. He remembers."
+      : moodLabel(mood, playerId),
   };
 }

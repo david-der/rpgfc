@@ -8,12 +8,7 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
 
-import {
-  ARCHETYPE_BY_ID,
-  FORM_TIER_LABELS,
-  feeTierFor,
-  wageTierFor,
-} from "@rpgfc/shared";
+import { ARCHETYPE_BY_ID, FORM_TIER_LABELS, feeTierFor, wageTierFor } from "@rpgfc/shared";
 import type { CurrencyTier, FormTier } from "@rpgfc/shared";
 
 import type { DbClient } from "../db/client.js";
@@ -139,7 +134,11 @@ async function loadClubDetail(
       .all(row.player_id);
     // Average the last 5 tier weights.
     const weightOf: Record<string, number> = {
-      Excellent: 4, Good: 3, Average: 2, Poor: 1, Dreadful: 0,
+      Excellent: 4,
+      Good: 3,
+      Average: 2,
+      Poor: 1,
+      Dreadful: 0,
     };
     const weights = formRow.map((r) => weightOf[r.tier] ?? 2);
     let formTier: FormTier | null = null;
@@ -213,9 +212,10 @@ async function loadClubDetail(
   });
 
   const wageBillRow = client.sqlite
-    .prepare<[number], { total: number | null }>(
-      `SELECT SUM(weekly_wage_cents) AS total FROM contracts WHERE club_id = ?`,
-    )
+    .prepare<
+      [number],
+      { total: number | null }
+    >(`SELECT SUM(weekly_wage_cents) AS total FROM contracts WHERE club_id = ?`)
     .get(clubId);
   const wageBillCents = Number(wageBillRow?.total ?? 0);
 

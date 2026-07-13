@@ -219,12 +219,8 @@ function FinanceTile({
   return (
     <div className={`border bg-parchment-50 p-4 ${border} ${subtle ? "opacity-80" : ""}`}>
       <div className="text-xs uppercase tracking-wide text-parchment-500">{label}</div>
-      <div className={`mt-2 font-mono text-2xl font-semibold tabular-nums ${text}`}>
-        {value}
-      </div>
-      {tier && (
-        <div className="mt-1 text-xs italic text-parchment-500">{tier} tier</div>
-      )}
+      <div className={`mt-2 font-mono text-2xl font-semibold tabular-nums ${text}`}>{value}</div>
+      {tier && <div className="mt-1 text-xs italic text-parchment-500">{tier} tier</div>}
     </div>
   );
 }
@@ -327,36 +323,36 @@ function LedgerTab() {
                 <th className="px-3 py-2 text-right">Amount</th>
               </tr>
             </thead>
-        <tbody className="divide-y divide-parchment-200">
-          {events.map((e) => {
-            const positive = e.amount_cents > 0;
-            return (
-              <tr key={e.id} className="hover:bg-parchment-100">
-                <td className="px-3 py-1.5 font-mono tabular-nums text-parchment-700">
-                  {e.season}
-                </td>
-                <td className="px-3 py-1.5 font-mono tabular-nums text-parchment-700">
-                  {e.match_week}
-                </td>
-                <td className="px-3 py-1.5 text-parchment-900">
-                  {KIND_LABEL[e.kind] ?? e.kind}
-                </td>
-                <td className="px-3 py-1.5 text-xs italic text-parchment-500">
-                  {e.note ?? ""}
-                </td>
-                <td
-                  className={`px-3 py-1.5 text-right font-mono font-semibold tabular-nums ${
-                    positive ? "text-moss-700" : "text-clay-700"
-                  }`}
-                >
-                  {positive ? "+" : ""}
-                  {formatCents(e.amount_cents)}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+            <tbody className="divide-y divide-parchment-200">
+              {events.map((e) => {
+                const positive = e.amount_cents > 0;
+                return (
+                  <tr key={e.id} className="hover:bg-parchment-100">
+                    <td className="px-3 py-1.5 font-mono tabular-nums text-parchment-700">
+                      {e.season}
+                    </td>
+                    <td className="px-3 py-1.5 font-mono tabular-nums text-parchment-700">
+                      {e.match_week}
+                    </td>
+                    <td className="px-3 py-1.5 text-parchment-900">
+                      {KIND_LABEL[e.kind] ?? e.kind}
+                    </td>
+                    <td className="px-3 py-1.5 text-xs italic text-parchment-500">
+                      {e.note ?? ""}
+                    </td>
+                    <td
+                      className={`px-3 py-1.5 text-right font-mono font-semibold tabular-nums ${
+                        positive ? "text-moss-700" : "text-clay-700"
+                      }`}
+                    >
+                      {positive ? "+" : ""}
+                      {formatCents(e.amount_cents)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </section>
     </div>

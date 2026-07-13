@@ -30,6 +30,9 @@ export interface GenerationContext {
   rng: Random;
   /** Force a specific age (used by the youth-intake pipeline). */
   overrideAge?: number;
+  /** Force an archetype when a world builder is satisfying a roster
+   *  contract. Standalone generation remains weighted by the RNG. */
+  overrideArchetypeId?: string;
 }
 
 function sampleNormalClamped(rng: Random, mean: number, spread: number, lo = 0, hi = 100): number {
@@ -136,7 +139,10 @@ export function generatePlayer(ctx: GenerationContext): NewHiddenPlayer {
 
   // 1. Pick archetype uniformly for Story 01. Later stories can weight this
   //    by league quality, squad needs, etc.
-  const archetype = rng.pick(ARCHETYPE_LIBRARY);
+  const archetype = ctx.overrideArchetypeId
+    ? (ARCHETYPE_LIBRARY.find((candidate) => candidate.id === ctx.overrideArchetypeId) ??
+      rng.pick(ARCHETYPE_LIBRARY))
+    : rng.pick(ARCHETYPE_LIBRARY);
 
   // 2–3. Sample gifts and traits.
   const hiddenAttrs = sampleGifts(rng, archetype);

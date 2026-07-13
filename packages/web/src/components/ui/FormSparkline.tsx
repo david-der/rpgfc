@@ -52,13 +52,7 @@ interface TooltipPayload {
   payload?: ChartPoint;
 }
 
-function FormTooltip({
-  active,
-  payload,
-}: {
-  active?: boolean;
-  payload?: TooltipPayload[];
-}) {
+function FormTooltip({ active, payload }: { active?: boolean; payload?: TooltipPayload[] }) {
   if (!active || !payload || payload.length === 0) return null;
   const point = payload[0]?.payload;
   if (!point) return null;
@@ -99,12 +93,7 @@ export function FormSparkline({ series }: FormSparklineProps) {
     <div data-testid="form-sparkline" className="h-32 w-full">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 4, right: 12, bottom: 4, left: 0 }}>
-          <CartesianGrid
-            horizontal
-            vertical={false}
-            stroke="#D8D2C0"
-            strokeDasharray="2 4"
-          />
+          <CartesianGrid horizontal vertical={false} stroke="#D8D2C0" strokeDasharray="2 4" />
           <XAxis
             dataKey="matchday"
             tick={false}

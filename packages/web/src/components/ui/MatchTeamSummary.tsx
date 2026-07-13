@@ -56,13 +56,23 @@ function aggregate(rows: RenderedMatchPerformance[]): TeamTotals {
       saves: t.saves + p.saves,
     }),
     {
-      shots: 0, shotsOnTarget: 0, xg: 0, keyPasses: 0,
-      passesAttempted: 0, passesCompleted: 0,
-      tacklesWon: 0, tacklesAttempted: 0,
-      interceptions: 0, clearances: 0,
-      aerialsWon: 0, aerialsContested: 0,
-      dribblesCompleted: 0, foulsCommitted: 0,
-      yellowCards: 0, redCards: 0, saves: 0,
+      shots: 0,
+      shotsOnTarget: 0,
+      xg: 0,
+      keyPasses: 0,
+      passesAttempted: 0,
+      passesCompleted: 0,
+      tacklesWon: 0,
+      tacklesAttempted: 0,
+      interceptions: 0,
+      clearances: 0,
+      aerialsWon: 0,
+      aerialsContested: 0,
+      dribblesCompleted: 0,
+      foulsCommitted: 0,
+      yellowCards: 0,
+      redCards: 0,
+      saves: 0,
     },
   );
 }
@@ -76,20 +86,27 @@ interface StatSpec {
 
 const STATS: StatSpec[] = [
   { label: "Shots", value: (t) => t.shots, format: (t) => String(t.shots) },
-  { label: "Shots on target", value: (t) => t.shotsOnTarget, format: (t) => String(t.shotsOnTarget) },
+  {
+    label: "Shots on target",
+    value: (t) => t.shotsOnTarget,
+    format: (t) => String(t.shotsOnTarget),
+  },
   { label: "Expected goals", value: (t) => t.xg, format: (t) => t.xg.toFixed(2) },
   { label: "Key passes", value: (t) => t.keyPasses, format: (t) => String(t.keyPasses) },
   {
     label: "Passes",
     value: (t) => t.passesCompleted,
     format: (t) => {
-      const pct = t.passesAttempted > 0
-        ? Math.round((t.passesCompleted / t.passesAttempted) * 100)
-        : 0;
+      const pct =
+        t.passesAttempted > 0 ? Math.round((t.passesCompleted / t.passesAttempted) * 100) : 0;
       return `${t.passesCompleted}/${t.passesAttempted} (${pct}%)`;
     },
   },
-  { label: "Dribbles", value: (t) => t.dribblesCompleted, format: (t) => String(t.dribblesCompleted) },
+  {
+    label: "Dribbles",
+    value: (t) => t.dribblesCompleted,
+    format: (t) => String(t.dribblesCompleted),
+  },
   {
     label: "Tackles won",
     value: (t) => t.tacklesWon,
@@ -100,21 +117,13 @@ const STATS: StatSpec[] = [
   {
     label: "Aerial duels won",
     value: (t) => t.aerialsWon,
-    format: (t) => t.aerialsContested > 0
-      ? `${t.aerialsWon}/${t.aerialsContested}`
-      : "0",
+    format: (t) => (t.aerialsContested > 0 ? `${t.aerialsWon}/${t.aerialsContested}` : "0"),
   },
   { label: "Saves", value: (t) => t.saves, format: (t) => String(t.saves) },
   { label: "Fouls", value: (t) => t.foulsCommitted, format: (t) => String(t.foulsCommitted) },
 ];
 
-export function MatchTeamSummary({
-  homeName,
-  awayName,
-  homeId,
-  awayId,
-  performances,
-}: Props) {
+export function MatchTeamSummary({ homeName, awayName, homeId, awayId, performances }: Props) {
   const homeTotals = aggregate(performances.filter((p) => p.clubId === homeId));
   const awayTotals = aggregate(performances.filter((p) => p.clubId === awayId));
 

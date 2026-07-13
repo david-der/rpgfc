@@ -13,12 +13,7 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
 
-import {
-  FORMATIONS,
-  PITCH_SLOTS,
-  PLAYING_STYLES,
-  TEAM_INSTRUCTIONS,
-} from "@rpgfc/shared";
+import { FORMATIONS, PITCH_SLOTS, PLAYING_STYLES, TEAM_INSTRUCTIONS } from "@rpgfc/shared";
 
 import {
   renderTacticsForClub,

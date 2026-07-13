@@ -17,8 +17,7 @@ import {
 } from "@rpgfc/shared";
 import type { CurrencyTier } from "@rpgfc/shared";
 
-import { REJECTION_PROSE } from "../rendering/index.js";
-import { extendContract } from "../application/transfers/extend-contract.js";
+import { REJECTION_PROSE, extendContract } from "../rendering/index.js";
 import type { DbClient } from "../db/client.js";
 import type { RejectionReason } from "@rpgfc/shared";
 
@@ -48,10 +47,7 @@ interface FinancesResponse {
   projectedAnnualWageCents: number;
 }
 
-async function loadFinances(
-  client: DbClient,
-  clubId: number,
-): Promise<FinancesResponse | null> {
+async function loadFinances(client: DbClient, clubId: number): Promise<FinancesResponse | null> {
   if (client.dialect !== "sqlite") return null;
 
   const club = client.sqlite
@@ -75,9 +71,10 @@ async function loadFinances(
   if (!club) return null;
 
   const wageBill = client.sqlite
-    .prepare<[number], { total: number | null }>(
-      `SELECT SUM(weekly_wage_cents) AS total FROM contracts WHERE club_id = ?`,
-    )
+    .prepare<
+      [number],
+      { total: number | null }
+    >(`SELECT SUM(weekly_wage_cents) AS total FROM contracts WHERE club_id = ?`)
     .get(clubId);
   const weeklyWageCents = Number(wageBill?.total ?? 0);
 
@@ -148,11 +145,7 @@ interface LedgerEvent {
   recorded_at: string;
 }
 
-async function loadLedger(
-  client: DbClient,
-  clubId: number,
-  limit = 40,
-): Promise<LedgerEvent[]> {
+async function loadLedger(client: DbClient, clubId: number, limit = 40): Promise<LedgerEvent[]> {
   if (client.dialect !== "sqlite") return [];
   return client.sqlite
     .prepare<[number, number], LedgerEvent>(
@@ -173,10 +166,7 @@ interface LedgerSeasonRollup {
   netCents: number;
 }
 
-async function loadLedgerRollup(
-  client: DbClient,
-  clubId: number,
-): Promise<LedgerSeasonRollup[]> {
+async function loadLedgerRollup(client: DbClient, clubId: number): Promise<LedgerSeasonRollup[]> {
   if (client.dialect !== "sqlite") return [];
   // Three classes of activity:
   //   revenue = any positive-amount event (matchday, sponsor, tv)
@@ -243,14 +233,12 @@ export function createClubRoute(deps: ClubRouteDeps) {
       }
       if (result.kind === "reject") {
         const prose = REJECTION_PROSE[result.reason as RejectionReason];
-        const message = prose
-          ?? (result.reason === "CLUB_CANNOT_AFFORD_BONUS"
+        const message =
+          prose ??
+          (result.reason === "CLUB_CANNOT_AFFORD_BONUS"
             ? "The club can't afford the signing bonus you proposed."
             : "The offer was rejected.");
-        return c.json(
-          { error: { code: "player_rejected", reason: result.reason, message } },
-          409,
-        );
+        return c.json({ error: { code: "player_rejected", reason: result.reason, message } }, 409);
       }
       return c.json({ ok: true });
     });

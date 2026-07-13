@@ -33,10 +33,7 @@ interface GoldenBootRow {
   goals: number;
 }
 
-async function loadGoldenBoot(
-  db: DbClient,
-  season: number,
-): Promise<GoldenBootRow | null> {
+async function loadGoldenBoot(db: DbClient, season: number): Promise<GoldenBootRow | null> {
   if (db.dialect === "sqlite") {
     const row = db.sqlite
       .prepare<[number], { name: string; goals: number }>(

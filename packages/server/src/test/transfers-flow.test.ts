@@ -70,10 +70,7 @@ describe("transfers end-to-end — Story 04", () => {
 
     // Pick a listed player NOT on club 1 (the buying club).
     const listed = db.sqlite
-      .prepare<
-        [],
-        { player_id: number; asking_price_cents: number }
-      >(
+      .prepare<[], { player_id: number; asking_price_cents: number }>(
         `SELECT l.player_id, l.asking_price_cents
          FROM listing l JOIN players p ON p.id = l.player_id
          WHERE p.club_id != 1 LIMIT 1`,
@@ -133,10 +130,7 @@ describe("transfers end-to-end — Story 04", () => {
 
     // Pick a listing that still exists AND isn't on the buying club.
     const listed = db.sqlite
-      .prepare<
-        [],
-        { player_id: number; asking_price_cents: number }
-      >(
+      .prepare<[], { player_id: number; asking_price_cents: number }>(
         `SELECT l.player_id, l.asking_price_cents
          FROM listing l JOIN players p ON p.id = l.player_id
          WHERE p.club_id != 1 LIMIT 1`,

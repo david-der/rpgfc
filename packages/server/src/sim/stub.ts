@@ -32,13 +32,7 @@
 import type { FormTier } from "@rpgfc/shared";
 
 import { mulberry32, type Random } from "../application/generation/rng.js";
-import {
-  ASSIST_EVENTS,
-  POOR_EVENTS,
-  SCORER_EVENTS,
-  STANDOUT_EVENTS,
-  pickEvent,
-} from "./prose.js";
+import { ASSIST_EVENTS, POOR_EVENTS, SCORER_EVENTS, STANDOUT_EVENTS, pickEvent } from "./prose.js";
 import type {
   SimEngine,
   SimMatchInput,
@@ -47,6 +41,7 @@ import type {
   SimPlayer,
   SimSide,
 } from "./interface.js";
+import { simulateCausalMatch } from "./causal.js";
 
 const HOME_ADVANTAGE = 2;
 const MAX_GOALS = 5;
@@ -186,51 +181,75 @@ interface StatRanges {
 
 const RANGES: Record<"gk" | "defender" | "midfielder" | "forward", StatRanges> = {
   gk: {
-    shots: [0, 0], shotConversion: 0, xgPerShot: 0,
+    shots: [0, 0],
+    shotConversion: 0,
+    xgPerShot: 0,
     keyPasses: [0, 1],
-    passes: [20, 35], passAccuracy: 0.7,
-    tacklesAttempted: [0, 1], tackleSuccess: 0.5,
+    passes: [20, 35],
+    passAccuracy: 0.7,
+    tacklesAttempted: [0, 1],
+    tackleSuccess: 0.5,
     interceptions: [0, 1],
     clearances: [2, 6],
-    aerials: [0, 1], aerialWinRate: 0.6,
+    aerials: [0, 1],
+    aerialWinRate: 0.6,
     dribbles: [0, 0],
-    foulsCommitted: [0, 1], foulsDrawn: [0, 1],
+    foulsCommitted: [0, 1],
+    foulsDrawn: [0, 1],
     saves: [1, 6],
   },
   defender: {
-    shots: [0, 2], shotConversion: 0.45, xgPerShot: 8,
+    shots: [0, 2],
+    shotConversion: 0.45,
+    xgPerShot: 8,
     keyPasses: [0, 1],
-    passes: [40, 70], passAccuracy: 0.82,
-    tacklesAttempted: [2, 6], tackleSuccess: 0.65,
+    passes: [40, 70],
+    passAccuracy: 0.82,
+    tacklesAttempted: [2, 6],
+    tackleSuccess: 0.65,
     interceptions: [1, 5],
     clearances: [3, 9],
-    aerials: [3, 8], aerialWinRate: 0.6,
+    aerials: [3, 8],
+    aerialWinRate: 0.6,
     dribbles: [0, 1],
-    foulsCommitted: [0, 3], foulsDrawn: [0, 2],
+    foulsCommitted: [0, 3],
+    foulsDrawn: [0, 2],
     saves: [0, 0],
   },
   midfielder: {
-    shots: [0, 3], shotConversion: 0.4, xgPerShot: 10,
+    shots: [0, 3],
+    shotConversion: 0.4,
+    xgPerShot: 10,
     keyPasses: [0, 4],
-    passes: [45, 85], passAccuracy: 0.85,
-    tacklesAttempted: [1, 5], tackleSuccess: 0.6,
+    passes: [45, 85],
+    passAccuracy: 0.85,
+    tacklesAttempted: [1, 5],
+    tackleSuccess: 0.6,
     interceptions: [0, 4],
     clearances: [0, 3],
-    aerials: [1, 4], aerialWinRate: 0.5,
+    aerials: [1, 4],
+    aerialWinRate: 0.5,
     dribbles: [0, 4],
-    foulsCommitted: [0, 3], foulsDrawn: [0, 3],
+    foulsCommitted: [0, 3],
+    foulsDrawn: [0, 3],
     saves: [0, 0],
   },
   forward: {
-    shots: [2, 6], shotConversion: 0.4, xgPerShot: 15,
+    shots: [2, 6],
+    shotConversion: 0.4,
+    xgPerShot: 15,
     keyPasses: [0, 4],
-    passes: [20, 45], passAccuracy: 0.78,
-    tacklesAttempted: [0, 2], tackleSuccess: 0.5,
+    passes: [20, 45],
+    passAccuracy: 0.78,
+    tacklesAttempted: [0, 2],
+    tackleSuccess: 0.5,
     interceptions: [0, 1],
     clearances: [0, 1],
-    aerials: [1, 5], aerialWinRate: 0.45,
+    aerials: [1, 5],
+    aerialWinRate: 0.45,
     dribbles: [1, 6],
-    foulsCommitted: [0, 2], foulsDrawn: [1, 4],
+    foulsCommitted: [0, 2],
+    foulsDrawn: [1, 4],
     saves: [0, 0],
   },
 };
@@ -256,7 +275,10 @@ function generateStats(
   goals: number,
   assists: number,
   rng: Random,
-): Omit<SimPerformance, "playerId" | "clubId" | "goals" | "assists" | "tier" | "eventDescription" | "ratingX10"> {
+): Omit<
+  SimPerformance,
+  "playerId" | "clubId" | "goals" | "assists" | "tier" | "eventDescription" | "ratingX10"
+> {
   const ranges = RANGES[player.positionFamily];
   const factor = TIER_FACTOR[tier];
 
@@ -298,13 +320,10 @@ function generateStats(
   const foulsCommitted = rollInRange(rng, ranges.foulsCommitted, 1.0);
   const foulsDrawn = rollInRange(rng, ranges.foulsDrawn, factor);
 
-  const saves = player.positionFamily === "gk"
-    ? rollInRange(rng, ranges.saves, factor)
-    : 0;
+  const saves = player.positionFamily === "gk" ? rollInRange(rng, ranges.saves, factor) : 0;
 
   // Cards: small chance per foul to earn a yellow. Rare reds.
-  const yellowCards =
-    foulsCommitted >= 2 && rng.chance(0.15 * foulsCommitted) ? 1 : 0;
+  const yellowCards = foulsCommitted >= 2 && rng.chance(0.15 * foulsCommitted) ? 1 : 0;
   const redCards = rng.chance(0.005) ? 1 : 0;
 
   return {
@@ -494,10 +513,7 @@ function distributeGoals(
     goalsByPlayer.set(scorer.playerId, (goalsByPlayer.get(scorer.playerId) ?? 0) + 1);
     if (rng.chance(0.6)) {
       const assister = pickWeightedExcept(rng, pool, scorer.playerId);
-      assistsByPlayer.set(
-        assister.playerId,
-        (assistsByPlayer.get(assister.playerId) ?? 0) + 1,
-      );
+      assistsByPlayer.set(assister.playerId, (assistsByPlayer.get(assister.playerId) ?? 0) + 1);
     }
   }
   return { goalsByPlayer, assistsByPlayer };
@@ -506,6 +522,9 @@ function distributeGoals(
 export function createSimStub(): SimEngine {
   return {
     simulateMatch(input: SimMatchInput): SimMatchResult {
+      if (input.home.starters.some((player) => player.gifts !== undefined)) {
+        return simulateCausalMatch(input);
+      }
       if (input.home.starters.length !== 11 || input.away.starters.length !== 11) {
         throw new Error("simulateMatch: each side must have exactly 11 starters");
       }
@@ -562,6 +581,15 @@ export function createSimStub(): SimEngine {
         homeGoals,
         awayGoals,
         performances: [...homePerformances, ...awayPerformances],
+        events: [],
+        playerUpdates: [...homePerformances, ...awayPerformances].map((performance) => ({
+          playerId: performance.playerId,
+          clubId: performance.clubId,
+          fatigueDelta: 18,
+          injuryMatches: 0,
+          yellowCards: performance.yellowCards,
+          redCard: performance.redCards > 0,
+        })),
       };
     },
   };

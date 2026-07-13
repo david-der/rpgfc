@@ -117,8 +117,13 @@ export async function tickWeeklyFinance(
 
     if (hostedByClub.has(club.id)) {
       insertEvent.run(
-        club.id, season, matchWeek, "revenue_matchday", rates.matchdayCents,
-        "Home match attendance", now,
+        club.id,
+        season,
+        matchWeek,
+        "revenue_matchday",
+        rates.matchdayCents,
+        "Home match attendance",
+        now,
       );
       bumpCash.run(rates.matchdayCents, club.id);
       totalRevenue += rates.matchdayCents;
@@ -128,10 +133,7 @@ export async function tickWeeklyFinance(
     const wageRow = getWageBill.get(club.id);
     const wageBill = Number(wageRow?.total ?? 0);
     if (wageBill > 0) {
-      insertEvent.run(
-        club.id, season, matchWeek, "expense_wages", -wageBill,
-        null, now,
-      );
+      insertEvent.run(club.id, season, matchWeek, "expense_wages", -wageBill, null, now);
       bumpCash.run(-wageBill, club.id);
       totalExpense += wageBill;
     }

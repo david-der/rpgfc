@@ -19,10 +19,7 @@ import {
 } from "../application/transfers/seed-listings.js";
 import { seedTacticsIfEmpty } from "../application/tactics/seed.js";
 import { seedSquadIfEmpty } from "../application/squad/seed.js";
-import {
-  ensureSaveState,
-  seedFixturesIfEmpty,
-} from "../application/season/seed.js";
+import { ensureSaveState, seedFixturesIfEmpty } from "../application/season/seed.js";
 import { advanceMatchday } from "../application/season/advance.js";
 import { submitBid } from "../application/transfers/bids.js";
 import { extendContract } from "../application/transfers/extend-contract.js";
@@ -124,14 +121,13 @@ function loadClubSnapshot(
     .get(clubId)!;
 
   const wage = db.sqlite
-    .prepare<[number], { total: number | null }>(
-      `SELECT SUM(weekly_wage_cents) AS total FROM contracts WHERE club_id = ?`,
-    )
+    .prepare<
+      [number],
+      { total: number | null }
+    >(`SELECT SUM(weekly_wage_cents) AS total FROM contracts WHERE club_id = ?`)
     .get(clubId);
   const squad = db.sqlite
-    .prepare<[number], { n: number }>(
-      `SELECT COUNT(*) AS n FROM squad_entries WHERE club_id = ?`,
-    )
+    .prepare<[number], { n: number }>(`SELECT COUNT(*) AS n FROM squad_entries WHERE club_id = ?`)
     .get(clubId);
 
   return {
@@ -193,7 +189,9 @@ function loadListings(db: DbClient, excludeClubId: number): ListingSnapshot[] {
     let regions: string[] = [];
     try {
       regions = r.regions_json ? (JSON.parse(r.regions_json) as string[]) : [];
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     const isListed = r.listing_asking !== null;
     const badgeKeys = db.sqlite
       .prepare<[number], { badge_key: string }>(
@@ -230,9 +228,7 @@ function loadListings(db: DbClient, excludeClubId: number): ListingSnapshot[] {
 function loadClubNationality(db: DbClient, clubId: number): string {
   if (db.dialect !== "sqlite") return "";
   const row = db.sqlite
-    .prepare<[number], { nationality: string }>(
-      `SELECT nationality FROM clubs WHERE id = ?`,
-    )
+    .prepare<[number], { nationality: string }>(`SELECT nationality FROM clubs WHERE id = ?`)
     .get(clubId);
   return row?.nationality ?? "";
 }
@@ -280,10 +276,7 @@ function loadOwnedPlayers(db: DbClient, clubId: number): OwnedPlayerSnapshot[] {
     }));
 }
 
-function loadSquadByPosition(
-  db: DbClient,
-  clubId: number,
-): Record<PositionFamily, number> {
+function loadSquadByPosition(db: DbClient, clubId: number): Record<PositionFamily, number> {
   const counts: Record<PositionFamily, number> = {
     gk: 0,
     defender: 0,
@@ -292,9 +285,10 @@ function loadSquadByPosition(
   };
   if (db.dialect !== "sqlite") return counts;
   const rows = db.sqlite
-    .prepare<[number], { archetype_id: string }>(
-      `SELECT archetype_id FROM players WHERE club_id = ?`,
-    )
+    .prepare<
+      [number],
+      { archetype_id: string }
+    >(`SELECT archetype_id FROM players WHERE club_id = ?`)
     .all(clubId);
   for (const r of rows) counts[positionFamilyFromArchetype(r.archetype_id)] += 1;
   return counts;
@@ -379,9 +373,7 @@ async function runOnDb(
   // Build a persona for every club from the strategies/ folder.
   const strategies = loadAllStrategies();
   const clubRows = db.sqlite
-    .prepare<[], { id: number; name: string }>(
-      `SELECT id, name FROM clubs ORDER BY id`,
-    )
+    .prepare<[], { id: number; name: string }>(`SELECT id, name FROM clubs ORDER BY id`)
     .all();
   const personaByClub = new Map<number, Persona>();
   const personaByClubName: Array<{ club: string; persona: Persona }> = [];
@@ -443,14 +435,10 @@ async function runOnDb(
         ownedPlayers,
         marketListings,
         playersWithActiveBid: activeBidPlayers,
-        playersRecentlyRejected:
-          rejectedBidsByClub.get(clubId) ?? new Set<number>(),
-        playerBidAttempts:
-          bidAttemptsByClub.get(clubId) ?? new Map<number, number>(),
-        extensionRejections:
-          extensionRejectionsByClub.get(clubId) ?? new Map<number, number>(),
-        priorityBackfillPositions:
-          backfillByClub.get(clubId) ?? new Set<PositionFamily>(),
+        playersRecentlyRejected: rejectedBidsByClub.get(clubId) ?? new Set<number>(),
+        playerBidAttempts: bidAttemptsByClub.get(clubId) ?? new Map<number, number>(),
+        extensionRejections: extensionRejectionsByClub.get(clubId) ?? new Map<number, number>(),
+        priorityBackfillPositions: backfillByClub.get(clubId) ?? new Set<PositionFamily>(),
         clubNationality: loadClubNationality(db, clubId),
         signingsThisSeason: signingsThisSeasonByClub.get(clubId) ?? 0,
       };
@@ -545,9 +533,10 @@ async function runOnDb(
     // Increment per-club signing counter by looking at what was newly
     // Signed during this matchday tick.
     const allSigned = db.sqlite
-      .prepare<[], { id: number; from_club_id: number }>(
-        `SELECT id, from_club_id FROM bids WHERE state = 'Signed'`,
-      )
+      .prepare<
+        [],
+        { id: number; from_club_id: number }
+      >(`SELECT id, from_club_id FROM bids WHERE state = 'Signed'`)
       .all();
     for (const r of allSigned) {
       if (seenSignedBidIds.has(r.id)) continue;
@@ -610,7 +599,17 @@ async function runOnDb(
 
     // Match log + standings.
     const matchRows = db.sqlite
-      .prepare<[number], { home_name: string; away_name: string; home_goals: number; away_goals: number; home_id: number; away_id: number }>(
+      .prepare<
+        [number],
+        {
+          home_name: string;
+          away_name: string;
+          home_goals: number;
+          away_goals: number;
+          home_id: number;
+          away_id: number;
+        }
+      >(
         `SELECT hc.name AS home_name, ac.name AS away_name,
                 m.home_goals, m.away_goals,
                 m.home_club_id AS home_id, m.away_club_id AS away_id
@@ -662,10 +661,7 @@ async function runOnDb(
   // ── final outcome stats ─────────────────────────────────────────────
 
   const bidStates = db.sqlite
-    .prepare<
-      [],
-      { from_club: string; player: string; state: string; reason: string | null }
-    >(
+    .prepare<[], { from_club: string; player: string; state: string; reason: string | null }>(
       `SELECT fc.name AS from_club, p.name AS player, b.state,
               b.rejection_reason AS reason
        FROM bids b
@@ -680,9 +676,7 @@ async function runOnDb(
   for (const t of transferAttempts) {
     const resolved = stateBy.get(`${t.byClub}:${t.playerName}`);
     if (resolved) {
-      t.outcome = resolved.reason
-        ? `${resolved.state} (${resolved.reason})`
-        : resolved.state;
+      t.outcome = resolved.reason ? `${resolved.state} (${resolved.reason})` : resolved.state;
     }
   }
 
@@ -698,10 +692,7 @@ async function runOnDb(
     .join(", ");
 
   const goalLeaders = db.sqlite
-    .prepare<
-      [],
-      { player: string; club: string; goals: number; assists: number }
-    >(
+    .prepare<[], { player: string; club: string; goals: number; assists: number }>(
       `SELECT p.name AS player, c.name AS club,
               SUM(pmp.goals) AS goals,
               SUM(pmp.assists) AS assists
@@ -870,10 +861,16 @@ function renderReport(input: ReportInput): string {
 
   lines.push("## Headline stats");
   lines.push("");
-  lines.push(`- Signed: **${input.stats.totalSigned}** across ${input.stats.totalClubs} clubs (${input.stats.clubsWithAtLeastOneSigning} clubs signed at least one)`);
+  lines.push(
+    `- Signed: **${input.stats.totalSigned}** across ${input.stats.totalClubs} clubs (${input.stats.clubsWithAtLeastOneSigning} clubs signed at least one)`,
+  );
   lines.push(`- Rejected: ${input.stats.totalRejected} of ${input.stats.totalAttempts} attempts`);
-  lines.push(`- Extensions: **${input.stats.extensionsAccepted} accepted**, ${input.stats.extensionsRejected} rejected`);
-  lines.push(`- Champion: **${input.stats.champion}** (${input.stats.topPoints} pts), spread ${input.stats.pointsSpread} pts`);
+  lines.push(
+    `- Extensions: **${input.stats.extensionsAccepted} accepted**, ${input.stats.extensionsRejected} rejected`,
+  );
+  lines.push(
+    `- Champion: **${input.stats.champion}** (${input.stats.topPoints} pts), spread ${input.stats.pointsSpread} pts`,
+  );
   lines.push(`- Golden boot: **${input.stats.goldenBoot}** (${input.stats.goldenBootGoals})`);
   lines.push(`- Clubs in the red: ${input.stats.clubsInNegativeCash}`);
   if (input.stats.rejectionBreakdown) {
@@ -965,9 +962,7 @@ function renderReport(input: ReportInput): string {
       lines.push(`- ${m.homeClubName} **${m.homeGoals} – ${m.awayGoals}** ${m.awayClubName}`);
     }
     lines.push("");
-    lines.push(
-      `Bids: ${w.bidsPlaced} · Extensions: ${w.extensionsAttempted}`,
-    );
+    lines.push(`Bids: ${w.bidsPlaced} · Extensions: ${w.extensionsAttempted}`);
     lines.push("");
   }
   return lines.join("\n");

@@ -54,6 +54,12 @@ export type { BestXI, BestXIEntry } from "./best-xi.js";
 // Convenience re-export so routes don't reach past the rendering barrel
 // to load the singleton save_state row (pure read, no hidden data).
 export { loadSeasonState } from "../application/season/state.js";
+// Season rollover — returns SeasonSummary (final table + narrative prose),
+// already a rendered-safe shape; no hidden fields cross the barrel.
+export { endSeason } from "../application/season/end.js";
+// Contract extension — returns ExtendResult (accept | reject-with-prose |
+// error), a rendered-safe shape.
+export { extendContract } from "../application/transfers/extend-contract.js";
 // Error types + rejection paraphrases — routes reach these through the
 // rendering barrel to honour the `no-hidden-in-routes` lint rule. Both
 // are pure value helpers, not hidden-player readers.

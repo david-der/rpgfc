@@ -19,6 +19,7 @@
     "test": "pnpm -r test",
     "doctrine": "pnpm --filter @rpgfc/web build && pnpm --filter @rpgfc/server build && playwright test --config tests/doctrine/playwright.config.ts",
     "season-sim": "pnpm --filter @rpgfc/server exec tsx src/sim-harness/run.ts",
+    "season-report": "pnpm --filter @rpgfc/server exec tsx src/scripts/season-report.ts",
     "gen-art": "pnpm --filter @rpgfc/server exec tsx src/scripts/generate-player-art.ts",
     "db:generate": "pnpm --filter @rpgfc/server db:generate",
     "db:reset": "rm -rf saves && mkdir -p saves"

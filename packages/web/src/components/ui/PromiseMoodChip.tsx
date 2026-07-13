@@ -30,12 +30,11 @@ const MOOD_WORD: Record<PromiseMood, string> = {
 
 export function PromiseMoodChip({ mood, label }: PromiseMoodChipProps) {
   return (
-    <div className={`inline-flex max-w-prose flex-col border bg-parchment-50 px-3 py-1 ${MOOD_CLASS[mood]}`}>
+    <div
+      className={`inline-flex max-w-prose flex-col border bg-parchment-50 px-3 py-1 ${MOOD_CLASS[mood]}`}
+    >
       <span className="font-sans text-xs uppercase tracking-wide">{MOOD_WORD[mood]}</span>
-      <span
-        data-testid="player-facing"
-        className="mt-1 font-serif text-sm text-parchment-800"
-      >
+      <span data-testid="player-facing" className="mt-1 font-serif text-sm text-parchment-800">
         {label}
       </span>
     </div>

@@ -163,7 +163,9 @@ export async function removeFromWatchlist(playerId: number) {
     param: { playerId: String(playerId) },
   });
   if (!res.ok) {
-    throw new Error(await readErrorMessage(res, "Could not remove this player from your watchlist."));
+    throw new Error(
+      await readErrorMessage(res, "Could not remove this player from your watchlist."),
+    );
   }
   return res.json();
 }
@@ -298,10 +300,7 @@ export async function updateTactics(body: {
   return res.json();
 }
 
-export async function setTacticsAssignment(body: {
-  slot: PitchSlot;
-  playerId: number | null;
-}) {
+export async function setTacticsAssignment(body: { slot: PitchSlot; playerId: number | null }) {
   const res = await api.api.tactics.assignments.$post({ json: body });
   if (!res.ok) {
     throw new Error(`tactics assignment failed: ${res.status}`);
@@ -384,7 +383,12 @@ export async function fetchLeagueTable() {
 export async function endSeason() {
   const res = await api.api.season.end.$post();
   if (!res.ok) {
-    throw new Error(await readErrorMessage(res, "The season could not be ended — make sure every fixture is played."));
+    throw new Error(
+      await readErrorMessage(
+        res,
+        "The season could not be ended — make sure every fixture is played.",
+      ),
+    );
   }
   return res.json();
 }

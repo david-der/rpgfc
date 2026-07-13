@@ -43,9 +43,7 @@ describe("enforceMinimumRosterSqlite — roster floor safety net", () => {
     if (db.dialect !== "sqlite") throw new Error("sqlite only");
     return (
       db.sqlite
-        .prepare<[number], { n: number }>(
-          `SELECT COUNT(*) AS n FROM players WHERE club_id = ?`,
-        )
+        .prepare<[number], { n: number }>(`SELECT COUNT(*) AS n FROM players WHERE club_id = ?`)
         .get(clubId)?.n ?? 0
     );
   }
@@ -55,9 +53,7 @@ describe("enforceMinimumRosterSqlite — roster floor safety net", () => {
 
     // Drain club 1 down to 9 players: free the rest.
     const roster = db.sqlite
-      .prepare<[number], { id: number }>(
-        `SELECT id FROM players WHERE club_id = ?`,
-      )
+      .prepare<[number], { id: number }>(`SELECT id FROM players WHERE club_id = ?`)
       .all(1);
     const keep = new Set(roster.slice(0, 9).map((r) => r.id));
     for (const r of roster) {
@@ -74,9 +70,7 @@ describe("enforceMinimumRosterSqlite — roster floor safety net", () => {
     expect(rosterSize(1)).toBe(ROSTER_FLOOR);
 
     // Every other club should also meet the floor.
-    const clubIds = db.sqlite
-      .prepare<[], { id: number }>(`SELECT id FROM clubs ORDER BY id`)
-      .all();
+    const clubIds = db.sqlite.prepare<[], { id: number }>(`SELECT id FROM clubs ORDER BY id`).all();
     for (const { id } of clubIds) {
       expect(rosterSize(id)).toBeGreaterThanOrEqual(ROSTER_FLOOR);
     }
@@ -163,12 +157,7 @@ describe("enforceMinimumRosterSqlite — roster floor safety net", () => {
                                   is_loan, loan_details_json, wages_by_season_json, signed_at)
            VALUES (?, ?, 300000, 0, 2, 'Squad', NULL, 0, NULL, ?, ?)`,
         )
-        .run(
-          playerId,
-          clubId,
-          JSON.stringify([300000, 300000]),
-          REFERENCE_DATE.toISOString(),
-        );
+        .run(playerId, clubId, JSON.stringify([300000, 300000]), REFERENCE_DATE.toISOString());
     };
 
     const GK_ARCHS = ["sweeper_keeper", "shot_stopper"];
@@ -196,9 +185,10 @@ describe("enforceMinimumRosterSqlite — roster floor safety net", () => {
     enforceMinimumRosterSqlite(db, REFERENCE_DATE.toISOString());
 
     const archRows = sqlite
-      .prepare<[number], { archetype_id: string }>(
-        `SELECT archetype_id FROM players WHERE club_id = ?`,
-      )
+      .prepare<
+        [number],
+        { archetype_id: string }
+      >(`SELECT archetype_id FROM players WHERE club_id = ?`)
       .all(5);
     const counts: Record<string, number> = { GK: 0, CB: 0, FB: 0, MID: 0, FWD: 0 };
     for (const r of archRows) {

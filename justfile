@@ -58,6 +58,10 @@ dev-web:
 sim:
     pnpm season-sim
 
+# Season report for any save DB: tables, tactics, scorers, league health.
+report db="saves/dev.db":
+    pnpm season-report --db {{db}}
+
 # Boot the UI against the post-season save. `just dev-post-season club=7`
 dev-post-season club="1":
     MANAGED_CLUB_ID={{club}} pnpm dev:post-season

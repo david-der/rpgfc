@@ -33,7 +33,10 @@ const createBody = z.object({
     .string()
     .min(1)
     .max(60)
-    .regex(/^[a-zA-Z0-9 _-]+$/, "Name must contain only letters, numbers, spaces, hyphens, and underscores"),
+    .regex(
+      /^[a-zA-Z0-9 _-]+$/,
+      "Name must contain only letters, numbers, spaces, hyphens, and underscores",
+    ),
 });
 
 const nameParam = z.object({

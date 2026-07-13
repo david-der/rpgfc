@@ -12,10 +12,7 @@ import type { PlayingTimeRole } from "@rpgfc/shared";
 import { stanceFor } from "@rpgfc/shared";
 
 import type { DbClient } from "../../db/client.js";
-import {
-  evaluatePlayerProposal,
-  evaluateSellerProposal,
-} from "./evaluators.js";
+import { evaluatePlayerProposal, evaluateSellerProposal } from "./evaluators.js";
 import { estimateValueCents } from "./valuations.js";
 
 const BID_DEADLINE_WEEKS = 4;
@@ -23,15 +20,17 @@ const BID_DEADLINE_WEEKS = 4;
 async function loadImpliedValue(client: DbClient, playerId: number): Promise<number> {
   if (client.dialect !== "sqlite") return 1_000_000_00;
   const row = client.sqlite
-    .prepare<[number], { name: string; archetype_id: string; experience_years: number }>(
-      `SELECT name, archetype_id, experience_years FROM players WHERE id = ?`,
-    )
+    .prepare<
+      [number],
+      { name: string; archetype_id: string; experience_years: number }
+    >(`SELECT name, archetype_id, experience_years FROM players WHERE id = ?`)
     .get(playerId);
   if (!row) return 1_000_000_00;
   const badges = client.sqlite
-    .prepare<[number], { badge_key: string }>(
-      `SELECT badge_key FROM player_badges WHERE player_id = ?`,
-    )
+    .prepare<
+      [number],
+      { badge_key: string }
+    >(`SELECT badge_key FROM player_badges WHERE player_id = ?`)
     .all(playerId);
   return estimateValueCents({
     name: row.name,
@@ -124,11 +123,18 @@ async function signFromTick(client: DbClient, bid: ActiveBidRow): Promise<void> 
        VALUES (?, ?, ?, ?, 3, ?, NULL, 0, NULL, ?, ?)`,
     )
     .run(
-      bid.player_id, bid.from_club_id, bid.wage_cents, bid.signing_bonus_cents,
-      bid.role_promise, scheduleJson, now,
+      bid.player_id,
+      bid.from_club_id,
+      bid.wage_cents,
+      bid.signing_bonus_cents,
+      bid.role_promise,
+      scheduleJson,
+      now,
     );
   // Move player.
-  client.sqlite.prepare(`UPDATE players SET club_id = ? WHERE id = ?`).run(bid.from_club_id, bid.player_id);
+  client.sqlite
+    .prepare(`UPDATE players SET club_id = ? WHERE id = ?`)
+    .run(bid.from_club_id, bid.player_id);
   // Remove listing.
   client.sqlite.prepare(`DELETE FROM listing WHERE player_id = ?`).run(bid.player_id);
   // Update squad.
@@ -141,10 +147,14 @@ async function signFromTick(client: DbClient, bid: ActiveBidRow): Promise<void> 
     .run(bid.from_club_id, bid.player_id, now, bid.from_club_id, now);
   // Transfer cash.
   client.sqlite
-    .prepare(`UPDATE club_identity_ext SET cash_reserve_cents = cash_reserve_cents - ? WHERE club_id = ?`)
+    .prepare(
+      `UPDATE club_identity_ext SET cash_reserve_cents = cash_reserve_cents - ? WHERE club_id = ?`,
+    )
     .run(bid.fee_cents, bid.from_club_id);
   client.sqlite
-    .prepare(`UPDATE club_identity_ext SET cash_reserve_cents = cash_reserve_cents + ? WHERE club_id = ?`)
+    .prepare(
+      `UPDATE club_identity_ext SET cash_reserve_cents = cash_reserve_cents + ? WHERE club_id = ?`,
+    )
     .run(bid.fee_cents, bid.to_club_id);
   // Cancel competing bids.
   client.sqlite
@@ -156,17 +166,15 @@ async function signFromTick(client: DbClient, bid: ActiveBidRow): Promise<void> 
     .run(now, bid.player_id, bid.id);
 }
 
-export async function tickBids(
-  client: DbClient,
-  currentMatchWeek: number,
-): Promise<BidTickResult> {
+export async function tickBids(client: DbClient, currentMatchWeek: number): Promise<BidTickResult> {
   const bids = await loadActiveBids(client);
   let evaluated = 0;
   let expired = 0;
   let signed = 0;
 
   for (const bid of bids) {
-    const deadline = bid.deadline_match_week ?? (bid.submitted_match_week ?? 0) + BID_DEADLINE_WEEKS;
+    const deadline =
+      bid.deadline_match_week ?? (bid.submitted_match_week ?? 0) + BID_DEADLINE_WEEKS;
 
     // Expire past-deadline bids.
     if (currentMatchWeek > deadline) {
@@ -185,17 +193,15 @@ export async function tickBids(
       // Unlisted path: no explicit listing → fall back to the
       // valuation formula and apply the stricter seller threshold.
       const isUnlisted = bid.asking_price_cents === null;
-      const askingCents = bid.asking_price_cents
-        ?? (await loadImpliedValue(client, bid.player_id));
+      const askingCents = bid.asking_price_cents ?? (await loadImpliedValue(client, bid.player_id));
 
       // Seller roster size — used to honor the roster floor.
       let sellerRosterSize = 0;
       if (client.dialect === "sqlite") {
-        sellerRosterSize = client.sqlite
-          .prepare<[number], { n: number }>(
-            `SELECT COUNT(*) AS n FROM players WHERE club_id = ?`,
-          )
-          .get(bid.to_club_id)?.n ?? 0;
+        sellerRosterSize =
+          client.sqlite
+            .prepare<[number], { n: number }>(`SELECT COUNT(*) AS n FROM players WHERE club_id = ?`)
+            .get(bid.to_club_id)?.n ?? 0;
       }
 
       // Load buyer budget for affordability check.
@@ -212,9 +218,10 @@ export async function tickBids(
         buyerCash = budget?.cash_reserve_cents ?? 0;
         buyerWageBudget = budget?.wage_budget_cents_per_week ?? 0;
         const wageRow = client.sqlite
-          .prepare<[number], { total: number | null }>(
-            `SELECT SUM(weekly_wage_cents) AS total FROM contracts WHERE club_id = ?`,
-          )
+          .prepare<
+            [number],
+            { total: number | null }
+          >(`SELECT SUM(weekly_wage_cents) AS total FROM contracts WHERE club_id = ?`)
           .get(bid.from_club_id);
         buyerCurrentWage = Number(wageRow?.total ?? 0);
       }
@@ -246,12 +253,25 @@ export async function tickBids(
 
     // Player evaluates after seller accepts.
     if (bid.state === "SellerAccepted" || bid.state === "PlayerReviewing") {
-      let prefs: { wageFloorCents: number; minPlayingTime: string; preferredRegions: string[]; forbiddenClubIds: number[] } | null = null;
+      let prefs: {
+        wageFloorCents: number;
+        minPlayingTime: string;
+        preferredRegions: string[];
+        forbiddenClubIds: number[];
+      } | null = null;
       let buyerNationality = "";
 
       if (client.dialect === "sqlite") {
         const prefRow = client.sqlite
-          .prepare<[number], { wage_floor_cents: number; min_playing_time: string; preferred_regions_json: string; forbidden_club_ids_json: string }>(
+          .prepare<
+            [number],
+            {
+              wage_floor_cents: number;
+              min_playing_time: string;
+              preferred_regions_json: string;
+              forbidden_club_ids_json: string;
+            }
+          >(
             `SELECT wage_floor_cents, min_playing_time, preferred_regions_json, forbidden_club_ids_json
              FROM player_preferences WHERE player_id = ?`,
           )

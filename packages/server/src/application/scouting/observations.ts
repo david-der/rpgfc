@@ -13,7 +13,7 @@
 // from `(runId, assignmentId, tickIndex)`. The same world replayed
 // produces the same observations.
 
-import type { CertaintyTier, ScoutVoiceId } from "@rpgfc/shared";
+import type { CertaintyTier, MentalTraits, ScoutVoiceId } from "@rpgfc/shared";
 import { ARCHETYPE_BY_ID } from "@rpgfc/shared";
 
 import type { DbClient } from "../../db/client.js";
@@ -31,6 +31,8 @@ const CERTAINTY_LADDER: readonly CertaintyTier[] = [
   "Certain",
 ];
 
+const FOCUS_MENTAL_TRAIT = "professionalism" as const;
+
 function nextRung(current: CertaintyTier): CertaintyTier {
   const idx = CERTAINTY_LADDER.indexOf(current);
   if (idx < 0) return "Speculation";
@@ -43,6 +45,7 @@ interface PlayerCore {
   nationality: string;
   archetypeId: string;
   hidden_attrs_json: string;
+  mental_traits_json: string;
   badge_keys: string[];
 }
 
@@ -119,9 +122,10 @@ async function loadPlayerCore(client: DbClient, playerId: number): Promise<Playe
           nationality: string;
           archetype_id: string;
           hidden_attrs_json: string;
+          mental_traits_json: string;
         }
       >(
-        `SELECT id, name, nationality, archetype_id, hidden_attrs_json
+        `SELECT id, name, nationality, archetype_id, hidden_attrs_json, mental_traits_json
          FROM players WHERE id = ?`,
       )
       .get(playerId);
@@ -140,8 +144,9 @@ async function loadPlayerCore(client: DbClient, playerId: number): Promise<Playe
     nationality: string;
     archetype_id: string;
     hidden_attrs_json: string;
+    mental_traits_json: string;
   }>(
-    `SELECT id, name, nationality, archetype_id, hidden_attrs_json
+    `SELECT id, name, nationality, archetype_id, hidden_attrs_json, mental_traits_json
      FROM players WHERE id = $1`,
     [playerId],
   );
@@ -176,9 +181,10 @@ async function loadPlayersInRegion(
           nationality: string;
           archetype_id: string;
           hidden_attrs_json: string;
+          mental_traits_json: string;
         }
       >(
-        `SELECT id, name, nationality, archetype_id, hidden_attrs_json
+        `SELECT id, name, nationality, archetype_id, hidden_attrs_json, mental_traits_json
          FROM players
          WHERE nationality IN (${placeholders})
          ORDER BY id
@@ -204,8 +210,9 @@ async function loadPlayersInRegion(
     nationality: string;
     archetype_id: string;
     hidden_attrs_json: string;
+    mental_traits_json: string;
   }>(
-    `SELECT id, name, nationality, archetype_id, hidden_attrs_json
+    `SELECT id, name, nationality, archetype_id, hidden_attrs_json, mental_traits_json
      FROM players
      WHERE nationality = ANY($1::text[])
      ORDER BY id
@@ -368,35 +375,63 @@ async function writeFocusObservation(
   now: string,
 ): Promise<WriteResult> {
   const hiddenAttrs = JSON.parse(player.hidden_attrs_json) as Record<string, number>;
+  const mentalTraits = JSON.parse(player.mental_traits_json) as MentalTraits;
   const ranking = rankGifts(hiddenAttrs);
 
   // Determine the next rung from the highest-currently-known certainty
   // for any natural-gift fact about this player.
   const currentTier = await loadHighestKnownCertainty(client, player.id);
   const nextTier = nextRung(currentTier);
+  const currentMentalTier = await loadKnownCertaintyForFact(
+    client,
+    player.id,
+    "mental_trait_tier",
+    FOCUS_MENTAL_TRAIT,
+  );
+  const nextMentalTier = nextRung(currentMentalTier);
+  const mentalPrecision =
+    nextMentalTier === "Certain" || nextMentalTier === "Confident" ? "fine" : "coarse";
 
-  // Write three new observation rows: top gift, weakest gift, and one
-  // randomly-chosen badge presence (if the player has any).
+  // Natural-gift and mental evidence advance independently. A strong gift
+  // report must not silently raise certainty about a player's character.
   const facts: Array<{
     factType: string;
     factKey: string;
     factValueTier: string;
+    certainty: CertaintyTier;
   }> = [
     {
       factType: "natural_gift_tier",
       factKey: ranking.topKey,
       factValueTier: tierWordFor(ranking.topKey, ranking.topValue, "fine"),
+      certainty: nextTier,
     },
     {
       factType: "natural_gift_tier",
       factKey: ranking.weakKey,
       factValueTier: tierWordFor(ranking.weakKey, ranking.weakValue, "fine"),
+      certainty: nextTier,
+    },
+    {
+      factType: "mental_trait_tier",
+      factKey: FOCUS_MENTAL_TRAIT,
+      factValueTier: tierWordFor(
+        FOCUS_MENTAL_TRAIT,
+        mentalTraits[FOCUS_MENTAL_TRAIT],
+        mentalPrecision,
+      ),
+      certainty: nextMentalTier,
     },
   ];
   if (player.badge_keys.length > 0) {
     const rng = mulberry32((scout.id * 100000 + tickIndex) >>> 0);
     const badge = player.badge_keys[Math.floor(rng.next() * player.badge_keys.length)]!;
-    facts.push({ factType: "badge_presence", factKey: badge, factValueTier: "present" });
+    facts.push({
+      factType: "badge_presence",
+      factKey: badge,
+      factValueTier: "present",
+      certainty: nextTier,
+    });
   }
 
   for (const fact of facts) {
@@ -407,7 +442,7 @@ async function writeFocusObservation(
       factType: fact.factType,
       factKey: fact.factKey,
       factValueTier: fact.factValueTier,
-      certainty: nextTier,
+      certainty: fact.certainty,
       observedAt: now,
       sourceScoutId: scout.id,
     });
@@ -426,7 +461,7 @@ async function writeFocusObservation(
   });
 
   // Auto-end the assignment if certainty has reached the top of the ladder.
-  if (nextTier === "Certain") {
+  if (nextTier === "Certain" && nextMentalTier === "Certain") {
     await endAssignmentRow(client, assignmentId, now);
   }
 
@@ -590,17 +625,60 @@ async function loadHighestKnownCertainty(
     rows = client.sqlite
       .prepare<[number], { certainty: string }>(
         `SELECT certainty FROM knowledge_nodes
-         WHERE subject_kind = 'player' AND subject_id = ?`,
+         WHERE subject_kind = 'player'
+           AND subject_id = ?
+           AND fact_type = 'natural_gift_tier'`,
       )
       .all(playerId);
   } else {
     const res = await client.pool.query<{ certainty: string }>(
       `SELECT certainty FROM knowledge_nodes
-       WHERE subject_kind = 'player' AND subject_id = $1`,
+       WHERE subject_kind = 'player'
+         AND subject_id = $1
+         AND fact_type = 'natural_gift_tier'`,
       [playerId],
     );
     rows = res.rows;
   }
+  let highest: CertaintyTier = "Unknown";
+  for (const row of rows) {
+    const tier = row.certainty as CertaintyTier;
+    if (CERTAINTY_LADDER.indexOf(tier) > CERTAINTY_LADDER.indexOf(highest)) {
+      highest = tier;
+    }
+  }
+  return highest;
+}
+
+async function loadKnownCertaintyForFact(
+  client: DbClient,
+  playerId: number,
+  factType: string,
+  factKey: string,
+): Promise<CertaintyTier> {
+  let rows: Array<{ certainty: string }>;
+  if (client.dialect === "sqlite") {
+    rows = client.sqlite
+      .prepare<[number, string, string], { certainty: string }>(
+        `SELECT certainty FROM knowledge_nodes
+         WHERE subject_kind = 'player'
+           AND subject_id = ?
+           AND fact_type = ?
+           AND fact_key = ?`,
+      )
+      .all(playerId, factType, factKey);
+  } else {
+    const res = await client.pool.query<{ certainty: string }>(
+      `SELECT certainty FROM knowledge_nodes
+       WHERE subject_kind = 'player'
+         AND subject_id = $1
+         AND fact_type = $2
+         AND fact_key = $3`,
+      [playerId, factType, factKey],
+    );
+    rows = res.rows;
+  }
+
   let highest: CertaintyTier = "Unknown";
   for (const row of rows) {
     const tier = row.certainty as CertaintyTier;

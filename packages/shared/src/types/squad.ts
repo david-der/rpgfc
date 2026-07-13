@@ -9,6 +9,7 @@
 import type { PlayingTimeRole } from "./contract.js";
 import type { CurrencyTier } from "./currency.js";
 import type { FormTier } from "./form.js";
+import type { RenderedAvailability } from "./availability.js";
 
 export const SQUAD_ROLES = ["Starter", "Rotation", "Backup", "Youth"] as const;
 export type SquadRole = (typeof SQUAD_ROLES)[number];
@@ -28,22 +29,10 @@ export interface SquadEntry {
   updatedAt: string;
 }
 
-export const PROMISE_MOODS = [
-  "Eager",
-  "Content",
-  "Concerned",
-  "Disappointed",
-  "Furious",
-] as const;
+export const PROMISE_MOODS = ["Eager", "Content", "Concerned", "Disappointed", "Furious"] as const;
 export type PromiseMood = (typeof PROMISE_MOODS)[number];
 
-export const HARMONY_TIERS = [
-  "Harmonious",
-  "Settled",
-  "Uneasy",
-  "Fractured",
-  "InRevolt",
-] as const;
+export const HARMONY_TIERS = ["Harmonious", "Settled", "Uneasy", "Fractured", "InRevolt"] as const;
 export type Harmony = (typeof HARMONY_TIERS)[number];
 
 export const HARMONY_LABELS: Record<Harmony, string> = {
@@ -80,10 +69,12 @@ export interface RenderedSquadEntry {
   /** Most-recent form tier from the last played match. null when no
    *  match has been played yet this season. */
   formTier: FormTier | null;
-  /** Per-match rating (rating_x10) for the player's last 5 matches,
-   *  newest first. Fewer entries if the player hasn't played 5 matches.
-   *  Used by the squad-row form sparkline. */
-  last5Ratings: number[];
+  /** Qualitative performance tiers for the player's last five matches,
+   *  newest first. Fewer entries if the player has played fewer matches. */
+  recentForm: FormTier[];
+  /** Qualitative availability; internal workload and countdown values never
+   *  cross the wire. */
+  availability: RenderedAvailability;
   /** Number of played match weeks since this player's last start. null
    *  if they have never started a match this season. 0 means they
    *  started the most-recent played match. */

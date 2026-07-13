@@ -40,8 +40,8 @@ function SavesList() {
       <SectionHeader eyebrow="Persistence" title="Save slots" />
 
       <p className="mt-4 text-sm text-parchment-700">
-        Every action auto-saves to the active slot. Create a new slot to snapshot your
-        progress. To load a different slot, restart the server with a different{" "}
+        Every action auto-saves to the active slot. Create a new slot to snapshot your progress. To
+        load a different slot, restart the server with a different{" "}
         <code className="font-mono text-xs text-parchment-900">DATABASE_URL</code>.
       </p>
 
@@ -84,38 +84,38 @@ function SavesList() {
 
       {/* List */}
       {query.isPending && <p className="mt-8 text-parchment-600">Loading saves…</p>}
-      {query.isError && (
-        <p className="mt-8 text-semantic-error">Could not load save slots.</p>
-      )}
+      {query.isError && <p className="mt-8 text-semantic-error">Could not load save slots.</p>}
       {query.data && (
         <section className="mt-8 space-y-2">
-          {(query.data as { slots: Array<{ name: string; fileName: string; active: boolean; sizeBytes: number }> }).slots.map(
-            (slot) => (
-              <div
-                key={slot.fileName}
-                className={`flex items-center justify-between border px-4 py-3 ${
-                  slot.active
-                    ? "border-moss-600 bg-parchment-50"
-                    : "border-parchment-300 bg-parchment-100"
-                }`}
-              >
-                <div>
-                  <div className="font-sans text-sm font-semibold text-parchment-900">
-                    {slot.name}
-                  </div>
-                  <div className="text-xs text-parchment-500">
-                    {slot.fileName}
-                    {slot.active && (
-                      <span className="ml-2 font-semibold uppercase text-moss-600">Active</span>
-                    )}
-                  </div>
+          {(
+            query.data as {
+              slots: Array<{ name: string; fileName: string; active: boolean; sizeBytes: number }>;
+            }
+          ).slots.map((slot) => (
+            <div
+              key={slot.fileName}
+              className={`flex items-center justify-between border px-4 py-3 ${
+                slot.active
+                  ? "border-moss-600 bg-parchment-50"
+                  : "border-parchment-300 bg-parchment-100"
+              }`}
+            >
+              <div>
+                <div className="font-sans text-sm font-semibold text-parchment-900">
+                  {slot.name}
                 </div>
-                <div className="font-mono text-xs text-parchment-500">
-                  {Math.round(slot.sizeBytes / 1024)} KB
+                <div className="text-xs text-parchment-500">
+                  {slot.fileName}
+                  {slot.active && (
+                    <span className="ml-2 font-semibold uppercase text-moss-600">Active</span>
+                  )}
                 </div>
               </div>
-            ),
-          )}
+              <div className="font-mono text-xs text-parchment-500">
+                {Math.round(slot.sizeBytes / 1024)} KB
+              </div>
+            </div>
+          ))}
           {(query.data as { slots: unknown[] }).slots.length === 0 && (
             <p className="text-sm italic text-parchment-500">No save files found.</p>
           )}

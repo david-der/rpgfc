@@ -76,9 +76,7 @@ interface FreeAgentRow {
   preferred_positions_json: string;
 }
 
-function pickBiggestDeficit(
-  have: Record<RosterBucket, number>,
-): RosterBucket | null {
+function pickBiggestDeficit(have: Record<RosterBucket, number>): RosterBucket | null {
   let best: RosterBucket | null = null;
   let bestDeficit = 0;
   for (const b of BUCKET_ORDER) {
@@ -145,9 +143,7 @@ export function enforceMinimumRosterSqlite(
           loan_details_json, wages_by_season_json, signed_at)
        VALUES (?, ?, ?, 0, ?, 'Squad', NULL, 0, NULL, ?, ?)`,
     );
-    const deleteSquadEntry = client.sqlite.prepare(
-      `DELETE FROM squad_entries WHERE player_id = ?`,
-    );
+    const deleteSquadEntry = client.sqlite.prepare(`DELETE FROM squad_entries WHERE player_id = ?`);
     const insertSquad = client.sqlite.prepare(
       `INSERT INTO squad_entries (club_id, player_id, role, updated_at)
        VALUES (?, ?, ?, ?)`,
@@ -179,20 +175,38 @@ export function enforceMinimumRosterSqlite(
       }
       if (!np) {
         np = generatePlayer({
-          runId, clubId: null, referenceDate: new Date(), rng, overrideAge: 18,
+          runId,
+          clubId: null,
+          referenceDate: new Date(),
+          rng,
+          overrideAge: 18,
         });
       }
       const info = insertPlayer.run(
-        runId, null, np.name, np.dob, np.age, np.nationality,
-        np.preferredFoot, np.archetypeId,
-        JSON.stringify(np.hiddenAttrs), JSON.stringify(np.mentalTraits),
-        np.experienceYears, JSON.stringify(np.narrativeSeed),
-        JSON.stringify(np.preferredPositions), now,
+        runId,
+        null,
+        np.name,
+        np.dob,
+        np.age,
+        np.nationality,
+        np.preferredFoot,
+        np.archetypeId,
+        JSON.stringify(np.hiddenAttrs),
+        JSON.stringify(np.mentalTraits),
+        np.experienceYears,
+        JSON.stringify(np.narrativeSeed),
+        JSON.stringify(np.preferredPositions),
+        now,
       );
       const pid = Number(info.lastInsertRowid);
       for (const key of np.badgeKeys) insertBadge.run(pid, key, null, now, "generation");
-      insertPreferences.run(pid, MIN_WAGE_CENTS, "Squad",
-        JSON.stringify([np.nationality]), JSON.stringify([]));
+      insertPreferences.run(
+        pid,
+        MIN_WAGE_CENTS,
+        "Squad",
+        JSON.stringify([np.nationality]),
+        JSON.stringify([]),
+      );
       generated++;
       return {
         id: pid,
@@ -227,8 +241,12 @@ export function enforceMinimumRosterSqlite(
     const signOne = (clubId: number, fa: FreeAgentRow) => {
       deleteContract.run(fa.id);
       insertContract.run(
-        fa.id, clubId, MIN_WAGE_CENTS, FORCED_CONTRACT_SEASONS,
-        JSON.stringify([MIN_WAGE_CENTS, MIN_WAGE_CENTS]), now,
+        fa.id,
+        clubId,
+        MIN_WAGE_CENTS,
+        FORCED_CONTRACT_SEASONS,
+        JSON.stringify([MIN_WAGE_CENTS, MIN_WAGE_CENTS]),
+        now,
       );
       movePlayer.run(clubId, fa.id);
       deleteSquadEntry.run(fa.id);
@@ -236,8 +254,13 @@ export function enforceMinimumRosterSqlite(
       clearListing.run(fa.id);
       const hasPrefs = hasPrefsStmt.get(fa.id);
       if (!hasPrefs || hasPrefs.n === 0) {
-        insertPreferences.run(fa.id, MIN_WAGE_CENTS, "Squad",
-          JSON.stringify([]), JSON.stringify([]));
+        insertPreferences.run(
+          fa.id,
+          MIN_WAGE_CENTS,
+          "Squad",
+          JSON.stringify([]),
+          JSON.stringify([]),
+        );
       }
       signings++;
     };
@@ -286,9 +309,7 @@ export async function enforceMinimumRosterPostgres(
   let signings = 0;
   let generated = 0;
   {
-    const runRow = await conn.query<{ run_id: number }>(
-      `SELECT run_id FROM clubs LIMIT 1`,
-    );
+    const runRow = await conn.query<{ run_id: number }>(`SELECT run_id FROM clubs LIMIT 1`);
     const runId = runRow.rows[0]?.run_id ?? 1;
     const seasonRow = await conn.query<{ season: number }>(
       `SELECT season FROM save_state WHERE id = 1`,
@@ -296,9 +317,7 @@ export async function enforceMinimumRosterPostgres(
     const season = seasonRow.rows[0]?.season ?? 0;
     const rng = mulberry32((runId * 2654435761 + season * 97 + 13) >>> 0);
 
-    const clubsRes = await conn.query<ClubRow>(
-      `SELECT id, nationality FROM clubs ORDER BY id`,
-    );
+    const clubsRes = await conn.query<ClubRow>(`SELECT id, nationality FROM clubs ORDER BY id`);
 
     const fetchFreeAgents = async (): Promise<FreeAgentRow[]> => {
       const r = await conn.query<FreeAgentRow>(
@@ -334,7 +353,11 @@ export async function enforceMinimumRosterPostgres(
       let np: ReturnType<typeof generatePlayer> | null = null;
       for (let i = 0; i < 60; i++) {
         const candidate = generatePlayer({
-          runId, clubId: null, referenceDate: new Date(), rng, overrideAge: 18,
+          runId,
+          clubId: null,
+          referenceDate: new Date(),
+          rng,
+          overrideAge: 18,
         });
         if (!eligible || eligible.includes(candidate.archetypeId)) {
           np = candidate;
@@ -343,7 +366,11 @@ export async function enforceMinimumRosterPostgres(
       }
       if (!np) {
         np = generatePlayer({
-          runId, clubId: null, referenceDate: new Date(), rng, overrideAge: 18,
+          runId,
+          clubId: null,
+          referenceDate: new Date(),
+          rng,
+          overrideAge: 18,
         });
       }
       const ins = await conn.query<{ id: number }>(
@@ -353,11 +380,20 @@ export async function enforceMinimumRosterPostgres(
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
          RETURNING id`,
         [
-          runId, null, np.name, np.dob, np.age, np.nationality,
-          np.preferredFoot, np.archetypeId,
-          JSON.stringify(np.hiddenAttrs), JSON.stringify(np.mentalTraits),
-          np.experienceYears, JSON.stringify(np.narrativeSeed),
-          JSON.stringify(np.preferredPositions), now,
+          runId,
+          null,
+          np.name,
+          np.dob,
+          np.age,
+          np.nationality,
+          np.preferredFoot,
+          np.archetypeId,
+          JSON.stringify(np.hiddenAttrs),
+          JSON.stringify(np.mentalTraits),
+          np.experienceYears,
+          JSON.stringify(np.narrativeSeed),
+          JSON.stringify(np.preferredPositions),
+          now,
         ],
       );
       const pid = ins.rows[0]!.id;
@@ -389,8 +425,14 @@ export async function enforceMinimumRosterPostgres(
                                 seasons_remaining, role_promise, release_clause_cents, is_loan,
                                 loan_details_json, wages_by_season_json, signed_at)
          VALUES ($1,$2,$3,0,$4,'Squad',NULL,0,NULL,$5,$6)`,
-        [fa.id, clubId, MIN_WAGE_CENTS, FORCED_CONTRACT_SEASONS,
-          JSON.stringify([MIN_WAGE_CENTS, MIN_WAGE_CENTS]), now],
+        [
+          fa.id,
+          clubId,
+          MIN_WAGE_CENTS,
+          FORCED_CONTRACT_SEASONS,
+          JSON.stringify([MIN_WAGE_CENTS, MIN_WAGE_CENTS]),
+          now,
+        ],
       );
       await conn.query(`UPDATE players SET club_id = $1 WHERE id = $2`, [clubId, fa.id]);
       await conn.query(`DELETE FROM squad_entries WHERE player_id = $1`, [fa.id]);
