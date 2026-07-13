@@ -94,8 +94,23 @@ function TableTab() {
     );
   }
 
+  // Style Guide v1.1 §16.1 — before the first whistle a zero is a claim,
+  // a dash is "not yet". Pre-play ordering is last season's finish.
+  const preSeason = rows.every((row) => row.played === 0);
+  const stat = (value: number | string) => (preSeason ? "—" : value);
+
   return (
     <div className="overflow-x-auto border border-parchment-300 bg-parchment-50">
+      {preSeason && (
+        <div className="flex items-center justify-between border-b border-parchment-300 bg-parchment-900 px-4 py-2.5">
+          <span className="font-serif text-sm text-parchment-100">
+            The season opens this week — the table remembers last year until the first whistle.
+          </span>
+          <span className="font-sans text-[10px] uppercase tracking-wide text-parchment-400">
+            Press Advance when ready
+          </span>
+        </div>
+      )}
       <table className="w-full text-left font-mono text-sm tabular-nums">
         <thead>
           <tr className="border-b border-parchment-300 bg-parchment-100 text-xs uppercase tracking-wide text-parchment-500">
@@ -152,25 +167,25 @@ function TableTab() {
                   )}
                 </td>
                 <td data-testid="league-table-allowlist-number" className="px-2 py-2">
-                  {row.played}
+                  {stat(row.played)}
                 </td>
                 <td data-testid="league-table-allowlist-number" className="px-2 py-2">
-                  {row.won}
+                  {stat(row.won)}
                 </td>
                 <td data-testid="league-table-allowlist-number" className="px-2 py-2">
-                  {row.drawn}
+                  {stat(row.drawn)}
                 </td>
                 <td data-testid="league-table-allowlist-number" className="px-2 py-2">
-                  {row.lost}
+                  {stat(row.lost)}
                 </td>
                 <td data-testid="league-table-allowlist-number" className="px-2 py-2">
-                  {row.goalsFor}
+                  {stat(row.goalsFor)}
                 </td>
                 <td data-testid="league-table-allowlist-number" className="px-2 py-2">
-                  {row.goalsAgainst}
+                  {stat(row.goalsAgainst)}
                 </td>
                 <td data-testid="league-table-allowlist-number" className="px-2 py-2">
-                  {row.goalDifference > 0 ? `+${row.goalDifference}` : row.goalDifference}
+                  {stat(row.goalDifference > 0 ? `+${row.goalDifference}` : row.goalDifference)}
                 </td>
                 <td className="px-3 py-2">
                   {row.recentForm.length > 0 ? (
@@ -187,7 +202,7 @@ function TableTab() {
                   data-testid="league-table-allowlist-number"
                   className="px-2 py-2 font-semibold text-parchment-900"
                 >
-                  {row.points}
+                  {stat(row.points)}
                 </td>
               </tr>
             );

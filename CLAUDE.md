@@ -5,7 +5,7 @@ This file is the agent's operating manual for the RPG FC repository. It is read 
 Canonical sources:
 - `docs/RPG_FC_Product_Requirements_Document.docx` — PRD v1.0
 - `docs/RPG_FC_Technical_Design_Document_v2.docx` — TDD v2.0 (TypeScript stack)
-- `docs/RPG_FC_Design_and_Style_Guide.docx` — Style Guide v1.0
+- `docs/RPG_FC_Design_and_Style_Guide.docx` — Style Guide v1.0, extended by `docs/RPG_FC_Style_Guide_v1.1_Addendum.md` (ink masthead, illustration system, game-loop Continue, state vocabulary — the addendum wins on conflict)
 - `docs/stories/` — story specs; each story has ACs that must all pass before it ships
 
 Nested operating notes (load these when working inside a subtree):

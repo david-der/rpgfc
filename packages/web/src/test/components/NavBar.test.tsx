@@ -140,10 +140,11 @@ describe("NavBar — Story 02", () => {
     renderNavAt("/");
     const nav = await screen.findByRole("navigation", { name: "Primary" });
     for (const link of within(nav).getAllByRole("link")) {
-      // Tailwind focus ring: focus-visible:outline + outline-offset-2 +
-      // outline-moss-600 (matches Style Guide §11 accessibility).
+      // Tailwind focus ring per Style Guide §11: focus-visible:outline +
+      // outline-offset-2. The ink masthead (v1.1 §13.1) uses moss-400 —
+      // moss-600 is near-invisible on parchment-900.
       expect(link.className).toMatch(/focus-visible:outline/);
-      expect(link.className).toMatch(/outline-moss-600/);
+      expect(link.className).toMatch(/outline-moss-400/);
     }
   });
 

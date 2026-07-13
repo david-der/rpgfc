@@ -25,11 +25,15 @@
 
 import { Link, useRouterState } from "@tanstack/react-router";
 
+import type { ReactNode } from "react";
+
 import type { NavItem } from "../../lib/navigation";
 import { isNavItemActive } from "../../lib/navigation";
 
 interface NavBarProps {
   items: readonly NavItem[];
+  /** Trailing masthead content (the Continue action). */
+  children?: ReactNode;
 }
 
 // Force Inter on every tab label the same way TabBar does, via a Tailwind
@@ -40,21 +44,24 @@ const LABEL_STYLE: React.CSSProperties = {
   fontFamily: "Inter, system-ui, -apple-system, sans-serif",
 };
 
-export function NavBar({ items }: NavBarProps) {
+export function NavBar({ items, children }: NavBarProps) {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
 
+  // Style Guide v1.1 §13.1 — the masthead is printed in ink. The dark
+  // bar is the app's single largest dark surface; it is what makes the
+  // cream pages below read as paper rather than beige.
   return (
-    <nav aria-label="Primary" className="border-b border-parchment-300 bg-parchment-50">
-      <div className="mx-auto flex max-w-5xl items-center gap-8 px-6">
+    <nav aria-label="Primary" className="border-b border-parchment-900 bg-parchment-900">
+      <div className="mx-auto flex max-w-5xl items-center gap-6 px-6">
         {items.map((item) => {
           const active = isNavItemActive(item, pathname);
           const Icon = item.icon;
 
           const base =
-            "inline-flex h-12 items-center gap-2 px-3 font-sans text-sm outline-offset-2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-moss-600";
+            "inline-flex h-12 items-center gap-2 px-3 font-sans text-sm outline-offset-2 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-moss-400";
           const activeClass = active
-            ? "-mb-px border-b-2 border-moss-500 font-medium text-parchment-900"
-            : "-mb-px border-b border-parchment-300 text-parchment-600 hover:text-parchment-900";
+            ? "-mb-px border-b-2 border-moss-400 font-medium text-moss-300"
+            : "-mb-px border-b border-transparent text-parchment-400 hover:text-parchment-100";
 
           // Accessible-name rule: don't set aria-label here — the visible
           // text inside the link (`item.label`) becomes the link's
@@ -75,6 +82,7 @@ export function NavBar({ items }: NavBarProps) {
             </Link>
           );
         })}
+        {children}
       </div>
     </nav>
   );

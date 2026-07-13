@@ -17,6 +17,7 @@
 import type { ReactNode } from "react";
 
 import { PRIMARY_NAV } from "../../lib/navigation";
+import { ContinueButton } from "./ContinueButton";
 import { NavBar } from "./NavBar";
 
 interface AppShellProps {
@@ -26,11 +27,13 @@ interface AppShellProps {
 export function AppShell({ children }: AppShellProps) {
   return (
     <div className="min-h-screen bg-parchment-50 text-parchment-900">
-      {/* Style Guide §3.3: the single 2px club-stripe that marks the
-          app's chrome. Driven by the --club-stripe CSS variable, so club
-          theming lands by changing that one variable. */}
-      <div className="h-[2px] bg-club-stripe" aria-hidden />
-      <NavBar items={PRIMARY_NAV} />
+      {/* Style Guide §3.3 + v1.1 §13.1: the club stripe rides above the
+          ink masthead at full saturation — the only chrome at full club
+          color. Driven by the --club-stripe CSS variable. */}
+      <div className="h-1 bg-club-stripe" aria-hidden />
+      <NavBar items={PRIMARY_NAV}>
+        <ContinueButton />
+      </NavBar>
       <main>{children}</main>
     </div>
   );
